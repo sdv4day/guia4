@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/winlib
+winlib.so
+winlib.dylib
+winlib.dll
+libwinlib.a
+winlib.a
+winlib.lib
+winlib-test-*
+*.exe
+*.pdb
+*.o
+*.obj
+*.lst

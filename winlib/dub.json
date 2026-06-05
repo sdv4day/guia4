@@ -1,0 +1,10 @@
+{
+	"description": "A minimal D application.",
+	"license": "proprietary",
+	"authors": [
+		"scan"
+	],
+	"copyright": "Copyright © 2026, scan",
+	"name": "winlib",
+	"targetType": "autodetect"
+}

@@ -1,0 +1,12 @@
+{
+	"description": "DGUI Framework - A modern retained-mode GUI framework in D",
+	"license": "proprietary",
+	"authors": ["scan"],
+	"copyright": "Copyright © 2026, scan",
+	"name": "guia4",
+	"targetType": "library",
+	"subPackages": ["winlib"],
+	"dependencies": {
+		"winlib": {"path": "winlib"}
+	}
+}

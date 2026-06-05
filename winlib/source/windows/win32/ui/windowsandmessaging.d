@@ -1,0 +1,6462 @@
+// Written in the D programming language.
+
+module windows.win32.ui.windowsandmessaging;
+
+public import windows.core;
+public import windows.win32.foundation : BOOL, BOOLEAN, CHAR, COLORREF, HANDLE, HINSTANCE, HRESULT, HWND, LPARAM,
+                                         LRESULT, POINT, PSTR, PWSTR, RECT, SIZE, WAIT_EVENT, WPARAM;
+public import windows.win32.graphics.gdi : BLENDFUNCTION, HBITMAP, HBRUSH, HDC, HRGN, LOGFONTA, LOGFONTW;
+public import windows.win32.ui.shell : HELPINFO;
+
+extern(Windows) @nogc nothrow:
+
+
+// Enums
+
+
+alias WNDCLASS_STYLES = uint;
+enum : uint
+{
+    CS_VREDRAW         = 0x00000001,
+    CS_HREDRAW         = 0x00000002,
+    CS_DBLCLKS         = 0x00000008,
+    CS_OWNDC           = 0x00000020,
+    CS_CLASSDC         = 0x00000040,
+    CS_PARENTDC        = 0x00000080,
+    CS_NOCLOSE         = 0x00000200,
+    CS_SAVEBITS        = 0x00000800,
+    CS_BYTEALIGNCLIENT = 0x00001000,
+    CS_BYTEALIGNWINDOW = 0x00002000,
+    CS_GLOBALCLASS     = 0x00004000,
+    CS_IME             = 0x00010000,
+    CS_DROPSHADOW      = 0x00020000,
+}
+
+alias CWP_FLAGS = uint;
+enum : uint
+{
+    CWP_ALL             = 0x00000000,
+    CWP_SKIPINVISIBLE   = 0x00000001,
+    CWP_SKIPDISABLED    = 0x00000002,
+    CWP_SKIPTRANSPARENT = 0x00000004,
+}
+
+alias MESSAGEBOX_STYLE = uint;
+enum : uint
+{
+    MB_ABORTRETRYIGNORE          = 0x00000002,
+    MB_CANCELTRYCONTINUE         = 0x00000006,
+    MB_HELP                      = 0x00004000,
+    MB_OK                        = 0x00000000,
+    MB_OKCANCEL                  = 0x00000001,
+    MB_RETRYCANCEL               = 0x00000005,
+    MB_YESNO                     = 0x00000004,
+    MB_YESNOCANCEL               = 0x00000003,
+    MB_ICONHAND                  = 0x00000010,
+    MB_ICONQUESTION              = 0x00000020,
+    MB_ICONEXCLAMATION           = 0x00000030,
+    MB_ICONASTERISK              = 0x00000040,
+    MB_USERICON                  = 0x00000080,
+    MB_ICONWARNING               = 0x00000030,
+    MB_ICONERROR                 = 0x00000010,
+    MB_ICONINFORMATION           = 0x00000040,
+    MB_ICONSTOP                  = 0x00000010,
+    MB_DEFBUTTON1                = 0x00000000,
+    MB_DEFBUTTON2                = 0x00000100,
+    MB_DEFBUTTON3                = 0x00000200,
+    MB_DEFBUTTON4                = 0x00000300,
+    MB_APPLMODAL                 = 0x00000000,
+    MB_SYSTEMMODAL               = 0x00001000,
+    MB_TASKMODAL                 = 0x00002000,
+    MB_NOFOCUS                   = 0x00008000,
+    MB_SETFOREGROUND             = 0x00010000,
+    MB_DEFAULT_DESKTOP_ONLY      = 0x00020000,
+    MB_TOPMOST                   = 0x00040000,
+    MB_RIGHT                     = 0x00080000,
+    MB_RTLREADING                = 0x00100000,
+    MB_SERVICE_NOTIFICATION      = 0x00200000,
+    MB_SERVICE_NOTIFICATION_NT3X = 0x00040000,
+    MB_TYPEMASK                  = 0x0000000f,
+    MB_ICONMASK                  = 0x000000f0,
+    MB_DEFMASK                   = 0x00000f00,
+    MB_MODEMASK                  = 0x00003000,
+    MB_MISCMASK                  = 0x0000c000,
+}
+
+alias MENU_ITEM_FLAGS = uint;
+enum : uint
+{
+    MF_BYCOMMAND       = 0x00000000,
+    MF_BYPOSITION      = 0x00000400,
+    MF_BITMAP          = 0x00000004,
+    MF_CHECKED         = 0x00000008,
+    MF_DISABLED        = 0x00000002,
+    MF_ENABLED         = 0x00000000,
+    MF_GRAYED          = 0x00000001,
+    MF_MENUBARBREAK    = 0x00000020,
+    MF_MENUBREAK       = 0x00000040,
+    MF_OWNERDRAW       = 0x00000100,
+    MF_POPUP           = 0x00000010,
+    MF_SEPARATOR       = 0x00000800,
+    MF_STRING          = 0x00000000,
+    MF_UNCHECKED       = 0x00000000,
+    MF_INSERT          = 0x00000000,
+    MF_CHANGE          = 0x00000080,
+    MF_APPEND          = 0x00000100,
+    MF_DELETE          = 0x00000200,
+    MF_REMOVE          = 0x00001000,
+    MF_USECHECKBITMAPS = 0x00000200,
+    MF_UNHILITE        = 0x00000000,
+    MF_HILITE          = 0x00000080,
+    MF_DEFAULT         = 0x00001000,
+    MF_SYSMENU         = 0x00002000,
+    MF_HELP            = 0x00004000,
+    MF_RIGHTJUSTIFY    = 0x00004000,
+    MF_MOUSESELECT     = 0x00008000,
+    MF_END             = 0x00000080,
+}
+
+alias SHOW_WINDOW_CMD = int;
+enum : int
+{
+    SW_HIDE            = 0x00000000,
+    SW_SHOWNORMAL      = 0x00000001,
+    SW_NORMAL          = 0x00000001,
+    SW_SHOWMINIMIZED   = 0x00000002,
+    SW_SHOWMAXIMIZED   = 0x00000003,
+    SW_MAXIMIZE        = 0x00000003,
+    SW_SHOWNOACTIVATE  = 0x00000004,
+    SW_SHOW            = 0x00000005,
+    SW_MINIMIZE        = 0x00000006,
+    SW_SHOWMINNOACTIVE = 0x00000007,
+    SW_SHOWNA          = 0x00000008,
+    SW_RESTORE         = 0x00000009,
+    SW_SHOWDEFAULT     = 0x0000000a,
+    SW_FORCEMINIMIZE   = 0x0000000b,
+    SW_MAX             = 0x0000000b,
+}
+
+alias SHOW_WINDOW_STATUS = uint;
+enum : uint
+{
+    SW_PARENTCLOSING = 0x00000001,
+    SW_OTHERZOOM     = 0x00000002,
+    SW_PARENTOPENING = 0x00000003,
+    SW_OTHERUNZOOM   = 0x00000004,
+}
+
+alias SCROLL_WINDOW_FLAGS = uint;
+enum : uint
+{
+    SW_SCROLLCHILDREN = 0x00000001,
+    SW_INVALIDATE     = 0x00000002,
+    SW_ERASE          = 0x00000004,
+    SW_SMOOTHSCROLL   = 0x00000010,
+}
+
+alias SYSTEM_PARAMETERS_INFO_ACTION = uint;
+enum : uint
+{
+    SPI_GETBEEP                      = 0x00000001,
+    SPI_SETBEEP                      = 0x00000002,
+    SPI_GETMOUSE                     = 0x00000003,
+    SPI_SETMOUSE                     = 0x00000004,
+    SPI_GETBORDER                    = 0x00000005,
+    SPI_SETBORDER                    = 0x00000006,
+    SPI_GETKEYBOARDSPEED             = 0x0000000a,
+    SPI_SETKEYBOARDSPEED             = 0x0000000b,
+    SPI_LANGDRIVER                   = 0x0000000c,
+    SPI_ICONHORIZONTALSPACING        = 0x0000000d,
+    SPI_GETSCREENSAVETIMEOUT         = 0x0000000e,
+    SPI_SETSCREENSAVETIMEOUT         = 0x0000000f,
+    SPI_GETSCREENSAVEACTIVE          = 0x00000010,
+    SPI_SETSCREENSAVEACTIVE          = 0x00000011,
+    SPI_GETGRIDGRANULARITY           = 0x00000012,
+    SPI_SETGRIDGRANULARITY           = 0x00000013,
+    SPI_SETDESKWALLPAPER             = 0x00000014,
+    SPI_SETDESKPATTERN               = 0x00000015,
+    SPI_GETKEYBOARDDELAY             = 0x00000016,
+    SPI_SETKEYBOARDDELAY             = 0x00000017,
+    SPI_ICONVERTICALSPACING          = 0x00000018,
+    SPI_GETICONTITLEWRAP             = 0x00000019,
+    SPI_SETICONTITLEWRAP             = 0x0000001a,
+    SPI_GETMENUDROPALIGNMENT         = 0x0000001b,
+    SPI_SETMENUDROPALIGNMENT         = 0x0000001c,
+    SPI_SETDOUBLECLKWIDTH            = 0x0000001d,
+    SPI_SETDOUBLECLKHEIGHT           = 0x0000001e,
+    SPI_GETICONTITLELOGFONT          = 0x0000001f,
+    SPI_SETDOUBLECLICKTIME           = 0x00000020,
+    SPI_SETMOUSEBUTTONSWAP           = 0x00000021,
+    SPI_SETICONTITLELOGFONT          = 0x00000022,
+    SPI_GETFASTTASKSWITCH            = 0x00000023,
+    SPI_SETFASTTASKSWITCH            = 0x00000024,
+    SPI_SETDRAGFULLWINDOWS           = 0x00000025,
+    SPI_GETDRAGFULLWINDOWS           = 0x00000026,
+    SPI_GETNONCLIENTMETRICS          = 0x00000029,
+    SPI_SETNONCLIENTMETRICS          = 0x0000002a,
+    SPI_GETMINIMIZEDMETRICS          = 0x0000002b,
+    SPI_SETMINIMIZEDMETRICS          = 0x0000002c,
+    SPI_GETICONMETRICS               = 0x0000002d,
+    SPI_SETICONMETRICS               = 0x0000002e,
+    SPI_SETWORKAREA                  = 0x0000002f,
+    SPI_GETWORKAREA                  = 0x00000030,
+    SPI_SETPENWINDOWS                = 0x00000031,
+    SPI_GETHIGHCONTRAST              = 0x00000042,
+    SPI_SETHIGHCONTRAST              = 0x00000043,
+    SPI_GETKEYBOARDPREF              = 0x00000044,
+    SPI_SETKEYBOARDPREF              = 0x00000045,
+    SPI_GETSCREENREADER              = 0x00000046,
+    SPI_SETSCREENREADER              = 0x00000047,
+    SPI_GETANIMATION                 = 0x00000048,
+    SPI_SETANIMATION                 = 0x00000049,
+    SPI_GETFONTSMOOTHING             = 0x0000004a,
+    SPI_SETFONTSMOOTHING             = 0x0000004b,
+    SPI_SETDRAGWIDTH                 = 0x0000004c,
+    SPI_SETDRAGHEIGHT                = 0x0000004d,
+    SPI_SETHANDHELD                  = 0x0000004e,
+    SPI_GETLOWPOWERTIMEOUT           = 0x0000004f,
+    SPI_GETPOWEROFFTIMEOUT           = 0x00000050,
+    SPI_SETLOWPOWERTIMEOUT           = 0x00000051,
+    SPI_SETPOWEROFFTIMEOUT           = 0x00000052,
+    SPI_GETLOWPOWERACTIVE            = 0x00000053,
+    SPI_GETPOWEROFFACTIVE            = 0x00000054,
+    SPI_SETLOWPOWERACTIVE            = 0x00000055,
+    SPI_SETPOWEROFFACTIVE            = 0x00000056,
+    SPI_SETCURSORS                   = 0x00000057,
+    SPI_SETICONS                     = 0x00000058,
+    SPI_GETDEFAULTINPUTLANG          = 0x00000059,
+    SPI_SETDEFAULTINPUTLANG          = 0x0000005a,
+    SPI_SETLANGTOGGLE                = 0x0000005b,
+    SPI_GETWINDOWSEXTENSION          = 0x0000005c,
+    SPI_SETMOUSETRAILS               = 0x0000005d,
+    SPI_GETMOUSETRAILS               = 0x0000005e,
+    SPI_SETSCREENSAVERRUNNING        = 0x00000061,
+    SPI_SCREENSAVERRUNNING           = 0x00000061,
+    SPI_GETFILTERKEYS                = 0x00000032,
+    SPI_SETFILTERKEYS                = 0x00000033,
+    SPI_GETTOGGLEKEYS                = 0x00000034,
+    SPI_SETTOGGLEKEYS                = 0x00000035,
+    SPI_GETMOUSEKEYS                 = 0x00000036,
+    SPI_SETMOUSEKEYS                 = 0x00000037,
+    SPI_GETSHOWSOUNDS                = 0x00000038,
+    SPI_SETSHOWSOUNDS                = 0x00000039,
+    SPI_GETSTICKYKEYS                = 0x0000003a,
+    SPI_SETSTICKYKEYS                = 0x0000003b,
+    SPI_GETACCESSTIMEOUT             = 0x0000003c,
+    SPI_SETACCESSTIMEOUT             = 0x0000003d,
+    SPI_GETSERIALKEYS                = 0x0000003e,
+    SPI_SETSERIALKEYS                = 0x0000003f,
+    SPI_GETSOUNDSENTRY               = 0x00000040,
+    SPI_SETSOUNDSENTRY               = 0x00000041,
+    SPI_GETSNAPTODEFBUTTON           = 0x0000005f,
+    SPI_SETSNAPTODEFBUTTON           = 0x00000060,
+    SPI_GETMOUSEHOVERWIDTH           = 0x00000062,
+    SPI_SETMOUSEHOVERWIDTH           = 0x00000063,
+    SPI_GETMOUSEHOVERHEIGHT          = 0x00000064,
+    SPI_SETMOUSEHOVERHEIGHT          = 0x00000065,
+    SPI_GETMOUSEHOVERTIME            = 0x00000066,
+    SPI_SETMOUSEHOVERTIME            = 0x00000067,
+    SPI_GETWHEELSCROLLLINES          = 0x00000068,
+    SPI_SETWHEELSCROLLLINES          = 0x00000069,
+    SPI_GETMENUSHOWDELAY             = 0x0000006a,
+    SPI_SETMENUSHOWDELAY             = 0x0000006b,
+    SPI_GETWHEELSCROLLCHARS          = 0x0000006c,
+    SPI_SETWHEELSCROLLCHARS          = 0x0000006d,
+    SPI_GETSHOWIMEUI                 = 0x0000006e,
+    SPI_SETSHOWIMEUI                 = 0x0000006f,
+    SPI_GETMOUSESPEED                = 0x00000070,
+    SPI_SETMOUSESPEED                = 0x00000071,
+    SPI_GETSCREENSAVERRUNNING        = 0x00000072,
+    SPI_GETDESKWALLPAPER             = 0x00000073,
+    SPI_GETAUDIODESCRIPTION          = 0x00000074,
+    SPI_SETAUDIODESCRIPTION          = 0x00000075,
+    SPI_GETSCREENSAVESECURE          = 0x00000076,
+    SPI_SETSCREENSAVESECURE          = 0x00000077,
+    SPI_GETHUNGAPPTIMEOUT            = 0x00000078,
+    SPI_SETHUNGAPPTIMEOUT            = 0x00000079,
+    SPI_GETWAITTOKILLTIMEOUT         = 0x0000007a,
+    SPI_SETWAITTOKILLTIMEOUT         = 0x0000007b,
+    SPI_GETWAITTOKILLSERVICETIMEOUT  = 0x0000007c,
+    SPI_SETWAITTOKILLSERVICETIMEOUT  = 0x0000007d,
+    SPI_GETMOUSEDOCKTHRESHOLD        = 0x0000007e,
+    SPI_SETMOUSEDOCKTHRESHOLD        = 0x0000007f,
+    SPI_GETPENDOCKTHRESHOLD          = 0x00000080,
+    SPI_SETPENDOCKTHRESHOLD          = 0x00000081,
+    SPI_GETWINARRANGING              = 0x00000082,
+    SPI_SETWINARRANGING              = 0x00000083,
+    SPI_GETMOUSEDRAGOUTTHRESHOLD     = 0x00000084,
+    SPI_SETMOUSEDRAGOUTTHRESHOLD     = 0x00000085,
+    SPI_GETPENDRAGOUTTHRESHOLD       = 0x00000086,
+    SPI_SETPENDRAGOUTTHRESHOLD       = 0x00000087,
+    SPI_GETMOUSESIDEMOVETHRESHOLD    = 0x00000088,
+    SPI_SETMOUSESIDEMOVETHRESHOLD    = 0x00000089,
+    SPI_GETPENSIDEMOVETHRESHOLD      = 0x0000008a,
+    SPI_SETPENSIDEMOVETHRESHOLD      = 0x0000008b,
+    SPI_GETDRAGFROMMAXIMIZE          = 0x0000008c,
+    SPI_SETDRAGFROMMAXIMIZE          = 0x0000008d,
+    SPI_GETSNAPSIZING                = 0x0000008e,
+    SPI_SETSNAPSIZING                = 0x0000008f,
+    SPI_GETDOCKMOVING                = 0x00000090,
+    SPI_SETDOCKMOVING                = 0x00000091,
+    SPI_GETTOUCHPREDICTIONPARAMETERS = 0x0000009c,
+    SPI_SETTOUCHPREDICTIONPARAMETERS = 0x0000009d,
+    SPI_GETLOGICALDPIOVERRIDE        = 0x0000009e,
+    SPI_SETLOGICALDPIOVERRIDE        = 0x0000009f,
+    SPI_GETMENURECT                  = 0x000000a2,
+    SPI_SETMENURECT                  = 0x000000a3,
+    SPI_GETTOUCHPADPARAMETERS        = 0x000000ae,
+    SPI_SETTOUCHPADPARAMETERS        = 0x000000af,
+    SPI_GETACTIVEWINDOWTRACKING      = 0x00001000,
+    SPI_SETACTIVEWINDOWTRACKING      = 0x00001001,
+    SPI_GETMENUANIMATION             = 0x00001002,
+    SPI_SETMENUANIMATION             = 0x00001003,
+    SPI_GETCOMBOBOXANIMATION         = 0x00001004,
+    SPI_SETCOMBOBOXANIMATION         = 0x00001005,
+    SPI_GETLISTBOXSMOOTHSCROLLING    = 0x00001006,
+    SPI_SETLISTBOXSMOOTHSCROLLING    = 0x00001007,
+    SPI_GETGRADIENTCAPTIONS          = 0x00001008,
+    SPI_SETGRADIENTCAPTIONS          = 0x00001009,
+    SPI_GETKEYBOARDCUES              = 0x0000100a,
+    SPI_SETKEYBOARDCUES              = 0x0000100b,
+    SPI_GETMENUUNDERLINES            = 0x0000100a,
+    SPI_SETMENUUNDERLINES            = 0x0000100b,
+    SPI_GETACTIVEWNDTRKZORDER        = 0x0000100c,
+    SPI_SETACTIVEWNDTRKZORDER        = 0x0000100d,
+    SPI_GETHOTTRACKING               = 0x0000100e,
+    SPI_SETHOTTRACKING               = 0x0000100f,
+    SPI_GETMENUFADE                  = 0x00001012,
+    SPI_SETMENUFADE                  = 0x00001013,
+    SPI_GETSELECTIONFADE             = 0x00001014,
+    SPI_SETSELECTIONFADE             = 0x00001015,
+    SPI_GETTOOLTIPANIMATION          = 0x00001016,
+    SPI_SETTOOLTIPANIMATION          = 0x00001017,
+    SPI_GETTOOLTIPFADE               = 0x00001018,
+    SPI_SETTOOLTIPFADE               = 0x00001019,
+    SPI_GETCURSORSHADOW              = 0x0000101a,
+    SPI_SETCURSORSHADOW              = 0x0000101b,
+    SPI_GETMOUSESONAR                = 0x0000101c,
+    SPI_SETMOUSESONAR                = 0x0000101d,
+    SPI_GETMOUSECLICKLOCK            = 0x0000101e,
+    SPI_SETMOUSECLICKLOCK            = 0x0000101f,
+    SPI_GETMOUSEVANISH               = 0x00001020,
+    SPI_SETMOUSEVANISH               = 0x00001021,
+    SPI_GETFLATMENU                  = 0x00001022,
+    SPI_SETFLATMENU                  = 0x00001023,
+    SPI_GETDROPSHADOW                = 0x00001024,
+    SPI_SETDROPSHADOW                = 0x00001025,
+    SPI_GETBLOCKSENDINPUTRESETS      = 0x00001026,
+    SPI_SETBLOCKSENDINPUTRESETS      = 0x00001027,
+    SPI_GETUIEFFECTS                 = 0x0000103e,
+    SPI_SETUIEFFECTS                 = 0x0000103f,
+    SPI_GETDISABLEOVERLAPPEDCONTENT  = 0x00001040,
+    SPI_SETDISABLEOVERLAPPEDCONTENT  = 0x00001041,
+    SPI_GETCLIENTAREAANIMATION       = 0x00001042,
+    SPI_SETCLIENTAREAANIMATION       = 0x00001043,
+    SPI_GETCLEARTYPE                 = 0x00001048,
+    SPI_SETCLEARTYPE                 = 0x00001049,
+    SPI_GETSPEECHRECOGNITION         = 0x0000104a,
+    SPI_SETSPEECHRECOGNITION         = 0x0000104b,
+    SPI_GETCARETBROWSING             = 0x0000104c,
+    SPI_SETCARETBROWSING             = 0x0000104d,
+    SPI_GETTHREADLOCALINPUTSETTINGS  = 0x0000104e,
+    SPI_SETTHREADLOCALINPUTSETTINGS  = 0x0000104f,
+    SPI_GETSYSTEMLANGUAGEBAR         = 0x00001050,
+    SPI_SETSYSTEMLANGUAGEBAR         = 0x00001051,
+    SPI_GETFOREGROUNDLOCKTIMEOUT     = 0x00002000,
+    SPI_SETFOREGROUNDLOCKTIMEOUT     = 0x00002001,
+    SPI_GETACTIVEWNDTRKTIMEOUT       = 0x00002002,
+    SPI_SETACTIVEWNDTRKTIMEOUT       = 0x00002003,
+    SPI_GETFOREGROUNDFLASHCOUNT      = 0x00002004,
+    SPI_SETFOREGROUNDFLASHCOUNT      = 0x00002005,
+    SPI_GETCARETWIDTH                = 0x00002006,
+    SPI_SETCARETWIDTH                = 0x00002007,
+    SPI_GETMOUSECLICKLOCKTIME        = 0x00002008,
+    SPI_SETMOUSECLICKLOCKTIME        = 0x00002009,
+    SPI_GETFONTSMOOTHINGTYPE         = 0x0000200a,
+    SPI_SETFONTSMOOTHINGTYPE         = 0x0000200b,
+    SPI_GETFONTSMOOTHINGCONTRAST     = 0x0000200c,
+    SPI_SETFONTSMOOTHINGCONTRAST     = 0x0000200d,
+    SPI_GETFOCUSBORDERWIDTH          = 0x0000200e,
+    SPI_SETFOCUSBORDERWIDTH          = 0x0000200f,
+    SPI_GETFOCUSBORDERHEIGHT         = 0x00002010,
+    SPI_SETFOCUSBORDERHEIGHT         = 0x00002011,
+    SPI_GETFONTSMOOTHINGORIENTATION  = 0x00002012,
+    SPI_SETFONTSMOOTHINGORIENTATION  = 0x00002013,
+    SPI_GETMINIMUMHITRADIUS          = 0x00002014,
+    SPI_SETMINIMUMHITRADIUS          = 0x00002015,
+    SPI_GETMESSAGEDURATION           = 0x00002016,
+    SPI_SETMESSAGEDURATION           = 0x00002017,
+    SPI_GETCONTACTVISUALIZATION      = 0x00002018,
+    SPI_SETCONTACTVISUALIZATION      = 0x00002019,
+    SPI_GETGESTUREVISUALIZATION      = 0x0000201a,
+    SPI_SETGESTUREVISUALIZATION      = 0x0000201b,
+    SPI_GETMOUSEWHEELROUTING         = 0x0000201c,
+    SPI_SETMOUSEWHEELROUTING         = 0x0000201d,
+    SPI_GETPENVISUALIZATION          = 0x0000201e,
+    SPI_SETPENVISUALIZATION          = 0x0000201f,
+    SPI_GETPENARBITRATIONTYPE        = 0x00002020,
+    SPI_SETPENARBITRATIONTYPE        = 0x00002021,
+    SPI_GETCARETTIMEOUT              = 0x00002022,
+    SPI_SETCARETTIMEOUT              = 0x00002023,
+    SPI_GETHANDEDNESS                = 0x00002024,
+    SPI_SETHANDEDNESS                = 0x00002025,
+}
+
+alias TRACK_POPUP_MENU_FLAGS = uint;
+enum : uint
+{
+    TPM_LEFTBUTTON      = 0x00000000,
+    TPM_RIGHTBUTTON     = 0x00000002,
+    TPM_LEFTALIGN       = 0x00000000,
+    TPM_CENTERALIGN     = 0x00000004,
+    TPM_RIGHTALIGN      = 0x00000008,
+    TPM_TOPALIGN        = 0x00000000,
+    TPM_VCENTERALIGN    = 0x00000010,
+    TPM_BOTTOMALIGN     = 0x00000020,
+    TPM_HORIZONTAL      = 0x00000000,
+    TPM_VERTICAL        = 0x00000040,
+    TPM_NONOTIFY        = 0x00000080,
+    TPM_RETURNCMD       = 0x00000100,
+    TPM_RECURSE         = 0x00000001,
+    TPM_HORPOSANIMATION = 0x00000400,
+    TPM_HORNEGANIMATION = 0x00000800,
+    TPM_VERPOSANIMATION = 0x00001000,
+    TPM_VERNEGANIMATION = 0x00002000,
+    TPM_NOANIMATION     = 0x00004000,
+    TPM_LAYOUTRTL       = 0x00008000,
+    TPM_WORKAREA        = 0x00010000,
+}
+
+alias WINDOW_EX_STYLE = uint;
+enum : uint
+{
+    WS_EX_DLGMODALFRAME       = 0x00000001,
+    WS_EX_NOPARENTNOTIFY      = 0x00000004,
+    WS_EX_TOPMOST             = 0x00000008,
+    WS_EX_ACCEPTFILES         = 0x00000010,
+    WS_EX_TRANSPARENT         = 0x00000020,
+    WS_EX_MDICHILD            = 0x00000040,
+    WS_EX_TOOLWINDOW          = 0x00000080,
+    WS_EX_WINDOWEDGE          = 0x00000100,
+    WS_EX_CLIENTEDGE          = 0x00000200,
+    WS_EX_CONTEXTHELP         = 0x00000400,
+    WS_EX_RIGHT               = 0x00001000,
+    WS_EX_LEFT                = 0x00000000,
+    WS_EX_RTLREADING          = 0x00002000,
+    WS_EX_LTRREADING          = 0x00000000,
+    WS_EX_LEFTSCROLLBAR       = 0x00004000,
+    WS_EX_RIGHTSCROLLBAR      = 0x00000000,
+    WS_EX_CONTROLPARENT       = 0x00010000,
+    WS_EX_STATICEDGE          = 0x00020000,
+    WS_EX_APPWINDOW           = 0x00040000,
+    WS_EX_OVERLAPPEDWINDOW    = 0x00000300,
+    WS_EX_PALETTEWINDOW       = 0x00000188,
+    WS_EX_LAYERED             = 0x00080000,
+    WS_EX_NOINHERITLAYOUT     = 0x00100000,
+    WS_EX_NOREDIRECTIONBITMAP = 0x00200000,
+    WS_EX_LAYOUTRTL           = 0x00400000,
+    WS_EX_COMPOSITED          = 0x02000000,
+    WS_EX_NOACTIVATE          = 0x08000000,
+}
+
+alias WINDOW_STYLE = uint;
+enum : uint
+{
+    WS_OVERLAPPED       = 0x00000000,
+    WS_POPUP            = 0x80000000,
+    WS_CHILD            = 0x40000000,
+    WS_MINIMIZE         = 0x20000000,
+    WS_VISIBLE          = 0x10000000,
+    WS_DISABLED         = 0x08000000,
+    WS_CLIPSIBLINGS     = 0x04000000,
+    WS_CLIPCHILDREN     = 0x02000000,
+    WS_MAXIMIZE         = 0x01000000,
+    WS_CAPTION          = 0x00c00000,
+    WS_BORDER           = 0x00800000,
+    WS_DLGFRAME         = 0x00400000,
+    WS_VSCROLL          = 0x00200000,
+    WS_HSCROLL          = 0x00100000,
+    WS_SYSMENU          = 0x00080000,
+    WS_THICKFRAME       = 0x00040000,
+    WS_GROUP            = 0x00020000,
+    WS_TABSTOP          = 0x00010000,
+    WS_MINIMIZEBOX      = 0x00020000,
+    WS_MAXIMIZEBOX      = 0x00010000,
+    WS_TILED            = 0x00000000,
+    WS_ICONIC           = 0x20000000,
+    WS_SIZEBOX          = 0x00040000,
+    WS_TILEDWINDOW      = 0x00cf0000,
+    WS_OVERLAPPEDWINDOW = 0x00cf0000,
+    WS_POPUPWINDOW      = 0x80880000,
+    WS_CHILDWINDOW      = 0x40000000,
+    WS_ACTIVECAPTION    = 0x00000001,
+}
+
+alias OBJECT_IDENTIFIER = int;
+enum : int
+{
+    OBJID_WINDOW            = 0x00000000,
+    OBJID_SYSMENU           = 0xffffffff,
+    OBJID_TITLEBAR          = 0xfffffffe,
+    OBJID_MENU              = 0xfffffffd,
+    OBJID_CLIENT            = 0xfffffffc,
+    OBJID_VSCROLL           = 0xfffffffb,
+    OBJID_HSCROLL           = 0xfffffffa,
+    OBJID_SIZEGRIP          = 0xfffffff9,
+    OBJID_CARET             = 0xfffffff8,
+    OBJID_CURSOR            = 0xfffffff7,
+    OBJID_ALERT             = 0xfffffff6,
+    OBJID_SOUND             = 0xfffffff5,
+    OBJID_QUERYCLASSNAMEIDX = 0xfffffff4,
+    OBJID_NATIVEOM          = 0xfffffff0,
+}
+
+alias MENU_ITEM_TYPE = uint;
+enum : uint
+{
+    MFT_BITMAP       = 0x00000004,
+    MFT_MENUBARBREAK = 0x00000020,
+    MFT_MENUBREAK    = 0x00000040,
+    MFT_OWNERDRAW    = 0x00000100,
+    MFT_RADIOCHECK   = 0x00000200,
+    MFT_RIGHTJUSTIFY = 0x00004000,
+    MFT_RIGHTORDER   = 0x00002000,
+    MFT_SEPARATOR    = 0x00000800,
+    MFT_STRING       = 0x00000000,
+}
+
+alias MESSAGEBOX_RESULT = int;
+enum : int
+{
+    IDOK       = 0x00000001,
+    IDCANCEL   = 0x00000002,
+    IDABORT    = 0x00000003,
+    IDRETRY    = 0x00000004,
+    IDIGNORE   = 0x00000005,
+    IDYES      = 0x00000006,
+    IDNO       = 0x00000007,
+    IDCLOSE    = 0x00000008,
+    IDHELP     = 0x00000009,
+    IDTRYAGAIN = 0x0000000a,
+    IDCONTINUE = 0x0000000b,
+    IDASYNC    = 0x00007d01,
+    IDTIMEOUT  = 0x00007d00,
+}
+
+alias MENU_ITEM_STATE = uint;
+enum : uint
+{
+    MFS_GRAYED    = 0x00000003,
+    MFS_DISABLED  = 0x00000003,
+    MFS_CHECKED   = 0x00000008,
+    MFS_HILITE    = 0x00000080,
+    MFS_ENABLED   = 0x00000000,
+    MFS_UNCHECKED = 0x00000000,
+    MFS_UNHILITE  = 0x00000000,
+    MFS_DEFAULT   = 0x00001000,
+}
+
+alias SCROLLBAR_CONSTANTS = int;
+enum : int
+{
+    SB_CTL  = 0x00000002,
+    SB_HORZ = 0x00000000,
+    SB_VERT = 0x00000001,
+    SB_BOTH = 0x00000003,
+}
+
+alias GET_CLASS_LONG_INDEX = int;
+enum : int
+{
+    GCW_ATOM           = 0xffffffe0,
+    GCL_CBCLSEXTRA     = 0xffffffec,
+    GCL_CBWNDEXTRA     = 0xffffffee,
+    GCL_HBRBACKGROUND  = 0xfffffff6,
+    GCL_HCURSOR        = 0xfffffff4,
+    GCL_HICON          = 0xfffffff2,
+    GCL_HICONSM        = 0xffffffde,
+    GCL_HMODULE        = 0xfffffff0,
+    GCL_MENUNAME       = 0xfffffff8,
+    GCL_STYLE          = 0xffffffe6,
+    GCL_WNDPROC        = 0xffffffe8,
+    GCLP_HBRBACKGROUND = 0xfffffff6,
+    GCLP_HCURSOR       = 0xfffffff4,
+    GCLP_HICON         = 0xfffffff2,
+    GCLP_HICONSM       = 0xffffffde,
+    GCLP_HMODULE       = 0xfffffff0,
+    GCLP_MENUNAME      = 0xfffffff8,
+    GCLP_WNDPROC       = 0xffffffe8,
+}
+
+alias UPDATE_LAYERED_WINDOW_FLAGS = uint;
+enum : uint
+{
+    ULW_ALPHA       = 0x00000002,
+    ULW_COLORKEY    = 0x00000001,
+    ULW_OPAQUE      = 0x00000004,
+    ULW_EX_NORESIZE = 0x00000008,
+}
+
+alias WINDOW_LONG_PTR_INDEX = int;
+enum : int
+{
+    GWL_EXSTYLE     = 0xffffffec,
+    GWLP_HINSTANCE  = 0xfffffffa,
+    GWLP_HWNDPARENT = 0xfffffff8,
+    GWLP_ID         = 0xfffffff4,
+    GWL_STYLE       = 0xfffffff0,
+    GWLP_USERDATA   = 0xffffffeb,
+    GWLP_WNDPROC    = 0xfffffffc,
+    GWL_HINSTANCE   = 0xfffffffa,
+    GWL_ID          = 0xfffffff4,
+    GWL_USERDATA    = 0xffffffeb,
+    GWL_WNDPROC     = 0xfffffffc,
+    GWL_HWNDPARENT  = 0xfffffff8,
+}
+
+alias ANIMATE_WINDOW_FLAGS = uint;
+enum : uint
+{
+    AW_ACTIVATE     = 0x00020000,
+    AW_BLEND        = 0x00080000,
+    AW_CENTER       = 0x00000010,
+    AW_HIDE         = 0x00010000,
+    AW_HOR_POSITIVE = 0x00000001,
+    AW_HOR_NEGATIVE = 0x00000002,
+    AW_SLIDE        = 0x00040000,
+    AW_VER_POSITIVE = 0x00000004,
+    AW_VER_NEGATIVE = 0x00000008,
+}
+
+alias CHANGE_WINDOW_MESSAGE_FILTER_FLAGS = uint;
+enum : uint
+{
+    MSGFLT_ADD    = 0x00000001,
+    MSGFLT_REMOVE = 0x00000002,
+}
+
+alias GDI_IMAGE_TYPE = uint;
+enum : uint
+{
+    IMAGE_BITMAP = 0x00000000,
+    IMAGE_CURSOR = 0x00000002,
+    IMAGE_ICON   = 0x00000001,
+}
+
+alias WINDOWS_HOOK_ID = int;
+enum : int
+{
+    WH_CALLWNDPROC     = 0x00000004,
+    WH_CALLWNDPROCRET  = 0x0000000c,
+    WH_CBT             = 0x00000005,
+    WH_DEBUG           = 0x00000009,
+    WH_FOREGROUNDIDLE  = 0x0000000b,
+    WH_GETMESSAGE      = 0x00000003,
+    WH_JOURNALPLAYBACK = 0x00000001,
+    WH_JOURNALRECORD   = 0x00000000,
+    WH_KEYBOARD        = 0x00000002,
+    WH_KEYBOARD_LL     = 0x0000000d,
+    WH_MOUSE           = 0x00000007,
+    WH_MOUSE_LL        = 0x0000000e,
+    WH_MSGFILTER       = 0xffffffff,
+    WH_SHELL           = 0x0000000a,
+    WH_SYSMSGFILTER    = 0x00000006,
+}
+
+alias IMAGE_FLAGS = uint;
+enum : uint
+{
+    LR_CREATEDIBSECTION = 0x00002000,
+    LR_DEFAULTCOLOR     = 0x00000000,
+    LR_DEFAULTSIZE      = 0x00000040,
+    LR_LOADFROMFILE     = 0x00000010,
+    LR_LOADMAP3DCOLORS  = 0x00001000,
+    LR_LOADTRANSPARENT  = 0x00000020,
+    LR_MONOCHROME       = 0x00000001,
+    LR_SHARED           = 0x00008000,
+    LR_VGACOLOR         = 0x00000080,
+    LR_COPYDELETEORG    = 0x00000008,
+    LR_COPYFROMRESOURCE = 0x00004000,
+    LR_COPYRETURNORG    = 0x00000004,
+}
+
+alias SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS = uint;
+enum : uint
+{
+    SPIF_UPDATEINIFILE    = 0x00000001,
+    SPIF_SENDCHANGE       = 0x00000002,
+    SPIF_SENDWININICHANGE = 0x00000002,
+}
+
+alias SET_WINDOW_POS_FLAGS = uint;
+enum : uint
+{
+    SWP_ASYNCWINDOWPOS = 0x00004000,
+    SWP_DEFERERASE     = 0x00002000,
+    SWP_DRAWFRAME      = 0x00000020,
+    SWP_FRAMECHANGED   = 0x00000020,
+    SWP_HIDEWINDOW     = 0x00000080,
+    SWP_NOACTIVATE     = 0x00000010,
+    SWP_NOCOPYBITS     = 0x00000100,
+    SWP_NOMOVE         = 0x00000002,
+    SWP_NOOWNERZORDER  = 0x00000200,
+    SWP_NOREDRAW       = 0x00000008,
+    SWP_NOREPOSITION   = 0x00000200,
+    SWP_NOSENDCHANGING = 0x00000400,
+    SWP_NOSIZE         = 0x00000001,
+    SWP_NOZORDER       = 0x00000004,
+    SWP_SHOWWINDOW     = 0x00000040,
+}
+
+alias MSG_WAIT_FOR_MULTIPLE_OBJECTS_EX_FLAGS = uint;
+enum : uint
+{
+    MWMO_NONE           = 0x00000000,
+    MWMO_ALERTABLE      = 0x00000002,
+    MWMO_INPUTAVAILABLE = 0x00000004,
+    MWMO_WAITALL        = 0x00000001,
+}
+
+alias QUEUE_STATUS_FLAGS = uint;
+enum : uint
+{
+    QS_ALLEVENTS      = 0x000004bf,
+    QS_ALLINPUT       = 0x000004ff,
+    QS_ALLPOSTMESSAGE = 0x00000100,
+    QS_HOTKEY         = 0x00000080,
+    QS_INPUT          = 0x00000407,
+    QS_KEY            = 0x00000001,
+    QS_MOUSE          = 0x00000006,
+    QS_MOUSEBUTTON    = 0x00000004,
+    QS_MOUSEMOVE      = 0x00000002,
+    QS_PAINT          = 0x00000020,
+    QS_POSTMESSAGE    = 0x00000008,
+    QS_RAWINPUT       = 0x00000400,
+    QS_SENDMESSAGE    = 0x00000040,
+    QS_TIMER          = 0x00000010,
+}
+
+alias REGISTER_NOTIFICATION_FLAGS = uint;
+enum : uint
+{
+    DEVICE_NOTIFY_SERVICE_HANDLE        = 0x00000001,
+    DEVICE_NOTIFY_CALLBACK              = 0x00000002,
+    DEVICE_NOTIFY_WINDOW_HANDLE         = 0x00000000,
+    DEVICE_NOTIFY_ALL_INTERFACE_CLASSES = 0x00000004,
+}
+
+alias SYSTEM_CURSOR_ID = uint;
+enum : uint
+{
+    OCR_APPSTARTING = 0x00007f8a,
+    OCR_NORMAL      = 0x00007f00,
+    OCR_CROSS       = 0x00007f03,
+    OCR_HAND        = 0x00007f89,
+    OCR_HELP        = 0x00007f8b,
+    OCR_IBEAM       = 0x00007f01,
+    OCR_NO          = 0x00007f88,
+    OCR_SIZEALL     = 0x00007f86,
+    OCR_SIZENESW    = 0x00007f83,
+    OCR_SIZENS      = 0x00007f85,
+    OCR_SIZENWSE    = 0x00007f82,
+    OCR_SIZEWE      = 0x00007f84,
+    OCR_UP          = 0x00007f04,
+    OCR_WAIT        = 0x00007f02,
+}
+
+alias LAYERED_WINDOW_ATTRIBUTES_FLAGS = uint;
+enum : uint
+{
+    LWA_ALPHA    = 0x00000002,
+    LWA_COLORKEY = 0x00000001,
+}
+
+alias SEND_MESSAGE_TIMEOUT_FLAGS = uint;
+enum : uint
+{
+    SMTO_ABORTIFHUNG        = 0x00000002,
+    SMTO_BLOCK              = 0x00000001,
+    SMTO_NORMAL             = 0x00000000,
+    SMTO_NOTIMEOUTIFNOTHUNG = 0x00000008,
+    SMTO_ERRORONEXIT        = 0x00000020,
+}
+
+alias PEEK_MESSAGE_REMOVE_TYPE = uint;
+enum : uint
+{
+    PM_NOREMOVE       = 0x00000000,
+    PM_REMOVE         = 0x00000001,
+    PM_NOYIELD        = 0x00000002,
+    PM_QS_INPUT       = 0x04070000,
+    PM_QS_POSTMESSAGE = 0x00980000,
+    PM_QS_PAINT       = 0x00200000,
+    PM_QS_SENDMESSAGE = 0x00400000,
+}
+
+alias GET_WINDOW_CMD = uint;
+enum : uint
+{
+    GW_CHILD        = 0x00000005,
+    GW_ENABLEDPOPUP = 0x00000006,
+    GW_HWNDFIRST    = 0x00000000,
+    GW_HWNDLAST     = 0x00000001,
+    GW_HWNDNEXT     = 0x00000002,
+    GW_HWNDPREV     = 0x00000003,
+    GW_OWNER        = 0x00000004,
+}
+
+alias SYSTEM_METRICS_INDEX = int;
+enum : int
+{
+    SM_ARRANGE                     = 0x00000038,
+    SM_CLEANBOOT                   = 0x00000043,
+    SM_CMONITORS                   = 0x00000050,
+    SM_CMOUSEBUTTONS               = 0x0000002b,
+    SM_CONVERTIBLESLATEMODE        = 0x00002003,
+    SM_CXBORDER                    = 0x00000005,
+    SM_CXCURSOR                    = 0x0000000d,
+    SM_CXDLGFRAME                  = 0x00000007,
+    SM_CXDOUBLECLK                 = 0x00000024,
+    SM_CXDRAG                      = 0x00000044,
+    SM_CXEDGE                      = 0x0000002d,
+    SM_CXFIXEDFRAME                = 0x00000007,
+    SM_CXFOCUSBORDER               = 0x00000053,
+    SM_CXFRAME                     = 0x00000020,
+    SM_CXFULLSCREEN                = 0x00000010,
+    SM_CXHSCROLL                   = 0x00000015,
+    SM_CXHTHUMB                    = 0x0000000a,
+    SM_CXICON                      = 0x0000000b,
+    SM_CXICONSPACING               = 0x00000026,
+    SM_CXMAXIMIZED                 = 0x0000003d,
+    SM_CXMAXTRACK                  = 0x0000003b,
+    SM_CXMENUCHECK                 = 0x00000047,
+    SM_CXMENUSIZE                  = 0x00000036,
+    SM_CXMIN                       = 0x0000001c,
+    SM_CXMINIMIZED                 = 0x00000039,
+    SM_CXMINSPACING                = 0x0000002f,
+    SM_CXMINTRACK                  = 0x00000022,
+    SM_CXPADDEDBORDER              = 0x0000005c,
+    SM_CXSCREEN                    = 0x00000000,
+    SM_CXSIZE                      = 0x0000001e,
+    SM_CXSIZEFRAME                 = 0x00000020,
+    SM_CXSMICON                    = 0x00000031,
+    SM_CXSMSIZE                    = 0x00000034,
+    SM_CXVIRTUALSCREEN             = 0x0000004e,
+    SM_CXVSCROLL                   = 0x00000002,
+    SM_CYBORDER                    = 0x00000006,
+    SM_CYCAPTION                   = 0x00000004,
+    SM_CYCURSOR                    = 0x0000000e,
+    SM_CYDLGFRAME                  = 0x00000008,
+    SM_CYDOUBLECLK                 = 0x00000025,
+    SM_CYDRAG                      = 0x00000045,
+    SM_CYEDGE                      = 0x0000002e,
+    SM_CYFIXEDFRAME                = 0x00000008,
+    SM_CYFOCUSBORDER               = 0x00000054,
+    SM_CYFRAME                     = 0x00000021,
+    SM_CYFULLSCREEN                = 0x00000011,
+    SM_CYHSCROLL                   = 0x00000003,
+    SM_CYICON                      = 0x0000000c,
+    SM_CYICONSPACING               = 0x00000027,
+    SM_CYKANJIWINDOW               = 0x00000012,
+    SM_CYMAXIMIZED                 = 0x0000003e,
+    SM_CYMAXTRACK                  = 0x0000003c,
+    SM_CYMENU                      = 0x0000000f,
+    SM_CYMENUCHECK                 = 0x00000048,
+    SM_CYMENUSIZE                  = 0x00000037,
+    SM_CYMIN                       = 0x0000001d,
+    SM_CYMINIMIZED                 = 0x0000003a,
+    SM_CYMINSPACING                = 0x00000030,
+    SM_CYMINTRACK                  = 0x00000023,
+    SM_CYSCREEN                    = 0x00000001,
+    SM_CYSIZE                      = 0x0000001f,
+    SM_CYSIZEFRAME                 = 0x00000021,
+    SM_CYSMCAPTION                 = 0x00000033,
+    SM_CYSMICON                    = 0x00000032,
+    SM_CYSMSIZE                    = 0x00000035,
+    SM_CYVIRTUALSCREEN             = 0x0000004f,
+    SM_CYVSCROLL                   = 0x00000014,
+    SM_CYVTHUMB                    = 0x00000009,
+    SM_DBCSENABLED                 = 0x0000002a,
+    SM_DEBUG                       = 0x00000016,
+    SM_DIGITIZER                   = 0x0000005e,
+    SM_IMMENABLED                  = 0x00000052,
+    SM_MAXIMUMTOUCHES              = 0x0000005f,
+    SM_MEDIACENTER                 = 0x00000057,
+    SM_MENUDROPALIGNMENT           = 0x00000028,
+    SM_MIDEASTENABLED              = 0x0000004a,
+    SM_MOUSEPRESENT                = 0x00000013,
+    SM_MOUSEHORIZONTALWHEELPRESENT = 0x0000005b,
+    SM_MOUSEWHEELPRESENT           = 0x0000004b,
+    SM_NETWORK                     = 0x0000003f,
+    SM_PENWINDOWS                  = 0x00000029,
+    SM_REMOTECONTROL               = 0x00002001,
+    SM_REMOTESESSION               = 0x00001000,
+    SM_SAMEDISPLAYFORMAT           = 0x00000051,
+    SM_SECURE                      = 0x0000002c,
+    SM_SERVERR2                    = 0x00000059,
+    SM_SHOWSOUNDS                  = 0x00000046,
+    SM_SHUTTINGDOWN                = 0x00002000,
+    SM_SLOWMACHINE                 = 0x00000049,
+    SM_STARTER                     = 0x00000058,
+    SM_SWAPBUTTON                  = 0x00000017,
+    SM_SYSTEMDOCKED                = 0x00002004,
+    SM_TABLETPC                    = 0x00000056,
+    SM_XVIRTUALSCREEN              = 0x0000004c,
+    SM_YVIRTUALSCREEN              = 0x0000004d,
+}
+
+alias GET_ANCESTOR_FLAGS = uint;
+enum : uint
+{
+    GA_PARENT    = 0x00000001,
+    GA_ROOT      = 0x00000002,
+    GA_ROOTOWNER = 0x00000003,
+}
+
+alias TILE_WINDOWS_HOW = uint;
+enum : uint
+{
+    MDITILE_HORIZONTAL = 0x00000001,
+    MDITILE_VERTICAL   = 0x00000000,
+}
+
+alias WINDOW_DISPLAY_AFFINITY = uint;
+enum : uint
+{
+    WDA_NONE               = 0x00000000,
+    WDA_MONITOR            = 0x00000001,
+    WDA_EXCLUDEFROMCAPTURE = 0x00000011,
+}
+
+alias FOREGROUND_WINDOW_LOCK_CODE = uint;
+enum : uint
+{
+    LSFW_LOCK   = 0x00000001,
+    LSFW_UNLOCK = 0x00000002,
+}
+
+alias CASCADE_WINDOWS_HOW = uint;
+enum : uint
+{
+    MDITILE_SKIPDISABLED = 0x00000002,
+    MDITILE_ZORDER       = 0x00000004,
+}
+
+alias WINDOW_MESSAGE_FILTER_ACTION = uint;
+enum : uint
+{
+    MSGFLT_ALLOW    = 0x00000001,
+    MSGFLT_DISALLOW = 0x00000002,
+    MSGFLT_RESET    = 0x00000000,
+}
+
+alias GET_MENU_DEFAULT_ITEM_FLAGS = uint;
+enum : uint
+{
+    GMDI_GOINTOPOPUPS = 0x00000002,
+    GMDI_USEDISABLED  = 0x00000001,
+}
+
+alias MSGFLTINFO_STATUS = uint;
+enum : uint
+{
+    MSGFLTINFO_NONE                     = 0x00000000,
+    MSGFLTINFO_ALLOWED_HIGHER           = 0x00000003,
+    MSGFLTINFO_ALREADYALLOWED_FORWND    = 0x00000001,
+    MSGFLTINFO_ALREADYDISALLOWED_FORWND = 0x00000002,
+}
+
+alias MENU_ITEM_MASK = uint;
+enum : uint
+{
+    MIIM_BITMAP     = 0x00000080,
+    MIIM_CHECKMARKS = 0x00000008,
+    MIIM_DATA       = 0x00000020,
+    MIIM_FTYPE      = 0x00000100,
+    MIIM_ID         = 0x00000002,
+    MIIM_STATE      = 0x00000001,
+    MIIM_STRING     = 0x00000040,
+    MIIM_SUBMENU    = 0x00000004,
+    MIIM_TYPE       = 0x00000010,
+}
+
+alias FLASHWINFO_FLAGS = uint;
+enum : uint
+{
+    FLASHW_ALL       = 0x00000003,
+    FLASHW_CAPTION   = 0x00000001,
+    FLASHW_STOP      = 0x00000000,
+    FLASHW_TIMER     = 0x00000004,
+    FLASHW_TIMERNOFG = 0x0000000c,
+    FLASHW_TRAY      = 0x00000002,
+}
+
+alias CURSORINFO_FLAGS = uint;
+enum : uint
+{
+    CURSOR_SHOWING    = 0x00000001,
+    CURSOR_SUPPRESSED = 0x00000002,
+}
+
+alias MENUINFO_STYLE = uint;
+enum : uint
+{
+    MNS_AUTODISMISS = 0x10000000,
+    MNS_CHECKORBMP  = 0x04000000,
+    MNS_DRAGDROP    = 0x20000000,
+    MNS_MODELESS    = 0x40000000,
+    MNS_NOCHECK     = 0x80000000,
+    MNS_NOTIFYBYPOS = 0x08000000,
+}
+
+alias WINDOWPLACEMENT_FLAGS = uint;
+enum : uint
+{
+    WPF_ASYNCWINDOWPLACEMENT = 0x00000004,
+    WPF_RESTORETOMAXIMIZED   = 0x00000002,
+    WPF_SETMINPOSITION       = 0x00000001,
+}
+
+alias MENUINFO_MASK = uint;
+enum : uint
+{
+    MIM_APPLYTOSUBMENUS = 0x80000000,
+    MIM_BACKGROUND      = 0x00000002,
+    MIM_HELPID          = 0x00000004,
+    MIM_MAXHEIGHT       = 0x00000001,
+    MIM_MENUDATA        = 0x00000008,
+    MIM_STYLE           = 0x00000010,
+}
+
+alias DEV_BROADCAST_HDR_DEVICE_TYPE = uint;
+enum : uint
+{
+    DBT_DEVTYP_DEVICEINTERFACE = 0x00000005,
+    DBT_DEVTYP_HANDLE          = 0x00000006,
+    DBT_DEVTYP_OEM             = 0x00000000,
+    DBT_DEVTYP_PORT            = 0x00000003,
+    DBT_DEVTYP_VOLUME          = 0x00000002,
+}
+
+alias MINIMIZEDMETRICS_ARRANGE = int;
+enum : int
+{
+    ARW_BOTTOMLEFT  = 0x00000000,
+    ARW_BOTTOMRIGHT = 0x00000001,
+    ARW_TOPLEFT     = 0x00000002,
+    ARW_TOPRIGHT    = 0x00000003,
+}
+
+alias DEV_BROADCAST_VOLUME_FLAGS = ushort;
+enum : ushort
+{
+    DBTF_MEDIA = cast(ushort)0x0001,
+    DBTF_NET   = cast(ushort)0x0002,
+}
+
+alias SCROLLINFO_MASK = uint;
+enum : uint
+{
+    SIF_ALL             = 0x00000017,
+    SIF_DISABLENOSCROLL = 0x00000008,
+    SIF_PAGE            = 0x00000002,
+    SIF_POS             = 0x00000004,
+    SIF_RANGE           = 0x00000001,
+    SIF_TRACKPOS        = 0x00000010,
+}
+
+alias MENUGETOBJECTINFO_FLAGS = uint;
+enum : uint
+{
+    MNGOF_BOTTOMGAP = 0x00000002,
+    MNGOF_TOPGAP    = 0x00000001,
+}
+
+alias GUITHREADINFO_FLAGS = uint;
+enum : uint
+{
+    GUI_CARETBLINKING  = 0x00000001,
+    GUI_INMENUMODE     = 0x00000004,
+    GUI_INMOVESIZE     = 0x00000002,
+    GUI_POPUPMENUMODE  = 0x00000010,
+    GUI_SYSTEMMENUMODE = 0x00000008,
+}
+
+alias KBDLLHOOKSTRUCT_FLAGS = uint;
+enum : uint
+{
+    LLKHF_EXTENDED          = 0x00000001,
+    LLKHF_ALTDOWN           = 0x00000020,
+    LLKHF_UP                = 0x00000080,
+    LLKHF_INJECTED          = 0x00000010,
+    LLKHF_LOWER_IL_INJECTED = 0x00000002,
+}
+
+alias ACCEL_VIRT_FLAGS = ubyte;
+enum : ubyte
+{
+    FVIRTKEY  = cast(ubyte)0x01,
+    FNOINVERT = cast(ubyte)0x02,
+    FSHIFT    = cast(ubyte)0x04,
+    FCONTROL  = cast(ubyte)0x08,
+    FALT      = cast(ubyte)0x10,
+}
+
+alias SCROLLBAR_COMMAND = int;
+enum : int
+{
+    SB_LINEUP        = 0x00000000,
+    SB_LINELEFT      = 0x00000000,
+    SB_LINEDOWN      = 0x00000001,
+    SB_LINERIGHT     = 0x00000001,
+    SB_PAGEUP        = 0x00000002,
+    SB_PAGELEFT      = 0x00000002,
+    SB_PAGEDOWN      = 0x00000003,
+    SB_PAGERIGHT     = 0x00000003,
+    SB_THUMBPOSITION = 0x00000004,
+    SB_THUMBTRACK    = 0x00000005,
+    SB_TOP           = 0x00000006,
+    SB_LEFT          = 0x00000006,
+    SB_RIGHT         = 0x00000007,
+    SB_BOTTOM        = 0x00000007,
+    SB_ENDSCROLL     = 0x00000008,
+}
+
+alias DI_FLAGS = uint;
+enum : uint
+{
+    DI_MASK        = 0x00000001,
+    DI_IMAGE       = 0x00000002,
+    DI_NORMAL      = 0x00000003,
+    DI_COMPAT      = 0x00000004,
+    DI_DEFAULTSIZE = 0x00000008,
+    DI_NOMIRROR    = 0x00000010,
+}
+
+alias POINTER_INPUT_TYPE = int;
+enum : int
+{
+    PT_POINTER  = 0x00000001,
+    PT_TOUCH    = 0x00000002,
+    PT_PEN      = 0x00000003,
+    PT_MOUSE    = 0x00000004,
+    PT_TOUCHPAD = 0x00000005,
+}
+
+alias EDIT_CONTROL_FEATURE = int;
+enum : int
+{
+    EDIT_CONTROL_FEATURE_ENTERPRISE_DATA_PROTECTION_PASTE_SUPPORT = 0x00000000,
+    EDIT_CONTROL_FEATURE_PASTE_NOTIFICATIONS                      = 0x00000001,
+}
+
+alias HANDEDNESS = int;
+enum : int
+{
+    HANDEDNESS_LEFT  = 0x00000000,
+    HANDEDNESS_RIGHT = 0x00000001,
+}
+
+alias LEGACY_TOUCHPAD_FEATURES = int;
+enum : int
+{
+    LEGACY_TOUCHPAD_FEATURE_NONE                     = 0x00000000,
+    LEGACY_TOUCHPAD_FEATURE_ENABLE_DISABLE           = 0x00000001,
+    LEGACY_TOUCHPAD_FEATURE_REVERSE_SCROLL_DIRECTION = 0x00000004,
+}
+
+alias TOUCHPAD_SENSITIVITY_LEVEL = int;
+enum : int
+{
+    TOUCHPAD_SENSITIVITY_LEVEL_MOST_SENSITIVE     = 0x00000000,
+    TOUCHPAD_SENSITIVITY_LEVEL_HIGH_SENSITIVITY   = 0x00000001,
+    TOUCHPAD_SENSITIVITY_LEVEL_MEDIUM_SENSITIVITY = 0x00000002,
+    TOUCHPAD_SENSITIVITY_LEVEL_LOW_SENSITIVITY    = 0x00000003,
+    TOUCHPAD_SENSITIVITY_LEVEL_LEAST_SENSITIVE    = 0x00000004,
+}
+
+alias WINDOW_PLACEMENT_STATE = int;
+enum : int
+{
+    WPS_NORMAL    = 0x00000000,
+    WPS_MAXIMIZED = 0x00000001,
+    WPS_MINIMIZED = 0x00000002,
+    WPS_ARRANGED  = 0x00000003,
+}
+
+alias WINDOW_ACTION_KINDS = int;
+enum : int
+{
+    WAK_NONE             = 0x00000000,
+    WAK_VISIBILITY       = 0x00000001,
+    WAK_POSITION         = 0x00000002,
+    WAK_SIZE             = 0x00000004,
+    WAK_INSERT_AFTER     = 0x00000008,
+    WAK_ACTIVATE         = 0x00000010,
+    WAK_PLACEMENT_STATE  = 0x00000020,
+    WAK_NORMAL_RECT      = 0x00000040,
+    WAK_MOVE_TO_MONITOR  = 0x00000080,
+    WAK_FIT_TO_MONITOR   = 0x00000100,
+    WAK_DISPLAY_CHANGE   = 0x00000200,
+    WAK_SYSTEM_OPERATION = 0x00000400,
+    WAK_COALESCEABLE     = 0x0000001f,
+}
+
+alias WINDOW_ACTION_MODIFIERS = int;
+enum : int
+{
+    WAM_NONE                  = 0x00000000,
+    WAM_FRAME_BOUNDS          = 0x00000001,
+    WAM_ACTIVATE_FOREGROUND   = 0x00000002,
+    WAM_ACTIVATE_INPUT        = 0x00000004,
+    WAM_ACTIVATE_NO_ZORDER    = 0x00000008,
+    WAM_INSERT_AFTER_NO_OWNER = 0x00000010,
+    WAM_RESTORE_TO_NORMAL     = 0x00000020,
+    WAM_RESTORE_TO_MAXIMIZED  = 0x00000040,
+    WAM_RESTORE_TO_ARRANGED   = 0x00000080,
+    WAM_WORK_AREA             = 0x00000100,
+    WAM_DPI                   = 0x00000200,
+    WAM_SCALED_TO_MONITOR     = 0x00000400,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ne-winuser-tooltip_dismiss_flags))], [])
+
+alias TOOLTIP_DISMISS_FLAGS = int;
+enum : int
+{
+    TDF_REGISTER   = 0x00000001,
+    TDF_UNREGISTER = 0x00000002,
+}
+
+alias MOVESIZE_OPERATION = int;
+enum : int
+{
+    MSO_SIZE_LEFT        = 0x00000001,
+    MSO_SIZE_RIGHT       = 0x00000002,
+    MSO_SIZE_TOP         = 0x00000003,
+    MSO_SIZE_TOPLEFT     = 0x00000004,
+    MSO_SIZE_TOPRIGHT    = 0x00000005,
+    MSO_SIZE_BOTTOM      = 0x00000006,
+    MSO_SIZE_BOTTOMLEFT  = 0x00000007,
+    MSO_SIZE_BOTTOMRIGHT = 0x00000008,
+    MSO_MOVE             = 0x00000009,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmplatformversion))], [])
+
+enum MrmPlatformVersion : int
+{
+    MrmPlatformVersion_Default         = 0x00000000,
+    MrmPlatformVersion_Windows10_0_0_0 = 0x010a0000,
+    MrmPlatformVersion_Windows10_0_0_5 = 0x010a0005,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmpackagingmode))], [])
+
+enum MrmPackagingMode : int
+{
+    MrmPackagingModeStandaloneFile = 0x00000000,
+    MrmPackagingModeAutoSplit      = 0x00000001,
+    MrmPackagingModeResourcePack   = 0x00000002,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmpackagingoptions))], [])
+
+enum MrmPackagingOptions : int
+{
+    MrmPackagingOptionsNone                        = 0x00000000,
+    MrmPackagingOptionsOmitSchemaFromResourcePacks = 0x00000001,
+    MrmPackagingOptionsSplitLanguageVariants       = 0x00000002,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmdumptype))], [])
+
+enum MrmDumpType : int
+{
+    MrmDumpType_Basic    = 0x00000000,
+    MrmDumpType_Detailed = 0x00000001,
+    MrmDumpType_Schema   = 0x00000002,
+}
+//ENUM ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmresourceindexermessageseverity))], [])
+
+enum MrmResourceIndexerMessageSeverity : int
+{
+    MrmResourceIndexerMessageSeverityVerbose = 0x00000000,
+    MrmResourceIndexerMessageSeverityInfo    = 0x00000001,
+    MrmResourceIndexerMessageSeverityWarning = 0x00000002,
+    MrmResourceIndexerMessageSeverityError   = 0x00000003,
+}
+
+enum MrmIndexerFlags : int
+{
+    MrmIndexerFlagsNone                  = 0x00000000,
+    MrmIndexerFlagsAutoMerge             = 0x00000001,
+    MrmIndexerFlagsCreateContentChecksum = 0x00000002,
+}
+
+// Constants
+
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-contextmenu))], [])*/uint WM_CONTEXTMENU = 0x0000007b;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/gdi/wm-printclient))], [])*/uint WM_PRINTCLIENT = 0x00000318;
+enum uint STRSAFE_USE_SECURE_CRT = 0x00000000;
+
+enum : uint
+{
+    STRSAFE_MAX_LENGTH   = 0x7ffffffe,
+    STRSAFE_IGNORE_NULLS = 0x00000100,
+}
+
+enum uint STRSAFE_FILL_ON_FAILURE = 0x00000400;
+enum uint STRSAFE_NO_TRUNCATION = 0x00001000;
+enum HRESULT STRSAFE_E_INVALID_PARAMETER = HRESULT(0x80070057);
+enum uint __WARNING_CYCLOMATIC_COMPLEXITY = 0x0000703e;
+enum uint __WARNING_RETURN_UNINIT_VAR = 0x000017d5;
+enum uint __WARNING_MISSING_ZERO_TERMINATION2 = 0x000017a6;
+enum uint __WARNING_UNSAFE_STRING_FUNCTION = 0x000061c1;
+enum uint __WARNING_POTENTIAL_BUFFER_OVERFLOW_HIGH_PRIORITY = 0x0000659f;
+enum uint __WARNING_POSTCONDITION_NULLTERMINATION_VIOLATION = 0x000065b4;
+enum uint __WARNING_RANGE_POSTCONDITION_VIOLATION = 0x000065cd;
+enum uint __WARNING_INVALID_PARAM_VALUE_3 = 0x00006e17;
+enum uint __WARNING_BANNED_API_USAGE = 0x0000702f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/wm-devicechange))], [])*/uint WM_DEVICECHANGE = 0x00000219;
+enum uint BSF_MSGSRV32ISOK_BIT = 0x0000001f;
+enum uint BSM_NETDRIVER = 0x00000002;
+
+enum : uint
+{
+    DBT_APPYBEGIN = 0x00000000,
+    DBT_APPYEND   = 0x00000001,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/dbt-querychangeconfig))], [])*/uint DBT_QUERYCHANGECONFIG = 0x00000017;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/dbt-configchangecanceled))], [])*/uint DBT_CONFIGCHANGECANCELED = 0x00000019;
+enum uint DBT_SHELLLOGGEDON = 0x00000020;
+enum uint DBT_VXDINITCOMPLETE = 0x00000023;
+
+enum : uint
+{
+    DBT_VOLLOCKLOCKTAKEN    = 0x00008042,
+    DBT_VOLLOCKLOCKFAILED   = 0x00008043,
+    DBT_VOLLOCKQUERYUNLOCK  = 0x00008044,
+    DBT_VOLLOCKLOCKRELEASED = 0x00008045,
+    DBT_VOLLOCKUNLOCKFAILED = 0x00008046,
+}
+
+enum : uint
+{
+    LOCKP_FAIL_WRITES      = 0x00000000,
+    LOCKP_FAIL_MEM_MAPPING = 0x00000002,
+}
+
+enum uint LOCKP_USER_MASK = 0x00000003;
+enum uint LOCKF_LOGICAL_LOCK = 0x00000000;
+enum uint DBT_NO_DISK_SPACE = 0x00000047;
+enum uint DBT_CONFIGMGPRIVATE = 0x00007fff;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/dbt-devicequeryremove))], [])*/uint
+{
+    DBT_DEVICEQUERYREMOVE       = 0x00008001,
+    DBT_DEVICEQUERYREMOVEFAILED = 0x00008002,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/dbt-deviceremovecomplete))], [])*/uint
+{
+    DBT_DEVICEREMOVECOMPLETE = 0x00008004,
+    DBT_DEVICETYPESPECIFIC   = 0x00008005,
+}
+
+enum : uint
+{
+    DBT_DEVTYP_DEVNODE = 0x00000001,
+    DBT_DEVTYP_NET     = 0x00000004,
+}
+
+enum : uint
+{
+    DBTF_XPORT   = 0x00000002,
+    DBTF_SLOWNET = 0x00000004,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/DevIO/dbt-userdefined))], [])*/uint DBT_USERDEFINED = 0x0000ffff;
+enum PWSTR RT_BITMAP = PWSTR(cast(wchar*)cast(ushort)0x0002);
+
+enum : PWSTR
+{
+    RT_MENU   = PWSTR(cast(wchar*)cast(ushort)0x0004),
+    RT_DIALOG = PWSTR(cast(wchar*)cast(ushort)0x0005),
+}
+
+enum : PWSTR
+{
+    RT_FONT        = PWSTR(cast(wchar*)cast(ushort)0x0008),
+    RT_ACCELERATOR = PWSTR(cast(wchar*)cast(ushort)0x0009),
+}
+
+enum uint DIFFERENCE = 0x0000000b;
+enum PWSTR RT_DLGINCLUDE = PWSTR(cast(wchar*)cast(ushort)0x0011);
+
+enum : PWSTR
+{
+    RT_VXD       = PWSTR(cast(wchar*)cast(ushort)0x0014),
+    RT_ANICURSOR = PWSTR(cast(wchar*)cast(ushort)0x0015),
+    RT_ANIICON   = PWSTR(cast(wchar*)cast(ushort)0x0016),
+}
+
+enum uint CREATEPROCESS_MANIFEST_RESOURCE_ID = 0x00000001;
+enum uint ISOLATIONAWARE_NOSTATICIMPORT_MANIFEST_RESOURCE_ID = 0x00000003;
+enum uint ISOLATIONPOLICY_BROWSER_MANIFEST_RESOURCE_ID = 0x00000005;
+enum uint MAXIMUM_RESERVED_MANIFEST_RESOURCE_ID = 0x00000010;
+enum uint HIDE_WINDOW = 0x00000000;
+enum uint SHOW_ICONWINDOW = 0x00000002;
+enum uint SHOW_OPENNOACTIVATE = 0x00000004;
+enum uint KF_DLGMODE = 0x00000800;
+enum uint KF_ALTDOWN = 0x00002000;
+enum uint KF_UP = 0x00008000;
+enum uint WH_HARDWARE = 0x00000008;
+enum int WH_MINHOOK = 0xffffffff;
+enum uint HC_ACTION = 0x00000000;
+
+enum : uint
+{
+    HC_SKIP     = 0x00000002,
+    HC_NOREMOVE = 0x00000003,
+    HC_NOREM    = 0x00000003,
+}
+
+enum uint HC_SYSMODALOFF = 0x00000005;
+
+enum : uint
+{
+    HCBT_MINMAX    = 0x00000001,
+    HCBT_QS        = 0x00000002,
+    HCBT_CREATEWND = 0x00000003,
+}
+
+enum uint HCBT_ACTIVATE = 0x00000005;
+enum uint HCBT_KEYSKIPPED = 0x00000007;
+enum uint HCBT_SETFOCUS = 0x00000009;
+enum uint WTS_CONSOLE_DISCONNECT = 0x00000002;
+enum uint WTS_REMOTE_DISCONNECT = 0x00000004;
+
+enum : uint
+{
+    WTS_SESSION_LOGOFF         = 0x00000006,
+    WTS_SESSION_LOCK           = 0x00000007,
+    WTS_SESSION_UNLOCK         = 0x00000008,
+    WTS_SESSION_REMOTE_CONTROL = 0x00000009,
+    WTS_SESSION_CREATE         = 0x0000000a,
+    WTS_SESSION_TERMINATE      = 0x0000000b,
+    WTS_SESSION_DESKTOP_READY  = 0x0000000f,
+}
+
+enum : uint
+{
+    MSGF_MESSAGEBOX = 0x00000001,
+    MSGF_MENU       = 0x00000002,
+    MSGF_SCROLLBAR  = 0x00000005,
+}
+
+enum : uint
+{
+    MSGF_MAX  = 0x00000008,
+    MSGF_USER = 0x00001000,
+}
+
+enum uint HSHELL_WINDOWDESTROYED = 0x00000002;
+enum uint HSHELL_WINDOWACTIVATED = 0x00000004;
+
+enum : uint
+{
+    HSHELL_REDRAW             = 0x00000006,
+    HSHELL_TASKMAN            = 0x00000007,
+    HSHELL_LANGUAGE           = 0x00000008,
+    HSHELL_SYSMENU            = 0x00000009,
+    HSHELL_ENDTASK            = 0x0000000a,
+    HSHELL_ACCESSIBILITYSTATE = 0x0000000b,
+}
+
+enum : uint
+{
+    HSHELL_WINDOWREPLACED  = 0x0000000d,
+    HSHELL_WINDOWREPLACING = 0x0000000e,
+}
+
+enum uint HSHELL_HIGHBIT = 0x00008000;
+
+enum : uint
+{
+    FAPPCOMMAND_KEY  = 0x00000000,
+    FAPPCOMMAND_OEM  = 0x00001000,
+    FAPPCOMMAND_MASK = 0x0000f000,
+}
+
+enum uint LLMHF_LOWER_IL_INJECTED = 0x00000002;
+enum uint HKL_NEXT = 0x00000001;
+
+enum : uint
+{
+    INPUTLANGCHANGE_FORWARD  = 0x00000002,
+    INPUTLANGCHANGE_BACKWARD = 0x00000004,
+}
+
+enum int WINSTA_ENUMDESKTOPS = 0x00000001;
+enum int WINSTA_ACCESSCLIPBOARD = 0x00000004;
+enum int WINSTA_WRITEATTRIBUTES = 0x00000010;
+
+enum : int
+{
+    WINSTA_EXITWINDOWS = 0x00000040,
+    WINSTA_ENUMERATE   = 0x00000100,
+    WINSTA_READSCREEN  = 0x00000200,
+}
+
+enum int WSF_VISIBLE = 0x00000001;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-null))], [])*/uint
+{
+    WM_NULL   = 0x00000000,
+    WM_CREATE = 0x00000001,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-move))], [])*/uint
+{
+    WM_MOVE     = 0x00000003,
+    WM_SIZE     = 0x00000005,
+    WM_ACTIVATE = 0x00000006,
+}
+
+enum uint WA_ACTIVE = 0x00000001;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-setfocus))], [])*/uint WM_SETFOCUS = 0x00000007;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-enable))], [])*/uint WM_ENABLE = 0x0000000a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-settext))], [])*/uint WM_SETTEXT = 0x0000000c;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-gettextlength))], [])*/uint WM_GETTEXTLENGTH = 0x0000000e;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-close))], [])*/uint WM_CLOSE = 0x00000010;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-queryopen))], [])*/uint WM_QUERYOPEN = 0x00000013;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-quit))], [])*/uint
+{
+    WM_QUIT       = 0x00000012,
+    WM_ERASEBKGND = 0x00000014,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-showwindow))], [])*/uint WM_SHOWWINDOW = 0x00000018;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-settingchange))], [])*/uint WM_SETTINGCHANGE = 0x0000001a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-activateapp))], [])*/uint WM_ACTIVATEAPP = 0x0000001c;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/SysInfo/wm-timechange))], [])*/uint WM_TIMECHANGE = 0x0000001e;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-setcursor))], [])*/uint WM_SETCURSOR = 0x00000020;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-childactivate))], [])*/uint WM_CHILDACTIVATE = 0x00000022;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-getminmaxinfo))], [])*/uint WM_GETMINMAXINFO = 0x00000024;
+enum uint WM_ICONERASEBKGND = 0x00000027;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/printdocs/wm-spoolerstatus))], [])*/uint WM_SPOOLERSTATUS = 0x0000002a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/wm-measureitem))], [])*/uint WM_MEASUREITEM = 0x0000002c;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/wm-vkeytoitem))], [])*/uint WM_VKEYTOITEM = 0x0000002e;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-setfont))], [])*/uint WM_SETFONT = 0x00000030;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-sethotkey))], [])*/uint WM_SETHOTKEY = 0x00000032;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-querydragicon))], [])*/uint WM_QUERYDRAGICON = 0x00000037;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/WinAuto/wm-getobject))], [])*/uint WM_GETOBJECT = 0x0000003d;
+enum uint WM_COMMNOTIFY = 0x00000044;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-windowposchanged))], [])*/uint WM_WINDOWPOSCHANGED = 0x00000047;
+enum uint PWR_OK = 0x00000001;
+
+enum : uint
+{
+    PWR_SUSPENDREQUEST = 0x00000001,
+    PWR_SUSPENDRESUME  = 0x00000002,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-copydata))], [])*/uint WM_COPYDATA = 0x0000004a;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-inputlangchangerequest))], [])*/uint
+{
+    WM_INPUTLANGCHANGEREQUEST = 0x00000050,
+    WM_INPUTLANGCHANGE        = 0x00000051,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/shell/wm-help))], [])*/uint
+{
+    WM_HELP        = 0x00000053,
+    WM_USERCHANGED = 0x00000054,
+}
+
+enum : uint
+{
+    NFR_ANSI    = 0x00000001,
+    NFR_UNICODE = 0x00000002,
+}
+
+enum uint NF_REQUERY = 0x00000004;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-stylechanged))], [])*/uint WM_STYLECHANGED = 0x0000007d;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-geticon))], [])*/uint WM_GETICON = 0x0000007f;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-nccreate))], [])*/uint
+{
+    WM_NCCREATE   = 0x00000081,
+    WM_NCDESTROY  = 0x00000082,
+    WM_NCCALCSIZE = 0x00000083,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/gdi/wm-ncpaint))], [])*/uint
+{
+    WM_NCPAINT    = 0x00000085,
+    WM_NCACTIVATE = 0x00000086,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/gdi/wm-syncpaint))], [])*/uint WM_SYNCPAINT = 0x00000088;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-nclbuttondown))], [])*/uint
+{
+    WM_NCLBUTTONDOWN   = 0x000000a1,
+    WM_NCLBUTTONUP     = 0x000000a2,
+    WM_NCLBUTTONDBLCLK = 0x000000a3,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-ncrbuttonup))], [])*/uint
+{
+    WM_NCRBUTTONUP     = 0x000000a5,
+    WM_NCRBUTTONDBLCLK = 0x000000a6,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-ncmbuttonup))], [])*/uint
+{
+    WM_NCMBUTTONUP     = 0x000000a8,
+    WM_NCMBUTTONDBLCLK = 0x000000a9,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-ncxbuttonup))], [])*/uint
+{
+    WM_NCXBUTTONUP     = 0x000000ac,
+    WM_NCXBUTTONDBLCLK = 0x000000ad,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-input))], [])*/uint WM_INPUT = 0x000000ff;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-keydown))], [])*/uint
+{
+    WM_KEYDOWN = 0x00000100,
+    WM_KEYUP   = 0x00000101,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-deadchar))], [])*/uint WM_DEADCHAR = 0x00000103;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-syskeyup))], [])*/uint
+{
+    WM_SYSKEYUP    = 0x00000105,
+    WM_SYSCHAR     = 0x00000106,
+    WM_SYSDEADCHAR = 0x00000107,
+}
+
+enum uint UNICODE_NOCHAR = 0x0000ffff;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Intl/wm-ime-endcomposition))], [])*/uint WM_IME_ENDCOMPOSITION = 0x0000010e;
+enum uint WM_IME_KEYLAST = 0x0000010f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-command))], [])*/uint WM_COMMAND = 0x00000111;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-timer))], [])*/uint WM_TIMER = 0x00000113;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/wm-vscroll))], [])*/uint WM_VSCROLL = 0x00000115;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-initmenupopup))], [])*/uint WM_INITMENUPOPUP = 0x00000117;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/wintouch/wm-gesturenotify))], [])*/uint WM_GESTURENOTIFY = 0x0000011a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-menuchar))], [])*/uint WM_MENUCHAR = 0x00000120;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-menurbuttonup))], [])*/uint
+{
+    WM_MENURBUTTONUP = 0x00000122,
+    WM_MENUDRAG      = 0x00000123,
+    WM_MENUGETOBJECT = 0x00000124,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-menucommand))], [])*/uint WM_MENUCOMMAND = 0x00000126;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-updateuistate))], [])*/uint WM_UPDATEUISTATE = 0x00000128;
+
+enum : uint
+{
+    UIS_SET        = 0x00000001,
+    UIS_CLEAR      = 0x00000002,
+    UIS_INITIALIZE = 0x00000003,
+}
+
+enum uint UISF_HIDEACCEL = 0x00000002;
+
+enum : uint
+{
+    WM_CTLCOLORMSGBOX    = 0x00000132,
+    WM_CTLCOLOREDIT      = 0x00000133,
+    WM_CTLCOLORLISTBOX   = 0x00000134,
+    WM_CTLCOLORBTN       = 0x00000135,
+    WM_CTLCOLORDLG       = 0x00000136,
+    WM_CTLCOLORSCROLLBAR = 0x00000137,
+    WM_CTLCOLORSTATIC    = 0x00000138,
+}
+
+enum : uint
+{
+    WM_MOUSEFIRST = 0x00000200,
+    WM_MOUSEMOVE  = 0x00000200,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-lbuttonup))], [])*/uint
+{
+    WM_LBUTTONUP     = 0x00000202,
+    WM_LBUTTONDBLCLK = 0x00000203,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-rbuttonup))], [])*/uint
+{
+    WM_RBUTTONUP     = 0x00000205,
+    WM_RBUTTONDBLCLK = 0x00000206,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-mbuttonup))], [])*/uint
+{
+    WM_MBUTTONUP     = 0x00000208,
+    WM_MBUTTONDBLCLK = 0x00000209,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-xbuttondown))], [])*/uint
+{
+    WM_XBUTTONDOWN   = 0x0000020b,
+    WM_XBUTTONUP     = 0x0000020c,
+    WM_XBUTTONDBLCLK = 0x0000020d,
+}
+
+enum uint WM_MOUSELAST = 0x0000020e;
+
+enum : ushort
+{
+    XBUTTON1 = cast(ushort)0x0001,
+    XBUTTON2 = cast(ushort)0x0002,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-entermenuloop))], [])*/uint WM_ENTERMENULOOP = 0x00000211;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/wm-nextmenu))], [])*/uint WM_NEXTMENU = 0x00000213;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-capturechanged))], [])*/uint WM_CAPTURECHANGED = 0x00000215;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Power/wm-powerbroadcast))], [])*/uint WM_POWERBROADCAST = 0x00000218;
+
+enum : uint
+{
+    PBT_APMQUERYSTANDBY       = 0x00000001,
+    PBT_APMQUERYSUSPENDFAILED = 0x00000002,
+    PBT_APMQUERYSTANDBYFAILED = 0x00000003,
+}
+
+enum : uint
+{
+    PBT_APMSTANDBY        = 0x00000005,
+    PBT_APMRESUMECRITICAL = 0x00000006,
+    PBT_APMRESUMESUSPEND  = 0x00000007,
+    PBT_APMRESUMESTANDBY  = 0x00000008,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Power/pbt-apmbatterylow))], [])*/uint
+{
+    PBT_APMBATTERYLOW        = 0x00000009,
+    PBT_APMPOWERSTATUSCHANGE = 0x0000000a,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Power/pbt-apmresumeautomatic))], [])*/uint PBT_APMRESUMEAUTOMATIC = 0x00000012;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-mdicreate))], [])*/uint
+{
+    WM_MDICREATE      = 0x00000220,
+    WM_MDIDESTROY     = 0x00000221,
+    WM_MDIACTIVATE    = 0x00000222,
+    WM_MDIRESTORE     = 0x00000223,
+    WM_MDINEXT        = 0x00000224,
+    WM_MDIMAXIMIZE    = 0x00000225,
+    WM_MDITILE        = 0x00000226,
+    WM_MDICASCADE     = 0x00000227,
+    WM_MDIICONARRANGE = 0x00000228,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-mdisetmenu))], [])*/uint WM_MDISETMENU = 0x00000230;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-exitsizemove))], [])*/uint WM_EXITSIZEMOVE = 0x00000232;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-mdirefreshmenu))], [])*/uint WM_MDIREFRESHMENU = 0x00000234;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputmsg/wm-pointerdeviceinrange))], [])*/uint
+{
+    WM_POINTERDEVICEINRANGE    = 0x00000239,
+    WM_POINTERDEVICEOUTOFRANGE = 0x0000023a,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputmsg/wm-ncpointerupdate))], [])*/uint
+{
+    WM_NCPOINTERUPDATE = 0x00000241,
+    WM_NCPOINTERDOWN   = 0x00000242,
+    WM_NCPOINTERUP     = 0x00000243,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputmsg/wm-pointerdown))], [])*/uint
+{
+    WM_POINTERDOWN           = 0x00000246,
+    WM_POINTERUP             = 0x00000247,
+    WM_POINTERENTER          = 0x00000249,
+    WM_POINTERLEAVE          = 0x0000024a,
+    WM_POINTERACTIVATE       = 0x0000024b,
+    WM_POINTERCAPTURECHANGED = 0x0000024c,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputmsg/wm-pointerwheel))], [])*/uint
+{
+    WM_POINTERWHEEL  = 0x0000024e,
+    WM_POINTERHWHEEL = 0x0000024f,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputmsg/wm-pointerroutedto))], [])*/uint
+{
+    WM_POINTERROUTEDTO       = 0x00000251,
+    WM_POINTERROUTEDAWAY     = 0x00000252,
+    WM_POINTERROUTEDRELEASED = 0x00000253,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Intl/wm-ime-notify))], [])*/uint
+{
+    WM_IME_NOTIFY          = 0x00000282,
+    WM_IME_CONTROL         = 0x00000283,
+    WM_IME_COMPOSITIONFULL = 0x00000284,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Intl/wm-ime-char))], [])*/uint
+{
+    WM_IME_CHAR    = 0x00000286,
+    WM_IME_REQUEST = 0x00000288,
+    WM_IME_KEYDOWN = 0x00000290,
+    WM_IME_KEYUP   = 0x00000291,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/inputdev/wm-ncmouseleave))], [])*/uint WM_NCMOUSELEAVE = 0x000002a2;
+
+enum : uint
+{
+    WM_TABLET_FIRST = 0x000002c0,
+    WM_TABLET_LAST  = 0x000002df,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/hidpi/wm-dpichanged-beforeparent))], [])*/uint
+{
+    WM_DPICHANGED_BEFOREPARENT = 0x000002e2,
+    WM_DPICHANGED_AFTERPARENT  = 0x000002e3,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-cut))], [])*/uint
+{
+    WM_CUT   = 0x00000300,
+    WM_COPY  = 0x00000301,
+    WM_PASTE = 0x00000302,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/wm-undo))], [])*/uint
+{
+    WM_UNDO             = 0x00000304,
+    WM_RENDERFORMAT     = 0x00000305,
+    WM_RENDERALLFORMATS = 0x00000306,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-drawclipboard))], [])*/uint WM_DRAWCLIPBOARD = 0x00000308;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-vscrollclipboard))], [])*/uint WM_VSCROLLCLIPBOARD = 0x0000030a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-askcbformatname))], [])*/uint WM_ASKCBFORMATNAME = 0x0000030c;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dataxchg/wm-hscrollclipboard))], [])*/uint WM_HSCROLLCLIPBOARD = 0x0000030e;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/gdi/wm-paletteischanging))], [])*/uint
+{
+    WM_PALETTEISCHANGING = 0x00000310,
+    WM_PALETTECHANGED    = 0x00000311,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/gdi/wm-print))], [])*/uint WM_PRINT = 0x00000317;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-themechanged))], [])*/uint WM_THEMECHANGED = 0x0000031a;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dwm/wm-dwmcompositionchanged))], [])*/uint WM_DWMCOMPOSITIONCHANGED = 0x0000031e;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dwm/wm-dwmcolorizationcolorchanged))], [])*/uint WM_DWMCOLORIZATIONCOLORCHANGED = 0x00000320;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dwm/wm-dwmsendiconicthumbnail))], [])*/uint
+{
+    WM_DWMSENDICONICTHUMBNAIL         = 0x00000323,
+    WM_DWMSENDICONICLIVEPREVIEWBITMAP = 0x00000326,
+}
+
+enum : uint
+{
+    WM_HANDHELDFIRST = 0x00000358,
+    WM_HANDHELDLAST  = 0x0000035f,
+}
+
+enum uint WM_AFXLAST = 0x0000037f;
+enum uint WM_PENWINLAST = 0x0000038f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/wm-user))], [])*/uint WM_USER = 0x00000400;
+
+enum : uint
+{
+    WMSZ_RIGHT    = 0x00000002,
+    WMSZ_TOP      = 0x00000003,
+    WMSZ_TOPLEFT  = 0x00000004,
+    WMSZ_TOPRIGHT = 0x00000005,
+}
+
+enum : uint
+{
+    WMSZ_BOTTOMLEFT  = 0x00000007,
+    WMSZ_BOTTOMRIGHT = 0x00000008,
+}
+
+enum int HTTRANSPARENT = 0xffffffff;
+enum uint HTCLIENT = 0x00000001;
+enum uint HTSYSMENU = 0x00000003;
+enum uint HTSIZE = 0x00000004;
+enum uint HTHSCROLL = 0x00000006;
+enum uint HTMINBUTTON = 0x00000008;
+enum uint HTLEFT = 0x0000000a;
+
+enum : uint
+{
+    HTTOP      = 0x0000000c,
+    HTTOPLEFT  = 0x0000000d,
+    HTTOPRIGHT = 0x0000000e,
+}
+
+enum : uint
+{
+    HTBOTTOMLEFT  = 0x00000010,
+    HTBOTTOMRIGHT = 0x00000011,
+}
+
+enum uint HTREDUCE = 0x00000008;
+
+enum : uint
+{
+    HTSIZEFIRST = 0x0000000a,
+    HTSIZELAST  = 0x00000011,
+}
+
+enum uint HTCLOSE = 0x00000014;
+
+enum : uint
+{
+    MA_ACTIVATE       = 0x00000001,
+    MA_ACTIVATEANDEAT = 0x00000002,
+}
+
+enum uint MA_NOACTIVATEANDEAT = 0x00000004;
+
+enum : uint
+{
+    ICON_BIG    = 0x00000001,
+    ICON_SMALL2 = 0x00000002,
+}
+
+enum : uint
+{
+    SIZE_MINIMIZED = 0x00000001,
+    SIZE_MAXIMIZED = 0x00000002,
+    SIZE_MAXSHOW   = 0x00000003,
+    SIZE_MAXHIDE   = 0x00000004,
+}
+
+enum uint SIZEICONIC = 0x00000001;
+
+enum : uint
+{
+    SIZEZOOMSHOW = 0x00000003,
+    SIZEZOOMHIDE = 0x00000004,
+}
+
+enum : uint
+{
+    WVR_ALIGNLEFT   = 0x00000020,
+    WVR_ALIGNBOTTOM = 0x00000040,
+    WVR_ALIGNRIGHT  = 0x00000080,
+}
+
+enum : uint
+{
+    WVR_VREDRAW    = 0x00000200,
+    WVR_VALIDRECTS = 0x00000400,
+}
+
+enum int PRF_NONCLIENT = 0x00000002;
+enum int PRF_ERASEBKGND = 0x00000008;
+enum int PRF_OWNED = 0x00000020;
+enum uint IDANI_CAPTION = 0x00000003;
+enum int IDHOT_SNAPDESKTOP = 0xfffffffe;
+
+enum : uint
+{
+    ENDSESSION_CRITICAL = 0x40000000,
+    ENDSESSION_LOGOFF   = 0x80000000,
+}
+
+enum HWND HWND_BROADCAST = HWND(cast(void*)0x0000ffff);
+
+enum : uint
+{
+    ISMEX_NOSEND   = 0x00000000,
+    ISMEX_SEND     = 0x00000001,
+    ISMEX_NOTIFY   = 0x00000002,
+    ISMEX_CALLBACK = 0x00000004,
+    ISMEX_REPLIED  = 0x00000008,
+}
+
+enum uint PW_RENDERFULLCONTENT = 0x00000002;
+
+enum : HWND
+{
+    HWND_TOP       = HWND(cast(void*)0x00000000),
+    HWND_BOTTOM    = HWND(cast(void*)0x00000001),
+    HWND_TOPMOST   = HWND(cast(void*)0xffffffff),
+    HWND_NOTOPMOST = HWND(cast(void*)0xfffffffe),
+}
+
+enum : uint
+{
+    POINTER_MOD_SHIFT = 0x00000004,
+    POINTER_MOD_CTRL  = 0x00000008,
+}
+
+enum : uint
+{
+    TOUCH_MASK_NONE        = 0x00000000,
+    TOUCH_MASK_CONTACTAREA = 0x00000001,
+    TOUCH_MASK_ORIENTATION = 0x00000002,
+    TOUCH_MASK_PRESSURE    = 0x00000004,
+}
+
+enum : uint
+{
+    PEN_FLAG_BARREL   = 0x00000001,
+    PEN_FLAG_INVERTED = 0x00000002,
+    PEN_FLAG_ERASER   = 0x00000004,
+}
+
+enum : uint
+{
+    PEN_MASK_PRESSURE = 0x00000001,
+    PEN_MASK_ROTATION = 0x00000002,
+    PEN_MASK_TILT_X   = 0x00000004,
+    PEN_MASK_TILT_Y   = 0x00000008,
+}
+
+enum : uint
+{
+    POINTER_MESSAGE_FLAG_INRANGE      = 0x00000002,
+    POINTER_MESSAGE_FLAG_INCONTACT    = 0x00000004,
+    POINTER_MESSAGE_FLAG_FIRSTBUTTON  = 0x00000010,
+    POINTER_MESSAGE_FLAG_SECONDBUTTON = 0x00000020,
+    POINTER_MESSAGE_FLAG_THIRDBUTTON  = 0x00000040,
+    POINTER_MESSAGE_FLAG_FOURTHBUTTON = 0x00000080,
+    POINTER_MESSAGE_FLAG_FIFTHBUTTON  = 0x00000100,
+    POINTER_MESSAGE_FLAG_PRIMARY      = 0x00002000,
+    POINTER_MESSAGE_FLAG_CONFIDENCE   = 0x00004000,
+    POINTER_MESSAGE_FLAG_CANCELED     = 0x00008000,
+}
+
+enum uint PA_NOACTIVATE = 0x00000003;
+
+enum : uint
+{
+    TOUCH_HIT_TESTING_DEFAULT            = 0x00000000,
+    TOUCH_HIT_TESTING_CLIENT             = 0x00000001,
+    TOUCH_HIT_TESTING_NONE               = 0x00000002,
+    TOUCH_HIT_TESTING_PROXIMITY_CLOSEST  = 0x00000000,
+    TOUCH_HIT_TESTING_PROXIMITY_FARTHEST = 0x00000fff,
+}
+
+enum uint QS_TOUCH = 0x00000800;
+
+enum : uint
+{
+    USER_TIMER_MAXIMUM = 0x7fffffff,
+    USER_TIMER_MINIMUM = 0x0000000a,
+}
+
+enum uint TIMERV_NO_COALESCING = 0xffffffff;
+enum uint TIMERV_COALESCING_MAX = 0x7ffffff5;
+
+enum : uint
+{
+    SM_RESERVED2 = 0x00000019,
+    SM_RESERVED3 = 0x0000001a,
+    SM_RESERVED4 = 0x0000001b,
+}
+
+enum uint SM_CARETBLINKINGENABLED = 0x00002002;
+
+enum : uint
+{
+    MENU_GET_ITEM_DATA = 0x00000002,
+    MENU_GET_SUBMENU   = 0x00000004,
+}
+
+enum uint MENU_INSERT_ITEM = 0x00000010;
+enum uint MENU_SET_ITEM_INFO = 0x00000040;
+enum uint MENU_CHECK_ITEM = 0x00000100;
+
+enum : uint
+{
+    MENU_SET_ITEM_DATA = 0x00000400,
+    MENU_SET_SUBMENU   = 0x00000800,
+}
+
+enum uint MNC_IGNORE = 0x00000000;
+enum uint MNC_EXECUTE = 0x00000002;
+enum uint MND_CONTINUE = 0x00000000;
+
+enum : uint
+{
+    MNGO_NOINTERFACE = 0x00000000,
+    MNGO_NOERROR     = 0x00000001,
+}
+
+enum : uint
+{
+    DOF_DOCUMENT  = 0x00008002,
+    DOF_DIRECTORY = 0x00008003,
+}
+
+enum uint DOF_PROGMAN = 0x00000001;
+enum int DO_DROPFILE = 0x454c4946;
+enum uint ASFW_ANY = 0xffffffff;
+
+enum : uint
+{
+    CTLCOLOR_MSGBOX    = 0x00000000,
+    CTLCOLOR_EDIT      = 0x00000001,
+    CTLCOLOR_LISTBOX   = 0x00000002,
+    CTLCOLOR_BTN       = 0x00000003,
+    CTLCOLOR_DLG       = 0x00000004,
+    CTLCOLOR_SCROLLBAR = 0x00000005,
+    CTLCOLOR_STATIC    = 0x00000006,
+    CTLCOLOR_MAX       = 0x00000007,
+}
+
+enum : uint
+{
+    SC_SIZE     = 0x0000f000,
+    SC_MOVE     = 0x0000f010,
+    SC_MINIMIZE = 0x0000f020,
+}
+
+enum uint SC_NEXTWINDOW = 0x0000f040;
+enum uint SC_CLOSE = 0x0000f060;
+enum uint SC_HSCROLL = 0x0000f080;
+enum uint SC_KEYMENU = 0x0000f100;
+enum uint SC_RESTORE = 0x0000f120;
+enum uint SC_HOTKEY = 0x0000f150;
+enum uint SC_MONITORPOWER = 0x0000f170;
+enum uint SC_SEPARATOR = 0x0000f00f;
+
+enum : uint
+{
+    SC_ICON = 0x0000f020,
+    SC_ZOOM = 0x0000f030,
+}
+
+enum : PWSTR
+{
+    IDC_IBEAM   = PWSTR(cast(wchar*)cast(ushort)0x7f01),
+    IDC_WAIT    = PWSTR(cast(wchar*)cast(ushort)0x7f02),
+    IDC_CROSS   = PWSTR(cast(wchar*)cast(ushort)0x7f03),
+    IDC_UPARROW = PWSTR(cast(wchar*)cast(ushort)0x7f04),
+}
+
+enum : PWSTR
+{
+    IDC_ICON     = PWSTR(cast(wchar*)cast(ushort)0x7f81),
+    IDC_SIZENWSE = PWSTR(cast(wchar*)cast(ushort)0x7f82),
+    IDC_SIZENESW = PWSTR(cast(wchar*)cast(ushort)0x7f83),
+    IDC_SIZEWE   = PWSTR(cast(wchar*)cast(ushort)0x7f84),
+    IDC_SIZENS   = PWSTR(cast(wchar*)cast(ushort)0x7f85),
+    IDC_SIZEALL  = PWSTR(cast(wchar*)cast(ushort)0x7f86),
+}
+
+enum : PWSTR
+{
+    IDC_HAND        = PWSTR(cast(wchar*)cast(ushort)0x7f89),
+    IDC_APPSTARTING = PWSTR(cast(wchar*)cast(ushort)0x7f8a),
+}
+
+enum : PWSTR
+{
+    IDC_PIN    = PWSTR(cast(wchar*)cast(ushort)0x7f9f),
+    IDC_PERSON = PWSTR(cast(wchar*)cast(ushort)0x7fa0),
+}
+
+enum uint CURSOR_CREATION_SCALING_DEFAULT = 0x00000002;
+enum uint LR_COLOR = 0x00000002;
+enum uint RES_CURSOR = 0x00000002;
+enum uint OBM_UPARROW = 0x00007ff1;
+enum uint OBM_RGARROW = 0x00007fef;
+enum uint OBM_REDUCE = 0x00007fed;
+
+enum : uint
+{
+    OBM_RESTORE = 0x00007feb,
+    OBM_REDUCED = 0x00007fea,
+}
+
+enum uint OBM_RESTORED = 0x00007fe8;
+enum uint OBM_DNARROWD = 0x00007fe6;
+enum uint OBM_LFARROWD = 0x00007fe4;
+
+enum : uint
+{
+    OBM_COMBO    = 0x00007fe2,
+    OBM_UPARROWI = 0x00007fe1,
+}
+
+enum uint OBM_RGARROWI = 0x00007fdf;
+enum uint OBM_OLD_CLOSE = 0x00007fff;
+
+enum : uint
+{
+    OBM_OLD_UPARROW = 0x00007ffd,
+    OBM_OLD_DNARROW = 0x00007ffc,
+    OBM_OLD_RGARROW = 0x00007ffb,
+    OBM_OLD_LFARROW = 0x00007ffa,
+}
+
+enum : uint
+{
+    OBM_CHECK      = 0x00007ff8,
+    OBM_CHECKBOXES = 0x00007ff7,
+}
+
+enum : uint
+{
+    OBM_OLD_REDUCE  = 0x00007ff5,
+    OBM_OLD_ZOOM    = 0x00007ff4,
+    OBM_OLD_RESTORE = 0x00007ff3,
+}
+
+enum : uint
+{
+    OCR_ICON   = 0x00007f81,
+    OCR_ICOCUR = 0x00007f87,
+}
+
+enum : uint
+{
+    OIC_HAND    = 0x00007f01,
+    OIC_QUES    = 0x00007f02,
+    OIC_BANG    = 0x00007f03,
+    OIC_NOTE    = 0x00007f04,
+    OIC_WINLOGO = 0x00007f05,
+    OIC_WARNING = 0x00007f03,
+}
+
+enum uint OIC_INFORMATION = 0x00007f04;
+enum uint ORD_LANGDRIVER = 0x00000001;
+
+enum : PWSTR
+{
+    IDI_HAND     = PWSTR(cast(wchar*)0x00007f01),
+    IDI_QUESTION = PWSTR(cast(wchar*)0x00007f02),
+}
+
+enum PWSTR IDI_ASTERISK = PWSTR(cast(wchar*)0x00007f04);
+enum PWSTR IDI_SHIELD = PWSTR(cast(wchar*)0x00007f06);
+
+enum : PWSTR
+{
+    IDI_ERROR       = PWSTR(cast(wchar*)0x00007f01),
+    IDI_INFORMATION = PWSTR(cast(wchar*)0x00007f04),
+}
+
+enum int ES_CENTER = 0x00000001;
+enum int ES_MULTILINE = 0x00000004;
+enum int ES_LOWERCASE = 0x00000010;
+
+enum : int
+{
+    ES_AUTOVSCROLL = 0x00000040,
+    ES_AUTOHSCROLL = 0x00000080,
+}
+
+enum int ES_OEMCONVERT = 0x00000400;
+enum int ES_WANTRETURN = 0x00001000;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/en-setfocus))], [])*/uint EN_SETFOCUS = 0x00000100;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/en-change--rich-edit-control-))], [])*/uint EN_CHANGE = 0x00000300;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/en-errspace))], [])*/uint EN_ERRSPACE = 0x00000500;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/en-hscroll))], [])*/uint EN_HSCROLL = 0x00000601;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/en-align-ltr-ec))], [])*/uint
+{
+    EN_ALIGN_LTR_EC = 0x00000700,
+    EN_ALIGN_RTL_EC = 0x00000701,
+}
+
+enum uint EN_AFTER_PASTE = 0x00000801;
+enum uint EC_RIGHTMARGIN = 0x00000002;
+enum uint EMSIS_COMPOSITIONSTRING = 0x00000001;
+enum uint EIMES_CANCELCOMPSTRINFOCUS = 0x00000002;
+enum int BS_PUSHBUTTON = 0x00000000;
+enum int BS_CHECKBOX = 0x00000002;
+enum int BS_RADIOBUTTON = 0x00000004;
+enum int BS_AUTO3STATE = 0x00000006;
+enum int BS_USERBUTTON = 0x00000008;
+enum int BS_PUSHBOX = 0x0000000a;
+enum int BS_TYPEMASK = 0x0000000f;
+
+enum : int
+{
+    BS_TEXT   = 0x00000000,
+    BS_ICON   = 0x00000040,
+    BS_BITMAP = 0x00000080,
+}
+
+enum int BS_RIGHT = 0x00000200;
+
+enum : int
+{
+    BS_TOP    = 0x00000400,
+    BS_BOTTOM = 0x00000800,
+}
+
+enum int BS_PUSHLIKE = 0x00001000;
+enum int BS_NOTIFY = 0x00004000;
+enum int BS_RIGHTBUTTON = 0x00000020;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bn-paint))], [])*/uint BN_PAINT = 0x00000001;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bn-unhilite))], [])*/uint BN_UNHILITE = 0x00000003;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bn-doubleclicked))], [])*/uint BN_DOUBLECLICKED = 0x00000005;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bn-unpushed))], [])*/uint BN_UNPUSHED = 0x00000003;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bn-setfocus))], [])*/uint BN_SETFOCUS = 0x00000006;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bm-getcheck))], [])*/uint BM_GETCHECK = 0x000000f0;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bm-getstate))], [])*/uint BM_GETSTATE = 0x000000f2;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bm-setstyle))], [])*/uint BM_SETSTYLE = 0x000000f4;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bm-getimage))], [])*/uint BM_GETIMAGE = 0x000000f6;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/bm-setdontclick))], [])*/uint BM_SETDONTCLICK = 0x000000f8;
+enum uint BST_FOCUS = 0x00000008;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/stm-geticon))], [])*/uint STM_GETICON = 0x00000171;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/stm-getimage))], [])*/uint STM_GETIMAGE = 0x00000173;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/stn-dblclk))], [])*/uint STN_DBLCLK = 0x00000001;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/stn-disable))], [])*/uint STN_DISABLE = 0x00000003;
+enum uint DWL_MSGRESULT = 0x00000000;
+enum uint DWL_USER = 0x00000008;
+enum int DS_ABSALIGN = 0x00000001;
+enum int DS_LOCALEDIT = 0x00000020;
+enum int DS_MODALFRAME = 0x00000080;
+enum int DS_SETFOREGROUND = 0x00000200;
+enum int DS_FIXEDSYS = 0x00000008;
+enum int DS_CONTROL = 0x00000400;
+enum int DS_CENTERMOUSE = 0x00001000;
+enum int DS_USEPIXELS = 0x00008000;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/dlgbox/dm-setdefid))], [])*/uint DM_SETDEFID = 0x00000401;
+enum uint DC_HASDEFID = 0x0000534b;
+
+enum : uint
+{
+    DLGC_WANTTAB     = 0x00000002,
+    DLGC_WANTALLKEYS = 0x00000004,
+    DLGC_WANTMESSAGE = 0x00000004,
+}
+
+enum uint DLGC_DEFPUSHBUTTON = 0x00000010;
+enum uint DLGC_RADIOBUTTON = 0x00000040;
+
+enum : uint
+{
+    DLGC_STATIC = 0x00000100,
+    DLGC_BUTTON = 0x00002000,
+}
+
+enum uint LB_OKAY = 0x00000000;
+enum int LB_ERRSPACE = 0xfffffffe;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lbn-selchange))], [])*/uint LBN_SELCHANGE = 0x00000001;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lbn-selcancel))], [])*/uint
+{
+    LBN_SELCANCEL = 0x00000003,
+    LBN_SETFOCUS  = 0x00000004,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-addstring))], [])*/uint LB_ADDSTRING = 0x00000180;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-deletestring))], [])*/uint LB_DELETESTRING = 0x00000182;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-resetcontent))], [])*/uint LB_RESETCONTENT = 0x00000184;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-setcursel))], [])*/uint LB_SETCURSEL = 0x00000186;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getcursel))], [])*/uint
+{
+    LB_GETCURSEL  = 0x00000188,
+    LB_GETTEXT    = 0x00000189,
+    LB_GETTEXTLEN = 0x0000018a,
+    LB_GETCOUNT   = 0x0000018b,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-dir))], [])*/uint
+{
+    LB_DIR         = 0x0000018d,
+    LB_GETTOPINDEX = 0x0000018e,
+}
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getselcount))], [])*/uint
+{
+    LB_GETSELCOUNT = 0x00000190,
+    LB_GETSELITEMS = 0x00000191,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-gethorizontalextent))], [])*/uint LB_GETHORIZONTALEXTENT = 0x00000193;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-setcolumnwidth))], [])*/uint LB_SETCOLUMNWIDTH = 0x00000195;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-settopindex))], [])*/uint LB_SETTOPINDEX = 0x00000197;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getitemdata))], [])*/uint LB_GETITEMDATA = 0x00000199;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-selitemrange))], [])*/uint LB_SELITEMRANGE = 0x0000019b;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getanchorindex))], [])*/uint LB_GETANCHORINDEX = 0x0000019d;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getcaretindex))], [])*/uint LB_GETCARETINDEX = 0x0000019f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getitemheight))], [])*/uint LB_GETITEMHEIGHT = 0x000001a1;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-setlocale))], [])*/uint LB_SETLOCALE = 0x000001a5;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-setcount))], [])*/uint LB_SETCOUNT = 0x000001a7;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-itemfrompoint))], [])*/uint LB_ITEMFROMPOINT = 0x000001a9;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/lb-getlistboxinfo))], [])*/uint LB_GETLISTBOXINFO = 0x000001b2;
+enum int LBS_NOTIFY = 0x00000001;
+enum int LBS_NOREDRAW = 0x00000004;
+
+enum : int
+{
+    LBS_OWNERDRAWFIXED    = 0x00000010,
+    LBS_OWNERDRAWVARIABLE = 0x00000020,
+}
+
+enum int LBS_USETABSTOPS = 0x00000080;
+enum int LBS_MULTICOLUMN = 0x00000200;
+enum int LBS_EXTENDEDSEL = 0x00000800;
+
+enum : int
+{
+    LBS_NODATA   = 0x00002000,
+    LBS_NOSEL    = 0x00004000,
+    LBS_COMBOBOX = 0x00008000,
+}
+
+enum : int
+{
+    CB_ERR      = 0xffffffff,
+    CB_ERRSPACE = 0xfffffffe,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cbn-selchange))], [])*/uint CBN_SELCHANGE = 0x00000001;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cbn-setfocus))], [])*/uint CBN_SETFOCUS = 0x00000003;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cbn-editchange))], [])*/uint
+{
+    CBN_EDITCHANGE = 0x00000005,
+    CBN_EDITUPDATE = 0x00000006,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cbn-closeup))], [])*/uint CBN_CLOSEUP = 0x00000008;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cbn-selendcancel))], [])*/uint CBN_SELENDCANCEL = 0x0000000a;
+
+enum : int
+{
+    CBS_DROPDOWN     = 0x00000002,
+    CBS_DROPDOWNLIST = 0x00000003,
+}
+
+enum int CBS_OWNERDRAWVARIABLE = 0x00000020;
+enum int CBS_OEMCONVERT = 0x00000080;
+enum int CBS_HASSTRINGS = 0x00000200;
+enum int CBS_DISABLENOSCROLL = 0x00000800;
+enum int CBS_LOWERCASE = 0x00004000;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-limittext))], [])*/uint CB_LIMITTEXT = 0x00000141;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-addstring))], [])*/uint CB_ADDSTRING = 0x00000143;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-dir))], [])*/uint
+{
+    CB_DIR          = 0x00000145,
+    CB_GETCOUNT     = 0x00000146,
+    CB_GETCURSEL    = 0x00000147,
+    CB_GETLBTEXT    = 0x00000148,
+    CB_GETLBTEXTLEN = 0x00000149,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-resetcontent))], [])*/uint CB_RESETCONTENT = 0x0000014b;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-selectstring))], [])*/uint CB_SELECTSTRING = 0x0000014d;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-showdropdown))], [])*/uint CB_SHOWDROPDOWN = 0x0000014f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-setitemdata))], [])*/uint CB_SETITEMDATA = 0x00000151;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-setitemheight))], [])*/uint CB_SETITEMHEIGHT = 0x00000153;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-setextendedui))], [])*/uint CB_SETEXTENDEDUI = 0x00000155;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-getdroppedstate))], [])*/uint CB_GETDROPPEDSTATE = 0x00000157;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-setlocale))], [])*/uint CB_SETLOCALE = 0x00000159;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-gettopindex))], [])*/uint CB_GETTOPINDEX = 0x0000015b;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-gethorizontalextent))], [])*/uint CB_GETHORIZONTALEXTENT = 0x0000015d;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-getdroppedwidth))], [])*/uint CB_GETDROPPEDWIDTH = 0x0000015f;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-initstorage))], [])*/uint CB_INITSTORAGE = 0x00000161;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/cb-getcomboboxinfo))], [])*/uint CB_GETCOMBOBOXINFO = 0x00000164;
+
+enum : int
+{
+    SBS_HORZ     = 0x00000000,
+    SBS_VERT     = 0x00000001,
+    SBS_TOPALIGN = 0x00000002,
+}
+
+enum int SBS_BOTTOMALIGN = 0x00000004;
+
+enum : int
+{
+    SBS_SIZEBOXTOPLEFTALIGN     = 0x00000002,
+    SBS_SIZEBOXBOTTOMRIGHTALIGN = 0x00000004,
+    SBS_SIZEBOX                 = 0x00000008,
+    SBS_SIZEGRIP                = 0x00000010,
+}
+
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/sbm-getpos))], [])*/uint SBM_GETPOS = 0x000000e1;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/sbm-setrangeredraw))], [])*/uint SBM_SETRANGEREDRAW = 0x000000e6;
+enum /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/sbm-enable-arrows))], [])*/uint SBM_ENABLE_ARROWS = 0x000000e4;
+
+enum : /*FIELD ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/Controls/sbm-getscrollinfo))], [])*/uint
+{
+    SBM_GETSCROLLINFO    = 0x000000ea,
+    SBM_GETSCROLLBARINFO = 0x000000eb,
+}
+
+enum : int
+{
+    HELP_CONTEXT  = 0x00000001,
+    HELP_QUIT     = 0x00000002,
+    HELP_INDEX    = 0x00000003,
+    HELP_CONTENTS = 0x00000003,
+}
+
+enum : int
+{
+    HELP_SETINDEX    = 0x00000005,
+    HELP_SETCONTENTS = 0x00000005,
+}
+
+enum int HELP_FORCEFILE = 0x00000009;
+
+enum : int
+{
+    HELP_COMMAND    = 0x00000102,
+    HELP_PARTIALKEY = 0x00000105,
+}
+
+enum int HELP_SETWINPOS = 0x00000203;
+
+enum : uint
+{
+    HELP_FINDER       = 0x0000000b,
+    HELP_WM_HELP      = 0x0000000c,
+    HELP_SETPOPUP_POS = 0x0000000d,
+}
+
+enum : uint
+{
+    HELP_TCARD_DATA         = 0x00000010,
+    HELP_TCARD_OTHER_CALLER = 0x00000011,
+}
+
+enum uint IDH_MISSING_CONTEXT = 0x00006f19;
+
+enum : uint
+{
+    IDH_OK     = 0x00006f1b,
+    IDH_CANCEL = 0x00006f1c,
+}
+
+enum uint MAX_TOUCH_PREDICTION_FILTER_TAPS = 0x00000003;
+
+enum : uint
+{
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_SAMPLETIME       = 0x00000008,
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_USE_HW_TIMESTAMP = 0x00000001,
+}
+
+enum : float
+{
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_RLS_LAMBDA_MIN           = 0x1.ccccccp-1,
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_RLS_LAMBDA_MAX           = 0x1.ff7ceep-1,
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_RLS_LAMBDA_LEARNING_RATE = 0x1.0624dep-10,
+    TOUCHPREDICTIONPARAMETERS_DEFAULT_RLS_EXPO_SMOOTH_ALPHA    = 0x1.fae148p-1,
+}
+
+enum int MIN_LOGICALDPIOVERRIDE = 0xfffffffe;
+
+enum : uint
+{
+    FE_FONTSMOOTHINGCLEARTYPE      = 0x00000002,
+    FE_FONTSMOOTHINGORIENTATIONBGR = 0x00000000,
+    FE_FONTSMOOTHINGORIENTATIONRGB = 0x00000001,
+}
+
+enum : uint
+{
+    CONTACTVISUALIZATION_ON               = 0x00000001,
+    CONTACTVISUALIZATION_PRESENTATIONMODE = 0x00000002,
+}
+
+enum : uint
+{
+    GESTUREVISUALIZATION_ON           = 0x0000001f,
+    GESTUREVISUALIZATION_TAP          = 0x00000001,
+    GESTUREVISUALIZATION_DOUBLETAP    = 0x00000002,
+    GESTUREVISUALIZATION_PRESSANDTAP  = 0x00000004,
+    GESTUREVISUALIZATION_PRESSANDHOLD = 0x00000008,
+    GESTUREVISUALIZATION_RIGHTTAP     = 0x00000010,
+}
+
+enum : uint
+{
+    MOUSEWHEEL_ROUTING_HYBRID    = 0x00000001,
+    MOUSEWHEEL_ROUTING_MOUSE_POS = 0x00000002,
+}
+
+enum : uint
+{
+    PENVISUALIZATION_OFF       = 0x00000000,
+    PENVISUALIZATION_TAP       = 0x00000001,
+    PENVISUALIZATION_DOUBLETAP = 0x00000002,
+    PENVISUALIZATION_CURSOR    = 0x00000020,
+}
+
+enum : uint
+{
+    PENARBITRATIONTYPE_WIN8 = 0x00000001,
+    PENARBITRATIONTYPE_FIS  = 0x00000002,
+    PENARBITRATIONTYPE_SPT  = 0x00000003,
+    PENARBITRATIONTYPE_MAX  = 0x00000004,
+}
+
+enum : int
+{
+    ARW_STARTMASK  = 0x00000003,
+    ARW_STARTRIGHT = 0x00000001,
+    ARW_STARTTOP   = 0x00000002,
+}
+
+enum : int
+{
+    ARW_RIGHT = 0x00000000,
+    ARW_UP    = 0x00000004,
+    ARW_DOWN  = 0x00000004,
+    ARW_HIDE  = 0x00000008,
+}
+
+enum uint HCF_DEFAULTDESKTOP = 0x00000200;
+enum uint FKF_FILTERKEYSON = 0x00000001;
+enum uint FKF_HOTKEYACTIVE = 0x00000004;
+enum uint FKF_HOTKEYSOUND = 0x00000010;
+enum uint FKF_CLICKON = 0x00000040;
+enum uint MKF_AVAILABLE = 0x00000002;
+enum uint MKF_CONFIRMHOTKEY = 0x00000008;
+enum uint MKF_INDICATOR = 0x00000020;
+enum uint MKF_REPLACENUMBERS = 0x00000080;
+enum uint MKF_RIGHTBUTTONSEL = 0x20000000;
+enum uint MKF_RIGHTBUTTONDOWN = 0x02000000;
+enum uint TKF_TOGGLEKEYSON = 0x00000001;
+enum uint TKF_HOTKEYACTIVE = 0x00000004;
+enum uint TKF_HOTKEYSOUND = 0x00000010;
+enum uint MONITORINFOF_PRIMARY = 0x00000001;
+
+enum : uint
+{
+    WINEVENT_SKIPOWNTHREAD  = 0x00000001,
+    WINEVENT_SKIPOWNPROCESS = 0x00000002,
+}
+
+enum uint CHILDID_SELF = 0x00000000;
+enum uint INDEXID_CONTAINER = 0x00000000;
+
+enum : uint
+{
+    EVENT_MAX                           = 0x7fffffff,
+    EVENT_SYSTEM_SOUND                  = 0x00000001,
+    EVENT_SYSTEM_ALERT                  = 0x00000002,
+    EVENT_SYSTEM_FOREGROUND             = 0x00000003,
+    EVENT_SYSTEM_MENUSTART              = 0x00000004,
+    EVENT_SYSTEM_MENUEND                = 0x00000005,
+    EVENT_SYSTEM_MENUPOPUPSTART         = 0x00000006,
+    EVENT_SYSTEM_MENUPOPUPEND           = 0x00000007,
+    EVENT_SYSTEM_CAPTURESTART           = 0x00000008,
+    EVENT_SYSTEM_CAPTUREEND             = 0x00000009,
+    EVENT_SYSTEM_MOVESIZESTART          = 0x0000000a,
+    EVENT_SYSTEM_MOVESIZEEND            = 0x0000000b,
+    EVENT_SYSTEM_CONTEXTHELPSTART       = 0x0000000c,
+    EVENT_SYSTEM_CONTEXTHELPEND         = 0x0000000d,
+    EVENT_SYSTEM_DRAGDROPSTART          = 0x0000000e,
+    EVENT_SYSTEM_DRAGDROPEND            = 0x0000000f,
+    EVENT_SYSTEM_DIALOGSTART            = 0x00000010,
+    EVENT_SYSTEM_DIALOGEND              = 0x00000011,
+    EVENT_SYSTEM_SCROLLINGSTART         = 0x00000012,
+    EVENT_SYSTEM_SCROLLINGEND           = 0x00000013,
+    EVENT_SYSTEM_SWITCHSTART            = 0x00000014,
+    EVENT_SYSTEM_SWITCHEND              = 0x00000015,
+    EVENT_SYSTEM_MINIMIZESTART          = 0x00000016,
+    EVENT_SYSTEM_MINIMIZEEND            = 0x00000017,
+    EVENT_SYSTEM_DESKTOPSWITCH          = 0x00000020,
+    EVENT_SYSTEM_SWITCHER_APPGRABBED    = 0x00000024,
+    EVENT_SYSTEM_SWITCHER_APPOVERTARGET = 0x00000025,
+    EVENT_SYSTEM_SWITCHER_APPDROPPED    = 0x00000026,
+    EVENT_SYSTEM_SWITCHER_CANCELLED     = 0x00000027,
+    EVENT_SYSTEM_IME_KEY_NOTIFICATION   = 0x00000029,
+}
+
+enum : uint
+{
+    EVENT_OEM_DEFINED_START = 0x00000101,
+    EVENT_OEM_DEFINED_END   = 0x000001ff,
+}
+
+enum : uint
+{
+    EVENT_UIA_EVENTID_END  = 0x00004eff,
+    EVENT_UIA_PROPID_START = 0x00007500,
+    EVENT_UIA_PROPID_END   = 0x000075ff,
+}
+
+enum : uint
+{
+    EVENT_CONSOLE_UPDATE_REGION     = 0x00004002,
+    EVENT_CONSOLE_UPDATE_SIMPLE     = 0x00004003,
+    EVENT_CONSOLE_UPDATE_SCROLL     = 0x00004004,
+    EVENT_CONSOLE_LAYOUT            = 0x00004005,
+    EVENT_CONSOLE_START_APPLICATION = 0x00004006,
+    EVENT_CONSOLE_END_APPLICATION   = 0x00004007,
+}
+
+enum : uint
+{
+    CONSOLE_CARET_SELECTION = 0x00000001,
+    CONSOLE_CARET_VISIBLE   = 0x00000002,
+}
+
+enum : uint
+{
+    EVENT_OBJECT_CREATE               = 0x00008000,
+    EVENT_OBJECT_DESTROY              = 0x00008001,
+    EVENT_OBJECT_SHOW                 = 0x00008002,
+    EVENT_OBJECT_HIDE                 = 0x00008003,
+    EVENT_OBJECT_REORDER              = 0x00008004,
+    EVENT_OBJECT_FOCUS                = 0x00008005,
+    EVENT_OBJECT_SELECTION            = 0x00008006,
+    EVENT_OBJECT_SELECTIONADD         = 0x00008007,
+    EVENT_OBJECT_SELECTIONREMOVE      = 0x00008008,
+    EVENT_OBJECT_SELECTIONWITHIN      = 0x00008009,
+    EVENT_OBJECT_STATECHANGE          = 0x0000800a,
+    EVENT_OBJECT_LOCATIONCHANGE       = 0x0000800b,
+    EVENT_OBJECT_NAMECHANGE           = 0x0000800c,
+    EVENT_OBJECT_DESCRIPTIONCHANGE    = 0x0000800d,
+    EVENT_OBJECT_VALUECHANGE          = 0x0000800e,
+    EVENT_OBJECT_PARENTCHANGE         = 0x0000800f,
+    EVENT_OBJECT_HELPCHANGE           = 0x00008010,
+    EVENT_OBJECT_DEFACTIONCHANGE      = 0x00008011,
+    EVENT_OBJECT_ACCELERATORCHANGE    = 0x00008012,
+    EVENT_OBJECT_INVOKED              = 0x00008013,
+    EVENT_OBJECT_TEXTSELECTIONCHANGED = 0x00008014,
+}
+
+enum uint EVENT_SYSTEM_ARRANGMENTPREVIEW = 0x00008016;
+
+enum : uint
+{
+    EVENT_OBJECT_UNCLOAKED                = 0x00008018,
+    EVENT_OBJECT_LIVEREGIONCHANGED        = 0x00008019,
+    EVENT_OBJECT_HOSTEDOBJECTSINVALIDATED = 0x00008020,
+}
+
+enum : uint
+{
+    EVENT_OBJECT_DRAGCANCEL                       = 0x00008022,
+    EVENT_OBJECT_DRAGCOMPLETE                     = 0x00008023,
+    EVENT_OBJECT_DRAGENTER                        = 0x00008024,
+    EVENT_OBJECT_DRAGLEAVE                        = 0x00008025,
+    EVENT_OBJECT_DRAGDROPPED                      = 0x00008026,
+    EVENT_OBJECT_IME_SHOW                         = 0x00008027,
+    EVENT_OBJECT_IME_HIDE                         = 0x00008028,
+    EVENT_OBJECT_IME_CHANGE                       = 0x00008029,
+    EVENT_OBJECT_TEXTEDIT_CONVERSIONTARGETCHANGED = 0x00008030,
+}
+
+enum : uint
+{
+    EVENT_AIA_START = 0x0000a000,
+    EVENT_AIA_END   = 0x0000afff,
+}
+
+enum : uint
+{
+    SOUND_SYSTEM_SHUTDOWN    = 0x00000002,
+    SOUND_SYSTEM_BEEP        = 0x00000003,
+    SOUND_SYSTEM_ERROR       = 0x00000004,
+    SOUND_SYSTEM_QUESTION    = 0x00000005,
+    SOUND_SYSTEM_WARNING     = 0x00000006,
+    SOUND_SYSTEM_INFORMATION = 0x00000007,
+    SOUND_SYSTEM_MAXIMIZE    = 0x00000008,
+    SOUND_SYSTEM_MINIMIZE    = 0x00000009,
+    SOUND_SYSTEM_RESTOREUP   = 0x0000000a,
+    SOUND_SYSTEM_RESTOREDOWN = 0x0000000b,
+    SOUND_SYSTEM_APPSTART    = 0x0000000c,
+    SOUND_SYSTEM_FAULT       = 0x0000000d,
+    SOUND_SYSTEM_APPEND      = 0x0000000e,
+    SOUND_SYSTEM_MENUCOMMAND = 0x0000000f,
+    SOUND_SYSTEM_MENUPOPUP   = 0x00000010,
+}
+
+enum uint CALERT_SYSTEM = 0x00000006;
+enum uint USER_DEFAULT_SCREEN_DPI = 0x00000060;
+
+enum : uint
+{
+    STATE_SYSTEM_FOCUSED         = 0x00000004,
+    STATE_SYSTEM_CHECKED         = 0x00000010,
+    STATE_SYSTEM_MIXED           = 0x00000020,
+    STATE_SYSTEM_INDETERMINATE   = 0x00000020,
+    STATE_SYSTEM_READONLY        = 0x00000040,
+    STATE_SYSTEM_HOTTRACKED      = 0x00000080,
+    STATE_SYSTEM_DEFAULT         = 0x00000100,
+    STATE_SYSTEM_EXPANDED        = 0x00000200,
+    STATE_SYSTEM_COLLAPSED       = 0x00000400,
+    STATE_SYSTEM_BUSY            = 0x00000800,
+    STATE_SYSTEM_FLOATING        = 0x00001000,
+    STATE_SYSTEM_MARQUEED        = 0x00002000,
+    STATE_SYSTEM_ANIMATED        = 0x00004000,
+    STATE_SYSTEM_SIZEABLE        = 0x00020000,
+    STATE_SYSTEM_MOVEABLE        = 0x00040000,
+    STATE_SYSTEM_SELFVOICING     = 0x00080000,
+    STATE_SYSTEM_SELECTABLE      = 0x00200000,
+    STATE_SYSTEM_LINKED          = 0x00400000,
+    STATE_SYSTEM_TRAVERSED       = 0x00800000,
+    STATE_SYSTEM_MULTISELECTABLE = 0x01000000,
+    STATE_SYSTEM_EXTSELECTABLE   = 0x02000000,
+    STATE_SYSTEM_ALERT_LOW       = 0x04000000,
+    STATE_SYSTEM_ALERT_MEDIUM    = 0x08000000,
+    STATE_SYSTEM_ALERT_HIGH      = 0x10000000,
+    STATE_SYSTEM_PROTECTED       = 0x20000000,
+    STATE_SYSTEM_VALID           = 0x3fffffff,
+}
+
+enum uint CCHILDREN_SCROLLBAR = 0x00000005;
+
+enum : uint
+{
+    RIM_INPUT     = 0x00000000,
+    RIM_INPUTSINK = 0x00000001,
+}
+
+enum : uint
+{
+    RI_MOUSE_LEFT_BUTTON_DOWN = 0x00000001,
+    RI_MOUSE_LEFT_BUTTON_UP   = 0x00000002,
+}
+
+enum uint RI_MOUSE_RIGHT_BUTTON_UP = 0x00000008;
+enum uint RI_MOUSE_MIDDLE_BUTTON_UP = 0x00000020;
+
+enum : uint
+{
+    RI_MOUSE_BUTTON_1_UP   = 0x00000002,
+    RI_MOUSE_BUTTON_2_DOWN = 0x00000004,
+    RI_MOUSE_BUTTON_2_UP   = 0x00000008,
+    RI_MOUSE_BUTTON_3_DOWN = 0x00000010,
+    RI_MOUSE_BUTTON_3_UP   = 0x00000020,
+    RI_MOUSE_BUTTON_4_DOWN = 0x00000040,
+    RI_MOUSE_BUTTON_4_UP   = 0x00000080,
+    RI_MOUSE_BUTTON_5_DOWN = 0x00000100,
+    RI_MOUSE_BUTTON_5_UP   = 0x00000200,
+    RI_MOUSE_WHEEL         = 0x00000400,
+    RI_MOUSE_HWHEEL        = 0x00000800,
+}
+
+enum : uint
+{
+    RI_KEY_BREAK           = 0x00000001,
+    RI_KEY_E0              = 0x00000002,
+    RI_KEY_E1              = 0x00000004,
+    RI_KEY_TERMSRV_SET_LED = 0x00000008,
+    RI_KEY_TERMSRV_SHADOW  = 0x00000010,
+}
+
+enum : uint
+{
+    GIDC_ARRIVAL = 0x00000001,
+    GIDC_REMOVAL = 0x00000002,
+}
+
+enum uint PDC_ARRIVAL = 0x00000001;
+
+enum : uint
+{
+    PDC_ORIENTATION_0   = 0x00000004,
+    PDC_ORIENTATION_90  = 0x00000008,
+    PDC_ORIENTATION_180 = 0x00000010,
+    PDC_ORIENTATION_270 = 0x00000020,
+}
+
+enum uint PDC_MODE_CENTERED = 0x00000080;
+enum uint PDC_RESOLUTION = 0x00000200;
+enum uint PDC_MODE_ASPECTRATIOPRESERVED = 0x00000800;
+enum uint TOUCHPAD_PARAMETERS_VERSION_2 = 0x00000002;
+enum uint GF_INERTIA = 0x00000002;
+enum uint GESTURECONFIGMAXCOUNT = 0x00000100;
+enum uint NID_INTEGRATED_TOUCH = 0x00000001;
+enum uint NID_INTEGRATED_PEN = 0x00000004;
+enum uint NID_MULTI_INPUT = 0x00000040;
+enum uint MAX_STR_BLOCKREASON = 0x00000100;
+enum uint WM_TOOLTIPDISMISS = 0x00000345;
+enum uint WM_CLOAKED_STATE_CHANGED = 0x00000347;
+
+enum : HBITMAP
+{
+    HBMMENU_SYSTEM          = HBITMAP(cast(void*)0x00000001),
+    HBMMENU_MBAR_RESTORE    = HBITMAP(cast(void*)0x00000002),
+    HBMMENU_MBAR_MINIMIZE   = HBITMAP(cast(void*)0x00000003),
+    HBMMENU_MBAR_CLOSE      = HBITMAP(cast(void*)0x00000005),
+    HBMMENU_MBAR_CLOSE_D    = HBITMAP(cast(void*)0x00000006),
+    HBMMENU_MBAR_MINIMIZE_D = HBITMAP(cast(void*)0x00000007),
+}
+
+enum : HBITMAP
+{
+    HBMMENU_POPUP_RESTORE  = HBITMAP(cast(void*)0x00000009),
+    HBMMENU_POPUP_MAXIMIZE = HBITMAP(cast(void*)0x0000000a),
+    HBMMENU_POPUP_MINIMIZE = HBITMAP(cast(void*)0x0000000b),
+}
+
+enum int LBS_STANDARD = 0x00a00003;
+enum uint WVR_REDRAW = 0x00000300;
+enum PWSTR RT_GROUP_ICON = PWSTR(cast(wchar*)cast(ushort)0x000e);
+enum int IDC_STATIC = 0xffffffff;
+
+// Callbacks
+
+alias WNDPROC = LRESULT function(HWND param0, uint param1, WPARAM param2, LPARAM param3);
+alias DLGPROC = ptrdiff_t function(HWND param0, uint param1, WPARAM param2, LPARAM param3);
+alias TIMERPROC = void function(HWND param0, uint param1, size_t param2, uint param3);
+alias WNDENUMPROC = BOOL function(HWND param0, LPARAM param1);
+alias HOOKPROC = LRESULT function(int code, WPARAM wParam, LPARAM lParam);
+alias SENDASYNCPROC = void function(HWND param0, uint param1, size_t param2, LRESULT param3);
+//DELEGATE ATTR: AnsiAttribute : CustomAttributeSig([], [])
+alias PROPENUMPROCA = BOOL function(HWND param0, const(PSTR) param1, HANDLE param2);
+//DELEGATE ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+alias PROPENUMPROCW = BOOL function(HWND param0, const(PWSTR) param1, HANDLE param2);
+//DELEGATE ATTR: AnsiAttribute : CustomAttributeSig([], [])
+alias PROPENUMPROCEXA = BOOL function(HWND param0, PSTR param1, HANDLE param2, size_t param3);
+//DELEGATE ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+alias PROPENUMPROCEXW = BOOL function(HWND param0, PWSTR param1, HANDLE param2, size_t param3);
+//DELEGATE ATTR: AnsiAttribute : CustomAttributeSig([], [])
+alias NAMEENUMPROCA = BOOL function(PSTR param0, LPARAM param1);
+//DELEGATE ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+alias NAMEENUMPROCW = BOOL function(PWSTR param0, LPARAM param1);
+alias PREGISTERCLASSNAMEW = BOOLEAN function(const(PWSTR) param0);
+alias MSGBOXCALLBACK = void function(HELPINFO* lpHelpInfo);
+
+// Structs
+
+
+@RAIIFree!UnhookWindowsHookEx
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HHOOK
+{
+    void* Value;
+}
+
+@RAIIFree!DestroyIcon
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HICON
+{
+    void* Value;
+}
+
+@RAIIFree!DestroyMenu
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HMENU
+{
+    void* Value;
+}
+
+@RAIIFree!DestroyCursor
+//STRUCT ATTR: AlsoUsableForAttribute : CustomAttributeSig([FixedArgSig(ElementSig(HICON))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HCURSOR
+{
+    void* Value;
+}
+
+@RAIIFree!DestroyAcceleratorTable
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HACCEL
+{
+    void* Value;
+}
+
+@RAIIFree!UnregisterDeviceNotification
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(-1))], [])
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HDEVNOTIFY
+{
+    void* Value;
+}
+
+//STRUCT ATTR: InvalidHandleValueAttribute : CustomAttributeSig([FixedArgSig(ElementSig(0))], [])
+struct HDWP
+{
+    void* Value;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-message_resource_entry))], [])
+struct MESSAGE_RESOURCE_ENTRY
+{
+    ushort Length;
+    ushort Flags;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/ubyte[1] Text;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-message_resource_block))], [])
+struct MESSAGE_RESOURCE_BLOCK
+{
+    uint LowId;
+    uint HighId;
+    uint OffsetToEntries;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-message_resource_data))], [])
+struct MESSAGE_RESOURCE_DATA
+{
+    uint NumberOfBlocks;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/MESSAGE_RESOURCE_BLOCK[1] Blocks;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cbt_createwnda))], [])
+struct CBT_CREATEWNDA
+{
+    CREATESTRUCTA* lpcs;
+    HWND           hwndInsertAfter;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cbt_createwndw))], [])
+struct CBT_CREATEWNDW
+{
+    CREATESTRUCTW* lpcs;
+    HWND           hwndInsertAfter;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cbtactivatestruct))], [])
+struct CBTACTIVATESTRUCT
+{
+    BOOL fMouse;
+    HWND hWndActive;
+}
+
+struct SHELLHOOKINFO
+{
+    HWND hwnd;
+    RECT rc;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-eventmsg))], [])
+struct EVENTMSG
+{
+    uint message;
+    uint paramL;
+    uint paramH;
+    uint time;
+    HWND hwnd;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cwpstruct))], [])
+struct CWPSTRUCT
+{
+    LPARAM lParam;
+    WPARAM wParam;
+    uint   message;
+    HWND   hwnd;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cwpretstruct))], [])
+struct CWPRETSTRUCT
+{
+    LRESULT lResult;
+    LPARAM  lParam;
+    WPARAM  wParam;
+    uint    message;
+    HWND    hwnd;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-kbdllhookstruct))], [])
+struct KBDLLHOOKSTRUCT
+{
+    uint   vkCode;
+    uint   scanCode;
+    KBDLLHOOKSTRUCT_FLAGS flags;
+    uint   time;
+    size_t dwExtraInfo;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-msllhookstruct))], [])
+struct MSLLHOOKSTRUCT
+{
+    POINT  pt;
+    uint   mouseData;
+    uint   flags;
+    uint   time;
+    size_t dwExtraInfo;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-debughookinfo))], [])
+struct DEBUGHOOKINFO
+{
+    uint   idThread;
+    uint   idThreadInstaller;
+    LPARAM lParam;
+    WPARAM wParam;
+    int    code;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-mousehookstruct))], [])
+struct MOUSEHOOKSTRUCT
+{
+    POINT  pt;
+    HWND   hwnd;
+    uint   wHitTestCode;
+    size_t dwExtraInfo;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-mousehookstructex))], [])
+struct MOUSEHOOKSTRUCTEX
+{
+    MOUSEHOOKSTRUCT Base;
+    uint            mouseData;
+}
+
+struct HARDWAREHOOKSTRUCT
+{
+    HWND   hwnd;
+    uint   message;
+    WPARAM wParam;
+    LPARAM lParam;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-wndclassexa))], [])
+struct WNDCLASSEXA
+{
+    uint            cbSize;
+    WNDCLASS_STYLES style;
+    WNDPROC         lpfnWndProc;
+    int             cbClsExtra;
+    int             cbWndExtra;
+    HINSTANCE       hInstance;
+    HICON           hIcon;
+    HCURSOR         hCursor;
+    HBRUSH          hbrBackground;
+    const(PSTR)     lpszMenuName;
+    const(PSTR)     lpszClassName;
+    HICON           hIconSm;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-wndclassexw))], [])
+struct WNDCLASSEXW
+{
+    uint            cbSize;
+    WNDCLASS_STYLES style;
+    WNDPROC         lpfnWndProc;
+    int             cbClsExtra;
+    int             cbWndExtra;
+    HINSTANCE       hInstance;
+    HICON           hIcon;
+    HCURSOR         hCursor;
+    HBRUSH          hbrBackground;
+    const(PWSTR)    lpszMenuName;
+    const(PWSTR)    lpszClassName;
+    HICON           hIconSm;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-wndclassa))], [])
+struct WNDCLASSA
+{
+    WNDCLASS_STYLES style;
+    WNDPROC         lpfnWndProc;
+    int             cbClsExtra;
+    int             cbWndExtra;
+    HINSTANCE       hInstance;
+    HICON           hIcon;
+    HCURSOR         hCursor;
+    HBRUSH          hbrBackground;
+    const(PSTR)     lpszMenuName;
+    const(PSTR)     lpszClassName;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-wndclassw))], [])
+struct WNDCLASSW
+{
+    WNDCLASS_STYLES style;
+    WNDPROC         lpfnWndProc;
+    int             cbClsExtra;
+    int             cbWndExtra;
+    HINSTANCE       hInstance;
+    HICON           hIcon;
+    HCURSOR         hCursor;
+    HBRUSH          hbrBackground;
+    const(PWSTR)    lpszMenuName;
+    const(PWSTR)    lpszClassName;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-msg))], [])
+struct MSG
+{
+    HWND   hwnd;
+    uint   message;
+    WPARAM wParam;
+    LPARAM lParam;
+    uint   time;
+    POINT  pt;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-minmaxinfo))], [])
+struct MINMAXINFO
+{
+    POINT ptReserved;
+    POINT ptMaxSize;
+    POINT ptMaxPosition;
+    POINT ptMinTrackSize;
+    POINT ptMaxTrackSize;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-mdinextmenu))], [])
+struct MDINEXTMENU
+{
+    HMENU hmenuIn;
+    HMENU hmenuNext;
+    HWND  hwndNext;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-windowpos))], [])
+struct WINDOWPOS
+{
+    HWND                 hwnd;
+    HWND                 hwndInsertAfter;
+    int                  x;
+    int                  y;
+    int                  cx;
+    int                  cy;
+    SET_WINDOW_POS_FLAGS flags;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-nccalcsize_params))], [])
+struct NCCALCSIZE_PARAMS
+{
+    RECT[3]    rgrc;
+    WINDOWPOS* lppos;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-accel))], [])
+struct ACCEL
+{
+    ACCEL_VIRT_FLAGS fVirt;
+    ushort           key;
+    ushort           cmd;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-createstructa))], [])
+struct CREATESTRUCTA
+{
+    void*           lpCreateParams;
+    HINSTANCE       hInstance;
+    HMENU           hMenu;
+    HWND            hwndParent;
+    int             cy;
+    int             cx;
+    int             y;
+    int             x;
+    /*FIELD ATTR: AssociatedEnumAttribute : CustomAttributeSig([FixedArgSig(ElementSig(WINDOW_STYLE))], [])*/int style;
+    const(PSTR)     lpszName;
+    const(PSTR)     lpszClass;
+    WINDOW_EX_STYLE dwExStyle;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-createstructw))], [])
+struct CREATESTRUCTW
+{
+    void*           lpCreateParams;
+    HINSTANCE       hInstance;
+    HMENU           hMenu;
+    HWND            hwndParent;
+    int             cy;
+    int             cx;
+    int             y;
+    int             x;
+    /*FIELD ATTR: AssociatedEnumAttribute : CustomAttributeSig([FixedArgSig(ElementSig(WINDOW_STYLE))], [])*/int style;
+    const(PWSTR)    lpszName;
+    const(PWSTR)    lpszClass;
+    WINDOW_EX_STYLE dwExStyle;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-windowplacement))], [])
+struct WINDOWPLACEMENT
+{
+    uint  length;
+    WINDOWPLACEMENT_FLAGS flags;
+    /*FIELD ATTR: AssociatedEnumAttribute : CustomAttributeSig([FixedArgSig(ElementSig(SHOW_WINDOW_CMD))], [])*/uint showCmd;
+    POINT ptMinPosition;
+    POINT ptMaxPosition;
+    RECT  rcNormalPosition;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-stylestruct))], [])
+struct STYLESTRUCT
+{
+    uint styleOld;
+    uint styleNew;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-updatelayeredwindowinfo))], [])
+struct UPDATELAYEREDWINDOWINFO
+{
+    uint          cbSize;
+    HDC           hdcDst;
+    const(POINT)* pptDst;
+    const(SIZE)*  psize;
+    HDC           hdcSrc;
+    const(POINT)* pptSrc;
+    COLORREF      crKey;
+    const(BLENDFUNCTION)* pblend;
+    UPDATE_LAYERED_WINDOW_FLAGS dwFlags;
+    const(RECT)*  prcDirty;
+}
+
+struct FRAME_MARGIN
+{
+    short left;
+    short right;
+    short top;
+    short bottom;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-flashwinfo))], [])
+struct FLASHWINFO
+{
+    uint             cbSize;
+    HWND             hwnd;
+    FLASHWINFO_FLAGS dwFlags;
+    uint             uCount;
+    uint             dwTimeout;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-dlgtemplate))], [])
+struct DLGTEMPLATE
+{
+align (2):
+    uint   style;
+    uint   dwExtendedStyle;
+    ushort cdit;
+    short  x;
+    short  y;
+    short  cx;
+    short  cy;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-dlgitemtemplate))], [])
+struct DLGITEMTEMPLATE
+{
+align (2):
+    uint   style;
+    uint   dwExtendedStyle;
+    short  x;
+    short  y;
+    short  cx;
+    short  cy;
+    ushort id;
+}
+
+struct GETCLIPBMETADATA
+{
+    uint Version;
+    BOOL IsDelayRendered;
+    BOOL IsSynthetic;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-tpmparams))], [])
+struct TPMPARAMS
+{
+    uint cbSize;
+    RECT rcExclude;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menuinfo))], [])
+struct MENUINFO
+{
+    uint           cbSize;
+    MENUINFO_MASK  fMask;
+    MENUINFO_STYLE dwStyle;
+    uint           cyMax;
+    HBRUSH         hbrBack;
+    uint           dwContextHelpID;
+    size_t         dwMenuData;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menugetobjectinfo))], [])
+struct MENUGETOBJECTINFO
+{
+    MENUGETOBJECTINFO_FLAGS dwFlags;
+    uint  uPos;
+    HMENU hmenu;
+    void* riid;
+    void* pvObj;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menuiteminfoa))], [])
+struct MENUITEMINFOA
+{
+    uint            cbSize;
+    MENU_ITEM_MASK  fMask;
+    MENU_ITEM_TYPE  fType;
+    MENU_ITEM_STATE fState;
+    uint            wID;
+    HMENU           hSubMenu;
+    HBITMAP         hbmpChecked;
+    HBITMAP         hbmpUnchecked;
+    size_t          dwItemData;
+    PSTR            dwTypeData;
+    uint            cch;
+    HBITMAP         hbmpItem;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menuiteminfow))], [])
+struct MENUITEMINFOW
+{
+    uint            cbSize;
+    MENU_ITEM_MASK  fMask;
+    MENU_ITEM_TYPE  fType;
+    MENU_ITEM_STATE fState;
+    uint            wID;
+    HMENU           hSubMenu;
+    HBITMAP         hbmpChecked;
+    HBITMAP         hbmpUnchecked;
+    size_t          dwItemData;
+    PWSTR           dwTypeData;
+    uint            cch;
+    HBITMAP         hbmpItem;
+}
+
+struct DROPSTRUCT
+{
+    HWND   hwndSource;
+    HWND   hwndSink;
+    uint   wFmt;
+    size_t dwData;
+    POINT  ptDrop;
+    uint   dwControlData;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-msgboxparamsa))], [])
+struct MSGBOXPARAMSA
+{
+    uint             cbSize;
+    HWND             hwndOwner;
+    HINSTANCE        hInstance;
+    const(PSTR)      lpszText;
+    const(PSTR)      lpszCaption;
+    MESSAGEBOX_STYLE dwStyle;
+    const(PSTR)      lpszIcon;
+    size_t           dwContextHelpId;
+    MSGBOXCALLBACK   lpfnMsgBoxCallback;
+    uint             dwLanguageId;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-msgboxparamsw))], [])
+struct MSGBOXPARAMSW
+{
+    uint             cbSize;
+    HWND             hwndOwner;
+    HINSTANCE        hInstance;
+    const(PWSTR)     lpszText;
+    const(PWSTR)     lpszCaption;
+    MESSAGEBOX_STYLE dwStyle;
+    const(PWSTR)     lpszIcon;
+    size_t           dwContextHelpId;
+    MSGBOXCALLBACK   lpfnMsgBoxCallback;
+    uint             dwLanguageId;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menuitemtemplateheader))], [])
+struct MENUITEMTEMPLATEHEADER
+{
+    ushort versionNumber;
+    ushort offset;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menuitemtemplate))], [])
+struct MENUITEMTEMPLATE
+{
+    ushort mtOption;
+    ushort mtID;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/wchar[1] mtString;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-iconinfo))], [])
+struct ICONINFO
+{
+    BOOL    fIcon;
+    uint    xHotspot;
+    uint    yHotspot;
+    HBITMAP hbmMask;
+    HBITMAP hbmColor;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cursorshape))], [])
+struct CURSORSHAPE
+{
+    int   xHotSpot;
+    int   yHotSpot;
+    int   cx;
+    int   cy;
+    int   cbWidth;
+    ubyte Planes;
+    ubyte BitsPixel;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-iconinfoexa))], [])
+struct ICONINFOEXA
+{
+    uint      cbSize;
+    BOOL      fIcon;
+    uint      xHotspot;
+    uint      yHotspot;
+    HBITMAP   hbmMask;
+    HBITMAP   hbmColor;
+    ushort    wResID;
+    CHAR[260] szModName;
+    CHAR[260] szResName;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-iconinfoexw))], [])
+struct ICONINFOEXW
+{
+    uint       cbSize;
+    BOOL       fIcon;
+    uint       xHotspot;
+    uint       yHotspot;
+    HBITMAP    hbmMask;
+    HBITMAP    hbmColor;
+    ushort     wResID;
+    wchar[260] szModName;
+    wchar[260] szResName;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-scrollinfo))], [])
+struct SCROLLINFO
+{
+    uint            cbSize;
+    SCROLLINFO_MASK fMask;
+    int             nMin;
+    int             nMax;
+    uint            nPage;
+    int             nPos;
+    int             nTrackPos;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-mdicreatestructa))], [])
+struct MDICREATESTRUCTA
+{
+    const(PSTR)  szClass;
+    const(PSTR)  szTitle;
+    HANDLE       hOwner;
+    int          x;
+    int          y;
+    int          cx;
+    int          cy;
+    WINDOW_STYLE style;
+    LPARAM       lParam;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-mdicreatestructw))], [])
+struct MDICREATESTRUCTW
+{
+    const(PWSTR) szClass;
+    const(PWSTR) szTitle;
+    HANDLE       hOwner;
+    int          x;
+    int          y;
+    int          cx;
+    int          cy;
+    WINDOW_STYLE style;
+    LPARAM       lParam;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-clientcreatestruct))], [])
+struct CLIENTCREATESTRUCT
+{
+    HANDLE hWindowMenu;
+    uint   idFirstChild;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-touchpredictionparameters))], [])
+struct TOUCHPREDICTIONPARAMETERS
+{
+    uint cbSize;
+    uint dwLatency;
+    uint dwSampleTime;
+    uint bUseHWTimeStamp;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-nonclientmetricsa))], [])
+struct NONCLIENTMETRICSA
+{
+    uint     cbSize;
+    int      iBorderWidth;
+    int      iScrollWidth;
+    int      iScrollHeight;
+    int      iCaptionWidth;
+    int      iCaptionHeight;
+    LOGFONTA lfCaptionFont;
+    int      iSmCaptionWidth;
+    int      iSmCaptionHeight;
+    LOGFONTA lfSmCaptionFont;
+    int      iMenuWidth;
+    int      iMenuHeight;
+    LOGFONTA lfMenuFont;
+    LOGFONTA lfStatusFont;
+    LOGFONTA lfMessageFont;
+    int      iPaddedBorderWidth;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-nonclientmetricsw))], [])
+struct NONCLIENTMETRICSW
+{
+    uint     cbSize;
+    int      iBorderWidth;
+    int      iScrollWidth;
+    int      iScrollHeight;
+    int      iCaptionWidth;
+    int      iCaptionHeight;
+    LOGFONTW lfCaptionFont;
+    int      iSmCaptionWidth;
+    int      iSmCaptionHeight;
+    LOGFONTW lfSmCaptionFont;
+    int      iMenuWidth;
+    int      iMenuHeight;
+    LOGFONTW lfMenuFont;
+    LOGFONTW lfStatusFont;
+    LOGFONTW lfMessageFont;
+    int      iPaddedBorderWidth;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-minimizedmetrics))], [])
+struct MINIMIZEDMETRICS
+{
+    uint cbSize;
+    int  iWidth;
+    int  iHorzGap;
+    int  iVertGap;
+    MINIMIZEDMETRICS_ARRANGE iArrange;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-iconmetricsa))], [])
+struct ICONMETRICSA
+{
+    uint     cbSize;
+    int      iHorzSpacing;
+    int      iVertSpacing;
+    int      iTitleWrap;
+    LOGFONTA lfFont;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-iconmetricsw))], [])
+struct ICONMETRICSW
+{
+    uint     cbSize;
+    int      iHorzSpacing;
+    int      iVertSpacing;
+    int      iTitleWrap;
+    LOGFONTW lfFont;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-animationinfo))], [])
+struct ANIMATIONINFO
+{
+    uint cbSize;
+    int  iMinAnimate;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-audiodescription))], [])
+struct AUDIODESCRIPTION
+{
+    uint cbSize;
+    BOOL Enabled;
+    uint Locale;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-guithreadinfo))], [])
+struct GUITHREADINFO
+{
+    uint                cbSize;
+    GUITHREADINFO_FLAGS flags;
+    HWND                hwndActive;
+    HWND                hwndFocus;
+    HWND                hwndCapture;
+    HWND                hwndMenuOwner;
+    HWND                hwndMoveSize;
+    HWND                hwndCaret;
+    RECT                rcCaret;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-cursorinfo))], [])
+struct CURSORINFO
+{
+    uint             cbSize;
+    CURSORINFO_FLAGS flags;
+    HCURSOR          hCursor;
+    POINT            ptScreenPos;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-windowinfo))], [])
+struct WINDOWINFO
+{
+    uint            cbSize;
+    RECT            rcWindow;
+    RECT            rcClient;
+    WINDOW_STYLE    dwStyle;
+    WINDOW_EX_STYLE dwExStyle;
+    uint            dwWindowStatus;
+    uint            cxWindowBorders;
+    uint            cyWindowBorders;
+    ushort          atomWindowType;
+    ushort          wCreatorVersion;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-titlebarinfo))], [])
+struct TITLEBARINFO
+{
+    uint    cbSize;
+    RECT    rcTitleBar;
+    uint[6] rgstate;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-titlebarinfoex))], [])
+struct TITLEBARINFOEX
+{
+    uint    cbSize;
+    RECT    rcTitleBar;
+    uint[6] rgstate;
+    RECT[6] rgrect;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-menubarinfo))], [])
+struct MENUBARINFO
+{
+    uint  cbSize;
+    RECT  rcBar;
+    HMENU hMenu;
+    HWND  hwndMenu;
+    /*FIELD ATTR: NativeBitfieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(fUnused)), FixedArgSig(ElementSig(2)), FixedArgSig(ElementSig(30))], [])*/int _bitfield69;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-scrollbarinfo))], [])
+struct SCROLLBARINFO
+{
+    uint    cbSize;
+    RECT    rcScrollBar;
+    int     dxyLineButton;
+    int     xyThumbTop;
+    int     xyThumbBottom;
+    int     reserved;
+    uint[6] rgstate;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-alttabinfo))], [])
+struct ALTTABINFO
+{
+    uint  cbSize;
+    int   cItems;
+    int   cColumns;
+    int   cRows;
+    int   iColFocus;
+    int   iRowFocus;
+    int   cxItem;
+    int   cyItem;
+    POINT ptStart;
+}
+
+struct TOUCHPAD_PARAMETERS_V1
+{
+    uint versionNumber;
+    uint maxSupportedContacts;
+    LEGACY_TOUCHPAD_FEATURES legacyTouchpadFeatures;
+    /*FIELD ATTR: NativeBitfieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(Reserved1)), FixedArgSig(ElementSig(7)), FixedArgSig(ElementSig(25))], [])*/int _bitfield1;
+    /*FIELD ATTR: NativeBitfieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(Reserved2)), FixedArgSig(ElementSig(10)), FixedArgSig(ElementSig(22))], [])*/int _bitfield2;
+    TOUCHPAD_SENSITIVITY_LEVEL sensitivityLevel;
+    uint cursorSpeed;
+    uint feedbackIntensity;
+    uint clickForceSensitivity;
+    uint rightClickZoneWidth;
+    uint rightClickZoneHeight;
+}
+
+struct TOUCHPAD_PARAMETERS_V2
+{
+    TOUCHPAD_PARAMETERS_V1 Base;
+    /*FIELD ATTR: NativeBitfieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(Reserved3)), FixedArgSig(ElementSig(3)), FixedArgSig(ElementSig(29))], [])*/int _bitfield70;
+}
+
+//STRUCT ATTR: StructSizeFieldAttribute : CustomAttributeSig([FixedArgSig(ElementSig(cbSize))], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/ns-winuser-changefilterstruct))], [])
+struct CHANGEFILTERSTRUCT
+{
+    uint              cbSize;
+    MSGFLTINFO_STATUS ExtStatus;
+}
+
+struct WINDOW_ACTION
+{
+    WINDOW_ACTION_KINDS kinds;
+    WINDOW_ACTION_MODIFIERS modifiers;
+    BOOL                visible;
+    POINT               position;
+    SIZE                size;
+    HWND                insertAfter;
+    WINDOW_PLACEMENT_STATE placementState;
+    RECT                normalRect;
+    RECT                workArea;
+    uint                dpi;
+    POINT               pointOnMonitor;
+    uint                monitorTopologyId;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/menuex-template-header))], [])
+struct MENUEX_TEMPLATE_HEADER
+{
+    ushort wVersion;
+    ushort wOffset;
+    uint   dwHelpId;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/menuex-template-item))], [])
+struct MENUEX_TEMPLATE_ITEM
+{
+    uint   dwType;
+    uint   dwState;
+    uint   uId;
+    ushort wFlags;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/wchar[1] szText;
+}
+
+struct MENUTEMPLATEEX
+{
+union Anonymous
+    {
+struct Menu
+        {
+            MENUITEMTEMPLATEHEADER mitHeader;
+            /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/MENUITEMTEMPLATE[1] miTemplate;
+        }
+struct MenuEx
+        {
+            MENUEX_TEMPLATE_HEADER mexHeader;
+            /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/MENUEX_TEMPLATE_ITEM[1] mexItem;
+        }
+    }
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/resourceindexer/ns-resourceindexer-indexedresourcequalifier))], [])
+struct IndexedResourceQualifier
+{
+    PWSTR name;
+    PWSTR value;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmresourceindexerhandle))], [])
+struct MrmResourceIndexerHandle
+{
+    void* handle;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmresourceindexermessage))], [])
+struct MrmResourceIndexerMessage
+{
+    MrmResourceIndexerMessageSeverity severity;
+    uint         id;
+    const(PWSTR) text;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_hdr))], [])
+struct DEV_BROADCAST_HDR
+{
+    uint dbch_size;
+    DEV_BROADCAST_HDR_DEVICE_TYPE dbch_devicetype;
+    uint dbch_reserved;
+}
+
+struct VolLockBroadcast
+{
+    DEV_BROADCAST_HDR vlb_dbh;
+    uint              vlb_owner;
+    ubyte             vlb_perms;
+    ubyte             vlb_lockType;
+    ubyte             vlb_drive;
+    ubyte             vlb_flags;
+}
+
+struct _DEV_BROADCAST_HEADER
+{
+    uint dbcd_size;
+    uint dbcd_devicetype;
+    uint dbcd_reserved;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_oem))], [])
+struct DEV_BROADCAST_OEM
+{
+    uint dbco_size;
+    uint dbco_devicetype;
+    uint dbco_reserved;
+    uint dbco_identifier;
+    uint dbco_suppfunc;
+}
+
+struct DEV_BROADCAST_DEVNODE
+{
+    uint dbcd_size;
+    uint dbcd_devicetype;
+    uint dbcd_reserved;
+    uint dbcd_devnode;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_volume))], [])
+struct DEV_BROADCAST_VOLUME
+{
+    uint dbcv_size;
+    uint dbcv_devicetype;
+    uint dbcv_reserved;
+    uint dbcv_unitmask;
+    DEV_BROADCAST_VOLUME_FLAGS dbcv_flags;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_port_a))], [])
+struct DEV_BROADCAST_PORT_A
+{
+    uint dbcp_size;
+    uint dbcp_devicetype;
+    uint dbcp_reserved;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/CHAR[1] dbcp_name;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_port_w))], [])
+struct DEV_BROADCAST_PORT_W
+{
+    uint dbcp_size;
+    uint dbcp_devicetype;
+    uint dbcp_reserved;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/wchar[1] dbcp_name;
+}
+
+struct DEV_BROADCAST_NET
+{
+    uint dbcn_size;
+    uint dbcn_devicetype;
+    uint dbcn_reserved;
+    uint dbcn_resource;
+    uint dbcn_flags;
+}
+
+//STRUCT ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_deviceinterface_a))], [])
+struct DEV_BROADCAST_DEVICEINTERFACE_A
+{
+    uint dbcc_size;
+    uint dbcc_devicetype;
+    uint dbcc_reserved;
+    GUID dbcc_classguid;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/CHAR[1] dbcc_name;
+}
+
+//STRUCT ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_deviceinterface_w))], [])
+struct DEV_BROADCAST_DEVICEINTERFACE_W
+{
+    uint dbcc_size;
+    uint dbcc_devicetype;
+    uint dbcc_reserved;
+    GUID dbcc_classguid;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/wchar[1] dbcc_name;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-dev_broadcast_handle))], [])
+struct DEV_BROADCAST_HANDLE
+{
+    uint       dbch_size;
+    uint       dbch_devicetype;
+    uint       dbch_reserved;
+    HANDLE     dbch_handle;
+    HDEVNOTIFY dbch_hdevnotify;
+    GUID       dbch_eventguid;
+    int        dbch_nameoffset;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/ubyte[1] dbch_data;
+}
+
+struct DEV_BROADCAST_HANDLE32
+{
+    uint dbch_size;
+    uint dbch_devicetype;
+    uint dbch_reserved;
+    uint dbch_handle;
+    uint dbch_hdevnotify;
+    GUID dbch_eventguid;
+    int  dbch_nameoffset;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/ubyte[1] dbch_data;
+}
+
+struct DEV_BROADCAST_HANDLE64
+{
+    uint  dbch_size;
+    uint  dbch_devicetype;
+    uint  dbch_reserved;
+    ulong dbch_handle;
+    ulong dbch_hdevnotify;
+    GUID  dbch_eventguid;
+    int   dbch_nameoffset;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/ubyte[1] dbch_data;
+}
+
+//STRUCT ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/dbt/ns-dbt-_dev_broadcast_userdefined))], [])
+struct _DEV_BROADCAST_USERDEFINED
+{
+    DEV_BROADCAST_HDR dbud_dbh;
+    /*FIELD ATTR: FlexibleArrayAttribute : CustomAttributeSig([], [])*/CHAR[1] dbud_szName;
+}
+
+struct DEVICE_EVENT_MOUNT
+{
+    uint Version;
+    uint Flags;
+    uint FileSystemNameLength;
+    uint FileSystemNameOffset;
+}
+
+struct DEVICE_EVENT_BECOMING_READY
+{
+    uint Version;
+    uint Reason;
+    uint Estimated100msToReady;
+}
+
+struct DEVICE_EVENT_EXTERNAL_REQUEST
+{
+    uint   Version;
+    uint   DeviceClass;
+    ushort ButtonStatus;
+    ushort Request;
+    long   SystemTime;
+}
+
+struct DEVICE_EVENT_GENERIC_DATA
+{
+    uint EventNumber;
+}
+
+struct DEVICE_EVENT_RBC_DATA
+{
+    uint  EventNumber;
+    ubyte SenseQualifier;
+    ubyte SenseCode;
+    ubyte SenseKey;
+    ubyte Reserved;
+    uint  Information;
+}
+
+struct GUID_IO_DISK_CLONE_ARRIVAL_INFORMATION
+{
+    uint DiskNumber;
+}
+
+struct DISK_HEALTH_NOTIFICATION_DATA
+{
+    GUID DeviceGuid;
+}
+
+// Functions
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadstringa))], [])
+@DllImport("USER32.dll")
+int LoadStringA(HINSTANCE hInstance, uint uID, PSTR lpBuffer, int cchBufferMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadstringw))], [])
+@DllImport("USER32.dll")
+int LoadStringW(HINSTANCE hInstance, uint uID, PWSTR lpBuffer, int cchBufferMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowlongptra))], [])
+version (X86) {
+@DllImport("USER32.dll")
+ptrdiff_t GetWindowLongPtrA(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowlongptrw))], [])
+version (X86) {
+@DllImport("USER32.dll")
+ptrdiff_t GetWindowLongPtrW(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowlongptra))], [])
+version (X86) {
+@DllImport("USER32.dll")
+ptrdiff_t SetWindowLongPtrA(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex, ptrdiff_t dwNewLong);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowlongptrw))], [])
+version (X86) {
+@DllImport("USER32.dll")
+ptrdiff_t SetWindowLongPtrW(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex, ptrdiff_t dwNewLong);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclasslongptra))], [])
+version (X86) {
+@DllImport("USER32.dll")
+size_t GetClassLongPtrA(HWND hWnd, GET_CLASS_LONG_INDEX nIndex);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclasslongptrw))], [])
+version (X86) {
+@DllImport("USER32.dll")
+size_t GetClassLongPtrW(HWND hWnd, GET_CLASS_LONG_INDEX nIndex);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setclasslongptra))], [])
+version (X86) {
+@DllImport("USER32.dll")
+size_t SetClassLongPtrA(HWND hWnd, GET_CLASS_LONG_INDEX nIndex, ptrdiff_t dwNewLong);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setclasslongptrw))], [])
+version (X86) {
+@DllImport("USER32.dll")
+size_t SetClassLongPtrW(HWND hWnd, GET_CLASS_LONG_INDEX nIndex, ptrdiff_t dwNewLong);
+
+}
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-wvsprintfa))], [])
+@DllImport("USER32.dll")
+int wvsprintfA(PSTR param0, const(PSTR) param1, byte* arglist);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-wvsprintfw))], [])
+@DllImport("USER32.dll")
+int wvsprintfW(PWSTR param0, const(PWSTR) param1, byte* arglist);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-wsprintfa))], [])
+@DllImport("USER32.dll")
+int wsprintfA(PSTR param0, const(PSTR) param1);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-wsprintfw))], [])
+@DllImport("USER32.dll")
+int wsprintfW(PWSTR param0, const(PWSTR) param1);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ishungappwindow))], [])
+@DllImport("USER32.dll")
+BOOL IsHungAppWindow(HWND hwnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-disableprocesswindowsghosting))], [])
+@DllImport("USER32.dll")
+void DisableProcessWindowsGhosting();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerwindowmessagea))], [])
+@DllImport("USER32.dll")
+uint RegisterWindowMessageA(const(PSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerwindowmessagew))], [])
+@DllImport("USER32.dll")
+uint RegisterWindowMessageW(const(PWSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmessagea))], [])
+@DllImport("USER32.dll")
+BOOL GetMessageA(MSG* lpMsg, HWND hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmessagew))], [])
+@DllImport("USER32.dll")
+BOOL GetMessageW(MSG* lpMsg, HWND hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-translatemessage))], [])
+@DllImport("USER32.dll")
+BOOL TranslateMessage(const(MSG)* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dispatchmessagea))], [])
+@DllImport("USER32.dll")
+LRESULT DispatchMessageA(const(MSG)* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dispatchmessagew))], [])
+@DllImport("USER32.dll")
+LRESULT DispatchMessageW(const(MSG)* lpMsg);
+
+@DllImport("USER32.dll")
+BOOL SetMessageQueue(int cMessagesMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-peekmessagea))], [])
+@DllImport("USER32.dll")
+BOOL PeekMessageA(MSG* lpMsg, HWND hWnd, uint wMsgFilterMin, uint wMsgFilterMax, 
+                  PEEK_MESSAGE_REMOVE_TYPE wRemoveMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-peekmessagew))], [])
+@DllImport("USER32.dll")
+BOOL PeekMessageW(MSG* lpMsg, HWND hWnd, uint wMsgFilterMin, uint wMsgFilterMax, 
+                  PEEK_MESSAGE_REMOVE_TYPE wRemoveMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmessagepos))], [])
+@DllImport("USER32.dll")
+uint GetMessagePos();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmessagetime))], [])
+@DllImport("USER32.dll")
+int GetMessageTime();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmessageextrainfo))], [])
+@DllImport("USER32.dll")
+LPARAM GetMessageExtraInfo();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswow64message))], [])
+@DllImport("USER32.dll")
+BOOL IsWow64Message();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmessageextrainfo))], [])
+@DllImport("USER32.dll")
+LPARAM SetMessageExtraInfo(LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagea))], [])
+@DllImport("USER32.dll")
+LRESULT SendMessageA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagew))], [])
+@DllImport("USER32.dll")
+LRESULT SendMessageW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagetimeouta))], [])
+@DllImport("USER32.dll")
+LRESULT SendMessageTimeoutA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam, SEND_MESSAGE_TIMEOUT_FLAGS fuFlags, 
+                            uint uTimeout, size_t* lpdwResult);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagetimeoutw))], [])
+@DllImport("USER32.dll")
+LRESULT SendMessageTimeoutW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam, SEND_MESSAGE_TIMEOUT_FLAGS fuFlags, 
+                            uint uTimeout, size_t* lpdwResult);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendnotifymessagea))], [])
+@DllImport("USER32.dll")
+BOOL SendNotifyMessageA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendnotifymessagew))], [])
+@DllImport("USER32.dll")
+BOOL SendNotifyMessageW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagecallbacka))], [])
+@DllImport("USER32.dll")
+BOOL SendMessageCallbackA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam, SENDASYNCPROC lpResultCallBack, 
+                          size_t dwData);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-sendmessagecallbackw))], [])
+@DllImport("USER32.dll")
+BOOL SendMessageCallbackW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam, SENDASYNCPROC lpResultCallBack, 
+                          size_t dwData);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerdevicenotificationa))], [])
+@DllImport("USER32.dll")
+HDEVNOTIFY RegisterDeviceNotificationA(HANDLE hRecipient, void* NotificationFilter, 
+                                       REGISTER_NOTIFICATION_FLAGS Flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerdevicenotificationw))], [])
+@DllImport("USER32.dll")
+HDEVNOTIFY RegisterDeviceNotificationW(HANDLE hRecipient, void* NotificationFilter, 
+                                       REGISTER_NOTIFICATION_FLAGS Flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-unregisterdevicenotification))], [])
+@DllImport("USER32.dll")
+BOOL UnregisterDeviceNotification(HDEVNOTIFY Handle);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-postmessagea))], [])
+@DllImport("USER32.dll")
+BOOL PostMessageA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-postmessagew))], [])
+@DllImport("USER32.dll")
+BOOL PostMessageW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-postthreadmessagea))], [])
+@DllImport("USER32.dll")
+BOOL PostThreadMessageA(uint idThread, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-postthreadmessagew))], [])
+@DllImport("USER32.dll")
+BOOL PostThreadMessageW(uint idThread, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-replymessage))], [])
+@DllImport("USER32.dll")
+BOOL ReplyMessage(LRESULT lResult);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-waitmessage))], [])
+@DllImport("USER32.dll")
+BOOL WaitMessage();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defwindowproca))], [])
+@DllImport("USER32.dll")
+LRESULT DefWindowProcA(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defwindowprocw))], [])
+@DllImport("USER32.dll")
+LRESULT DefWindowProcW(HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-postquitmessage))], [])
+@DllImport("USER32.dll")
+void PostQuitMessage(int nExitCode);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-callwindowproca))], [])
+@DllImport("USER32.dll")
+LRESULT CallWindowProcA(WNDPROC lpPrevWndFunc, HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-callwindowprocw))], [])
+@DllImport("USER32.dll")
+LRESULT CallWindowProcW(WNDPROC lpPrevWndFunc, HWND hWnd, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insendmessage))], [])
+@DllImport("USER32.dll")
+BOOL InSendMessage();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insendmessageex))], [])
+@DllImport("USER32.dll")
+uint InSendMessageEx(/*PARAM ATTR: ReservedAttribute : CustomAttributeSig([], [])*/void* lpReserved);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerclassa))], [])
+@DllImport("USER32.dll")
+ushort RegisterClassA(const(WNDCLASSA)* lpWndClass);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerclassw))], [])
+@DllImport("USER32.dll")
+ushort RegisterClassW(const(WNDCLASSW)* lpWndClass);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-unregisterclassa))], [])
+@DllImport("USER32.dll")
+BOOL UnregisterClassA(const(PSTR) lpClassName, HINSTANCE hInstance);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-unregisterclassw))], [])
+@DllImport("USER32.dll")
+BOOL UnregisterClassW(const(PWSTR) lpClassName, HINSTANCE hInstance);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassinfoa))], [])
+@DllImport("USER32.dll")
+BOOL GetClassInfoA(HINSTANCE hInstance, const(PSTR) lpClassName, WNDCLASSA* lpWndClass);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassinfow))], [])
+@DllImport("USER32.dll")
+BOOL GetClassInfoW(HINSTANCE hInstance, const(PWSTR) lpClassName, WNDCLASSW* lpWndClass);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerclassexa))], [])
+@DllImport("USER32.dll")
+ushort RegisterClassExA(const(WNDCLASSEXA)* param0);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerclassexw))], [])
+@DllImport("USER32.dll")
+ushort RegisterClassExW(const(WNDCLASSEXW)* param0);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassinfoexa))], [])
+@DllImport("USER32.dll")
+BOOL GetClassInfoExA(HINSTANCE hInstance, const(PSTR) lpszClass, WNDCLASSEXA* lpwcx);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassinfoexw))], [])
+@DllImport("USER32.dll")
+BOOL GetClassInfoExW(HINSTANCE hInstance, const(PWSTR) lpszClass, WNDCLASSEXW* lpwcx);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createwindowexa))], [])
+@DllImport("USER32.dll")
+HWND CreateWindowExA(WINDOW_EX_STYLE dwExStyle, const(PSTR) lpClassName, const(PSTR) lpWindowName, 
+                     WINDOW_STYLE dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, 
+                     HINSTANCE hInstance, void* lpParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createwindowexw))], [])
+@DllImport("USER32.dll")
+HWND CreateWindowExW(WINDOW_EX_STYLE dwExStyle, const(PWSTR) lpClassName, const(PWSTR) lpWindowName, 
+                     WINDOW_STYLE dwStyle, int X, int Y, int nWidth, int nHeight, HWND hWndParent, HMENU hMenu, 
+                     HINSTANCE hInstance, void* lpParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindow))], [])
+@DllImport("USER32.dll")
+BOOL IsWindow(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ismenu))], [])
+@DllImport("USER32.dll")
+BOOL IsMenu(HMENU hMenu);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischild))], [])
+@DllImport("USER32.dll")
+BOOL IsChild(HWND hWndParent, HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroywindow))], [])
+@DllImport("USER32.dll")
+BOOL DestroyWindow(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showwindow))], [])
+@DllImport("USER32.dll")
+BOOL ShowWindow(HWND hWnd, SHOW_WINDOW_CMD nCmdShow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-animatewindow))], [])
+@DllImport("USER32.dll")
+BOOL AnimateWindow(HWND hWnd, uint dwTime, ANIMATE_WINDOW_FLAGS dwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-updatelayeredwindow))], [])
+@DllImport("USER32.dll")
+BOOL UpdateLayeredWindow(HWND hWnd, HDC hdcDst, POINT* pptDst, SIZE* psize, HDC hdcSrc, POINT* pptSrc, 
+                         COLORREF crKey, BLENDFUNCTION* pblend, UPDATE_LAYERED_WINDOW_FLAGS dwFlags);
+
+@DllImport("USER32.dll")
+BOOL UpdateLayeredWindowIndirect(HWND hWnd, const(UPDATELAYEREDWINDOWINFO)* pULWInfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getlayeredwindowattributes))], [])
+@DllImport("USER32.dll")
+BOOL GetLayeredWindowAttributes(HWND hwnd, COLORREF* pcrKey, ubyte* pbAlpha, 
+                                LAYERED_WINDOW_ATTRIBUTES_FLAGS* pdwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setlayeredwindowattributes))], [])
+@DllImport("USER32.dll")
+BOOL SetLayeredWindowAttributes(HWND hwnd, COLORREF crKey, ubyte bAlpha, LAYERED_WINDOW_ATTRIBUTES_FLAGS dwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showwindowasync))], [])
+@DllImport("USER32.dll")
+BOOL ShowWindowAsync(HWND hWnd, SHOW_WINDOW_CMD nCmdShow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-flashwindow))], [])
+@DllImport("USER32.dll")
+BOOL FlashWindow(HWND hWnd, BOOL bInvert);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-flashwindowex))], [])
+@DllImport("USER32.dll")
+BOOL FlashWindowEx(FLASHWINFO* pfwi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showownedpopups))], [])
+@DllImport("USER32.dll")
+BOOL ShowOwnedPopups(HWND hWnd, BOOL fShow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-openicon))], [])
+@DllImport("USER32.dll")
+BOOL OpenIcon(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-closewindow))], [])
+@DllImport("USER32.dll")
+BOOL CloseWindow(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-movewindow))], [])
+@DllImport("USER32.dll")
+BOOL MoveWindow(HWND hWnd, int X, int Y, int nWidth, int nHeight, BOOL bRepaint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowpos))], [])
+@DllImport("USER32.dll")
+BOOL SetWindowPos(HWND hWnd, HWND hWndInsertAfter, int X, int Y, int cx, int cy, SET_WINDOW_POS_FLAGS uFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowplacement))], [])
+@DllImport("USER32.dll")
+BOOL GetWindowPlacement(HWND hWnd, WINDOWPLACEMENT* lpwndpl);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowplacement))], [])
+@DllImport("USER32.dll")
+BOOL SetWindowPlacement(HWND hWnd, const(WINDOWPLACEMENT)* lpwndpl);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.1))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowdisplayaffinity))], [])
+@DllImport("USER32.dll")
+BOOL GetWindowDisplayAffinity(HWND hWnd, uint* pdwAffinity);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.1))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowdisplayaffinity))], [])
+@DllImport("USER32.dll")
+BOOL SetWindowDisplayAffinity(HWND hWnd, WINDOW_DISPLAY_AFFINITY dwAffinity);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-begindeferwindowpos))], [])
+@DllImport("USER32.dll")
+HDWP BeginDeferWindowPos(int nNumWindows);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-deferwindowpos))], [])
+@DllImport("USER32.dll")
+HDWP DeferWindowPos(HDWP hWinPosInfo, HWND hWnd, HWND hWndInsertAfter, int x, int y, int cx, int cy, 
+                    SET_WINDOW_POS_FLAGS uFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enddeferwindowpos))], [])
+@DllImport("USER32.dll")
+BOOL EndDeferWindowPos(HDWP hWinPosInfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindowvisible))], [])
+@DllImport("USER32.dll")
+BOOL IsWindowVisible(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-isiconic))], [])
+@DllImport("USER32.dll")
+BOOL IsIconic(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-anypopup))], [])
+@DllImport("USER32.dll")
+BOOL AnyPopup();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-bringwindowtotop))], [])
+@DllImport("USER32.dll")
+BOOL BringWindowToTop(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iszoomed))], [])
+@DllImport("USER32.dll")
+BOOL IsZoomed(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createdialogparama))], [])
+@DllImport("USER32.dll")
+HWND CreateDialogParamA(HINSTANCE hInstance, const(PSTR) lpTemplateName, HWND hWndParent, DLGPROC lpDialogFunc, 
+                        LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createdialogparamw))], [])
+@DllImport("USER32.dll")
+HWND CreateDialogParamW(HINSTANCE hInstance, const(PWSTR) lpTemplateName, HWND hWndParent, DLGPROC lpDialogFunc, 
+                        LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createdialogindirectparama))], [])
+@DllImport("USER32.dll")
+HWND CreateDialogIndirectParamA(HINSTANCE hInstance, DLGTEMPLATE* lpTemplate, HWND hWndParent, 
+                                DLGPROC lpDialogFunc, LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createdialogindirectparamw))], [])
+@DllImport("USER32.dll")
+HWND CreateDialogIndirectParamW(HINSTANCE hInstance, DLGTEMPLATE* lpTemplate, HWND hWndParent, 
+                                DLGPROC lpDialogFunc, LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dialogboxparama))], [])
+@DllImport("USER32.dll")
+ptrdiff_t DialogBoxParamA(HINSTANCE hInstance, const(PSTR) lpTemplateName, HWND hWndParent, DLGPROC lpDialogFunc, 
+                          LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dialogboxparamw))], [])
+@DllImport("USER32.dll")
+ptrdiff_t DialogBoxParamW(HINSTANCE hInstance, const(PWSTR) lpTemplateName, HWND hWndParent, DLGPROC lpDialogFunc, 
+                          LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dialogboxindirectparama))], [])
+@DllImport("USER32.dll")
+ptrdiff_t DialogBoxIndirectParamA(HINSTANCE hInstance, DLGTEMPLATE* hDialogTemplate, HWND hWndParent, 
+                                  DLGPROC lpDialogFunc, LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-dialogboxindirectparamw))], [])
+@DllImport("USER32.dll")
+ptrdiff_t DialogBoxIndirectParamW(HINSTANCE hInstance, DLGTEMPLATE* hDialogTemplate, HWND hWndParent, 
+                                  DLGPROC lpDialogFunc, LPARAM dwInitParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enddialog))], [])
+@DllImport("USER32.dll")
+BOOL EndDialog(HWND hDlg, ptrdiff_t nResult);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdlgitem))], [])
+@DllImport("USER32.dll")
+HWND GetDlgItem(HWND hDlg, int nIDDlgItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setdlgitemint))], [])
+@DllImport("USER32.dll")
+BOOL SetDlgItemInt(HWND hDlg, int nIDDlgItem, uint uValue, BOOL bSigned);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdlgitemint))], [])
+@DllImport("USER32.dll")
+uint GetDlgItemInt(HWND hDlg, int nIDDlgItem, BOOL* lpTranslated, BOOL bSigned);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setdlgitemtexta))], [])
+@DllImport("USER32.dll")
+BOOL SetDlgItemTextA(HWND hDlg, int nIDDlgItem, const(PSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setdlgitemtextw))], [])
+@DllImport("USER32.dll")
+BOOL SetDlgItemTextW(HWND hDlg, int nIDDlgItem, const(PWSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdlgitemtexta))], [])
+@DllImport("USER32.dll")
+uint GetDlgItemTextA(HWND hDlg, int nIDDlgItem, PSTR lpString, int cchMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdlgitemtextw))], [])
+@DllImport("USER32.dll")
+uint GetDlgItemTextW(HWND hDlg, int nIDDlgItem, PWSTR lpString, int cchMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-senddlgitemmessagea))], [])
+@DllImport("USER32.dll")
+LRESULT SendDlgItemMessageA(HWND hDlg, int nIDDlgItem, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-senddlgitemmessagew))], [])
+@DllImport("USER32.dll")
+LRESULT SendDlgItemMessageW(HWND hDlg, int nIDDlgItem, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getnextdlggroupitem))], [])
+@DllImport("USER32.dll")
+HWND GetNextDlgGroupItem(HWND hDlg, HWND hCtl, BOOL bPrevious);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getnextdlgtabitem))], [])
+@DllImport("USER32.dll")
+HWND GetNextDlgTabItem(HWND hDlg, HWND hCtl, BOOL bPrevious);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdlgctrlid))], [])
+@DllImport("USER32.dll")
+int GetDlgCtrlID(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdialogbaseunits))], [])
+@DllImport("USER32.dll")
+int GetDialogBaseUnits();
+
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defdlgproca))], [])
+@DllImport("USER32.dll")
+LRESULT DefDlgProcA(HWND hDlg, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defdlgprocw))], [])
+@DllImport("USER32.dll")
+LRESULT DefDlgProcW(HWND hDlg, uint Msg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-callmsgfiltera))], [])
+@DllImport("USER32.dll")
+BOOL CallMsgFilterA(MSG* lpMsg, int nCode);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-callmsgfilterw))], [])
+@DllImport("USER32.dll")
+BOOL CallMsgFilterW(MSG* lpMsg, int nCode);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-chartooema))], [])
+@DllImport("USER32.dll")
+BOOL CharToOemA(const(PSTR) pSrc, PSTR pDst);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-chartooemw))], [])
+@DllImport("USER32.dll")
+BOOL CharToOemW(const(PWSTR) pSrc, PSTR pDst);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-oemtochara))], [])
+@DllImport("USER32.dll")
+BOOL OemToCharA(const(PSTR) pSrc, PSTR pDst);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-oemtocharw))], [])
+@DllImport("USER32.dll")
+BOOL OemToCharW(const(PSTR) pSrc, PWSTR pDst);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-chartooembuffa))], [])
+@DllImport("USER32.dll")
+BOOL CharToOemBuffA(const(PSTR) lpszSrc, PSTR lpszDst, uint cchDstLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-chartooembuffw))], [])
+@DllImport("USER32.dll")
+BOOL CharToOemBuffW(const(PWSTR) lpszSrc, PSTR lpszDst, uint cchDstLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-oemtocharbuffa))], [])
+@DllImport("USER32.dll")
+BOOL OemToCharBuffA(const(PSTR) lpszSrc, PSTR lpszDst, uint cchDstLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-oemtocharbuffw))], [])
+@DllImport("USER32.dll")
+BOOL OemToCharBuffW(const(PSTR) lpszSrc, PWSTR lpszDst, uint cchDstLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charuppera))], [])
+@DllImport("USER32.dll")
+PSTR CharUpperA(PSTR lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charupperw))], [])
+@DllImport("USER32.dll")
+PWSTR CharUpperW(PWSTR lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charupperbuffa))], [])
+@DllImport("USER32.dll")
+uint CharUpperBuffA(PSTR lpsz, uint cchLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charupperbuffw))], [])
+@DllImport("USER32.dll")
+uint CharUpperBuffW(PWSTR lpsz, uint cchLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charlowera))], [])
+@DllImport("USER32.dll")
+PSTR CharLowerA(PSTR lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charlowerw))], [])
+@DllImport("USER32.dll")
+PWSTR CharLowerW(PWSTR lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charlowerbuffa))], [])
+@DllImport("USER32.dll")
+uint CharLowerBuffA(PSTR lpsz, uint cchLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charlowerbuffw))], [])
+@DllImport("USER32.dll")
+uint CharLowerBuffW(PWSTR lpsz, uint cchLength);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charnexta))], [])
+@DllImport("USER32.dll")
+PSTR CharNextA(const(PSTR) lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charnextw))], [])
+@DllImport("USER32.dll")
+PWSTR CharNextW(const(PWSTR) lpsz);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charpreva))], [])
+@DllImport("USER32.dll")
+PSTR CharPrevA(const(PSTR) lpszStart, const(PSTR) lpszCurrent);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charprevw))], [])
+@DllImport("USER32.dll")
+PWSTR CharPrevW(const(PWSTR) lpszStart, const(PWSTR) lpszCurrent);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charnextexa))], [])
+@DllImport("USER32.dll")
+PSTR CharNextExA(ushort CodePage, const(PSTR) lpCurrentChar, uint dwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-charprevexa))], [])
+@DllImport("USER32.dll")
+PSTR CharPrevExA(ushort CodePage, const(PSTR) lpStart, const(PSTR) lpCurrentChar, uint dwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischaralphaa))], [])
+@DllImport("USER32.dll")
+BOOL IsCharAlphaA(CHAR ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischaralphaw))], [])
+@DllImport("USER32.dll")
+BOOL IsCharAlphaW(wchar ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischaralphanumerica))], [])
+@DllImport("USER32.dll")
+BOOL IsCharAlphaNumericA(CHAR ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischaralphanumericw))], [])
+@DllImport("USER32.dll")
+BOOL IsCharAlphaNumericW(wchar ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischaruppera))], [])
+@DllImport("USER32.dll")
+BOOL IsCharUpperA(CHAR ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischarupperw))], [])
+@DllImport("USER32.dll")
+BOOL IsCharUpperW(wchar ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischarlowera))], [])
+@DllImport("USER32.dll")
+BOOL IsCharLowerA(CHAR ch);
+
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-ischarlowerw))], [])
+@DllImport("USER32.dll")
+BOOL IsCharLowerW(wchar ch);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getinputstate))], [])
+@DllImport("USER32.dll")
+BOOL GetInputState();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getqueuestatus))], [])
+@DllImport("USER32.dll")
+uint GetQueueStatus(QUEUE_STATUS_FLAGS flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjects))], [])
+@DllImport("USER32.dll")
+WAIT_EVENT MsgWaitForMultipleObjects(uint nCount, const(HANDLE)* pHandles, BOOL fWaitAll, uint dwMilliseconds, 
+                                     QUEUE_STATUS_FLAGS dwWakeMask);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-msgwaitformultipleobjectsex))], [])
+@DllImport("USER32.dll")
+WAIT_EVENT MsgWaitForMultipleObjectsEx(uint nCount, const(HANDLE)* pHandles, uint dwMilliseconds, 
+                                       QUEUE_STATUS_FLAGS dwWakeMask, MSG_WAIT_FOR_MULTIPLE_OBJECTS_EX_FLAGS dwFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-settimer))], [])
+@DllImport("USER32.dll")
+size_t SetTimer(HWND hWnd, size_t nIDEvent, uint uElapse, TIMERPROC lpTimerFunc);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows8.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setcoalescabletimer))], [])
+@DllImport("USER32.dll")
+size_t SetCoalescableTimer(HWND hWnd, size_t nIDEvent, uint uElapse, TIMERPROC lpTimerFunc, uint uToleranceDelay);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-killtimer))], [])
+@DllImport("USER32.dll")
+BOOL KillTimer(HWND hWnd, size_t uIDEvent);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-iswindowunicode))], [])
+@DllImport("USER32.dll")
+BOOL IsWindowUnicode(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadacceleratorsa))], [])
+@DllImport("USER32.dll")
+HACCEL LoadAcceleratorsA(HINSTANCE hInstance, const(PSTR) lpTableName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadacceleratorsw))], [])
+@DllImport("USER32.dll")
+HACCEL LoadAcceleratorsW(HINSTANCE hInstance, const(PWSTR) lpTableName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createacceleratortablea))], [])
+@DllImport("USER32.dll")
+HACCEL CreateAcceleratorTableA(ACCEL* paccel, int cAccel);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createacceleratortablew))], [])
+@DllImport("USER32.dll")
+HACCEL CreateAcceleratorTableW(ACCEL* paccel, int cAccel);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroyacceleratortable))], [])
+@DllImport("USER32.dll")
+BOOL DestroyAcceleratorTable(HACCEL hAccel);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-copyacceleratortablea))], [])
+@DllImport("USER32.dll")
+int CopyAcceleratorTableA(HACCEL hAccelSrc, ACCEL* lpAccelDst, int cAccelEntries);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-copyacceleratortablew))], [])
+@DllImport("USER32.dll")
+int CopyAcceleratorTableW(HACCEL hAccelSrc, ACCEL* lpAccelDst, int cAccelEntries);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-translateacceleratora))], [])
+@DllImport("USER32.dll")
+int TranslateAcceleratorA(HWND hWnd, HACCEL hAccTable, MSG* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-translateacceleratorw))], [])
+@DllImport("USER32.dll")
+int TranslateAcceleratorW(HWND hWnd, HACCEL hAccTable, MSG* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getsystemmetrics))], [])
+@DllImport("USER32.dll")
+int GetSystemMetrics(SYSTEM_METRICS_INDEX nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadmenua))], [])
+@DllImport("USER32.dll")
+HMENU LoadMenuA(HINSTANCE hInstance, const(PSTR) lpMenuName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadmenuw))], [])
+@DllImport("USER32.dll")
+HMENU LoadMenuW(HINSTANCE hInstance, const(PWSTR) lpMenuName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadmenuindirecta))], [])
+@DllImport("USER32.dll")
+HMENU LoadMenuIndirectA(const(void)* lpMenuTemplate);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadmenuindirectw))], [])
+@DllImport("USER32.dll")
+HMENU LoadMenuIndirectW(const(void)* lpMenuTemplate);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenu))], [])
+@DllImport("USER32.dll")
+HMENU GetMenu(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenu))], [])
+@DllImport("USER32.dll")
+BOOL SetMenu(HWND hWnd, HMENU hMenu);
+
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+@DllImport("USER32.dll")
+BOOL ChangeMenuA(HMENU hMenu, uint cmd, const(PSTR) lpszNewItem, uint cmdInsert, uint flags);
+
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+@DllImport("USER32.dll")
+BOOL ChangeMenuW(HMENU hMenu, uint cmd, const(PWSTR) lpszNewItem, uint cmdInsert, uint flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-hilitemenuitem))], [])
+@DllImport("USER32.dll")
+BOOL HiliteMenuItem(HWND hWnd, HMENU hMenu, uint uIDHiliteItem, uint uHilite);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenustringa))], [])
+@DllImport("USER32.dll")
+int GetMenuStringA(HMENU hMenu, uint uIDItem, PSTR lpString, int cchMax, MENU_ITEM_FLAGS flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenustringw))], [])
+@DllImport("USER32.dll")
+int GetMenuStringW(HMENU hMenu, uint uIDItem, PWSTR lpString, int cchMax, MENU_ITEM_FLAGS flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenustate))], [])
+@DllImport("USER32.dll")
+uint GetMenuState(HMENU hMenu, uint uId, MENU_ITEM_FLAGS uFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-drawmenubar))], [])
+@DllImport("USER32.dll")
+BOOL DrawMenuBar(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getsystemmenu))], [])
+@DllImport("USER32.dll")
+HMENU GetSystemMenu(HWND hWnd, BOOL bRevert);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createmenu))], [])
+@DllImport("USER32.dll")
+HMENU CreateMenu();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createpopupmenu))], [])
+@DllImport("USER32.dll")
+HMENU CreatePopupMenu();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroymenu))], [])
+@DllImport("USER32.dll")
+BOOL DestroyMenu(HMENU hMenu);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-checkmenuitem))], [])
+@DllImport("USER32.dll")
+uint CheckMenuItem(HMENU hMenu, uint uIDCheckItem, uint uCheck);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enablemenuitem))], [])
+@DllImport("USER32.dll")
+BOOL EnableMenuItem(HMENU hMenu, uint uIDEnableItem, MENU_ITEM_FLAGS uEnable);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getsubmenu))], [])
+@DllImport("USER32.dll")
+HMENU GetSubMenu(HMENU hMenu, int nPos);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuitemid))], [])
+@DllImport("USER32.dll")
+uint GetMenuItemID(HMENU hMenu, int nPos);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuitemcount))], [])
+@DllImport("USER32.dll")
+int GetMenuItemCount(HMENU hMenu);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insertmenua))], [])
+@DllImport("USER32.dll")
+BOOL InsertMenuA(HMENU hMenu, uint uPosition, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insertmenuw))], [])
+@DllImport("USER32.dll")
+BOOL InsertMenuW(HMENU hMenu, uint uPosition, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PWSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-appendmenua))], [])
+@DllImport("USER32.dll")
+BOOL AppendMenuA(HMENU hMenu, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-appendmenuw))], [])
+@DllImport("USER32.dll")
+BOOL AppendMenuW(HMENU hMenu, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PWSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-modifymenua))], [])
+@DllImport("USER32.dll")
+BOOL ModifyMenuA(HMENU hMnu, uint uPosition, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-modifymenuw))], [])
+@DllImport("USER32.dll")
+BOOL ModifyMenuW(HMENU hMnu, uint uPosition, MENU_ITEM_FLAGS uFlags, size_t uIDNewItem, const(PWSTR) lpNewItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-removemenu))], [])
+@DllImport("USER32.dll")
+BOOL RemoveMenu(HMENU hMenu, uint uPosition, MENU_ITEM_FLAGS uFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-deletemenu))], [])
+@DllImport("USER32.dll")
+BOOL DeleteMenu(HMENU hMenu, uint uPosition, MENU_ITEM_FLAGS uFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenuitembitmaps))], [])
+@DllImport("USER32.dll")
+BOOL SetMenuItemBitmaps(HMENU hMenu, uint uPosition, MENU_ITEM_FLAGS uFlags, HBITMAP hBitmapUnchecked, 
+                        HBITMAP hBitmapChecked);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenucheckmarkdimensions))], [])
+@DllImport("USER32.dll")
+int GetMenuCheckMarkDimensions();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-trackpopupmenu))], [])
+@DllImport("USER32.dll")
+BOOL TrackPopupMenu(HMENU hMenu, TRACK_POPUP_MENU_FLAGS uFlags, int x, int y, 
+                    /*PARAM ATTR: ReservedAttribute : CustomAttributeSig([], [])*/int nReserved, HWND hWnd, 
+                    const(RECT)* prcRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-trackpopupmenuex))], [])
+@DllImport("USER32.dll")
+BOOL TrackPopupMenuEx(HMENU hMenu, uint uFlags, int x, int y, HWND hwnd, TPMPARAMS* lptpm);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.1))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-calculatepopupwindowposition))], [])
+@DllImport("USER32.dll")
+BOOL CalculatePopupWindowPosition(const(POINT)* anchorPoint, const(SIZE)* windowSize, uint flags, 
+                                  RECT* excludeRect, RECT* popupWindowPosition);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetMenuInfo(HMENU param0, MENUINFO* param1);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenuinfo))], [])
+@DllImport("USER32.dll")
+BOOL SetMenuInfo(HMENU param0, MENUINFO* param1);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-endmenu))], [])
+@DllImport("USER32.dll")
+BOOL EndMenu();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insertmenuitema))], [])
+@DllImport("USER32.dll")
+BOOL InsertMenuItemA(HMENU hmenu, uint item, BOOL fByPosition, MENUITEMINFOA* lpmi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-insertmenuitemw))], [])
+@DllImport("USER32.dll")
+BOOL InsertMenuItemW(HMENU hmenu, uint item, BOOL fByPosition, MENUITEMINFOW* lpmi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuiteminfoa))], [])
+@DllImport("USER32.dll")
+BOOL GetMenuItemInfoA(HMENU hmenu, uint item, BOOL fByPosition, MENUITEMINFOA* lpmii);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuiteminfow))], [])
+@DllImport("USER32.dll")
+BOOL GetMenuItemInfoW(HMENU hmenu, uint item, BOOL fByPosition, MENUITEMINFOW* lpmii);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenuiteminfoa))], [])
+@DllImport("USER32.dll")
+BOOL SetMenuItemInfoA(HMENU hmenu, uint item, BOOL fByPositon, MENUITEMINFOA* lpmii);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenuiteminfow))], [])
+@DllImport("USER32.dll")
+BOOL SetMenuItemInfoW(HMENU hmenu, uint item, BOOL fByPositon, MENUITEMINFOW* lpmii);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenudefaultitem))], [])
+@DllImport("USER32.dll")
+uint GetMenuDefaultItem(HMENU hMenu, uint fByPos, GET_MENU_DEFAULT_ITEM_FLAGS gmdiFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setmenudefaultitem))], [])
+@DllImport("USER32.dll")
+BOOL SetMenuDefaultItem(HMENU hMenu, uint uItem, uint fByPos);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenuitemrect))], [])
+@DllImport("USER32.dll")
+BOOL GetMenuItemRect(HWND hWnd, HMENU hMenu, uint uItem, RECT* lprcItem);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-menuitemfrompoint))], [])
+@DllImport("USER32.dll")
+int MenuItemFromPoint(HWND hWnd, HMENU hMenu, POINT ptScreen);
+
+@DllImport("USER32.dll")
+uint DragObject(HWND hwndParent, HWND hwndFrom, uint fmt, size_t data, HCURSOR hcur);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-drawicon))], [])
+@DllImport("USER32.dll")
+BOOL DrawIcon(HDC hDC, int X, int Y, HICON hIcon);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getforegroundwindow))], [])
+@DllImport("USER32.dll")
+HWND GetForegroundWindow();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-switchtothiswindow))], [])
+@DllImport("USER32.dll")
+void SwitchToThisWindow(HWND hwnd, BOOL fUnknown);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setforegroundwindow))], [])
+@DllImport("USER32.dll")
+BOOL SetForegroundWindow(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-allowsetforegroundwindow))], [])
+@DllImport("USER32.dll")
+BOOL AllowSetForegroundWindow(uint dwProcessId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-locksetforegroundwindow))], [])
+@DllImport("USER32.dll")
+BOOL LockSetForegroundWindow(FOREGROUND_WINDOW_LOCK_CODE uLockCode);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-scrollwindow))], [])
+@DllImport("USER32.dll")
+BOOL ScrollWindow(HWND hWnd, int XAmount, int YAmount, const(RECT)* lpRect, const(RECT)* lpClipRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-scrolldc))], [])
+@DllImport("USER32.dll")
+BOOL ScrollDC(HDC hDC, int dx, int dy, const(RECT)* lprcScroll, const(RECT)* lprcClip, HRGN hrgnUpdate, 
+              RECT* lprcUpdate);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-scrollwindowex))], [])
+@DllImport("USER32.dll")
+int ScrollWindowEx(HWND hWnd, int dx, int dy, const(RECT)* prcScroll, const(RECT)* prcClip, HRGN hrgnUpdate, 
+                   RECT* prcUpdate, SCROLL_WINDOW_FLAGS flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getscrollpos))], [])
+@DllImport("USER32.dll")
+int GetScrollPos(HWND hWnd, SCROLLBAR_CONSTANTS nBar);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getscrollrange))], [])
+@DllImport("USER32.dll")
+BOOL GetScrollRange(HWND hWnd, SCROLLBAR_CONSTANTS nBar, int* lpMinPos, int* lpMaxPos);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setpropa))], [])
+@DllImport("USER32.dll")
+BOOL SetPropA(HWND hWnd, const(PSTR) lpString, HANDLE hData);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setpropw))], [])
+@DllImport("USER32.dll")
+BOOL SetPropW(HWND hWnd, const(PWSTR) lpString, HANDLE hData);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getpropa))], [])
+@DllImport("USER32.dll")
+HANDLE GetPropA(HWND hWnd, const(PSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getpropw))], [])
+@DllImport("USER32.dll")
+HANDLE GetPropW(HWND hWnd, const(PWSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-removepropa))], [])
+@DllImport("USER32.dll")
+HANDLE RemovePropA(HWND hWnd, const(PSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-removepropw))], [])
+@DllImport("USER32.dll")
+HANDLE RemovePropW(HWND hWnd, const(PWSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumpropsexa))], [])
+@DllImport("USER32.dll")
+int EnumPropsExA(HWND hWnd, PROPENUMPROCEXA lpEnumFunc, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumpropsexw))], [])
+@DllImport("USER32.dll")
+int EnumPropsExW(HWND hWnd, PROPENUMPROCEXW lpEnumFunc, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumpropsa))], [])
+@DllImport("USER32.dll")
+int EnumPropsA(HWND hWnd, PROPENUMPROCA lpEnumFunc);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumpropsw))], [])
+@DllImport("USER32.dll")
+int EnumPropsW(HWND hWnd, PROPENUMPROCW lpEnumFunc);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowtexta))], [])
+@DllImport("USER32.dll")
+BOOL SetWindowTextA(HWND hWnd, const(PSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowtextw))], [])
+@DllImport("USER32.dll")
+BOOL SetWindowTextW(HWND hWnd, const(PWSTR) lpString);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowtexta))], [])
+@DllImport("USER32.dll")
+int GetWindowTextA(HWND hWnd, PSTR lpString, int nMaxCount);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowtextw))], [])
+@DllImport("USER32.dll")
+int GetWindowTextW(HWND hWnd, PWSTR lpString, int nMaxCount);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowtextlengtha))], [])
+@DllImport("USER32.dll")
+int GetWindowTextLengthA(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowtextlengthw))], [])
+@DllImport("USER32.dll")
+int GetWindowTextLengthW(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclientrect))], [])
+@DllImport("USER32.dll")
+BOOL GetClientRect(HWND hWnd, RECT* lpRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowrect))], [])
+@DllImport("USER32.dll")
+BOOL GetWindowRect(HWND hWnd, RECT* lpRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-adjustwindowrect))], [])
+@DllImport("USER32.dll")
+BOOL AdjustWindowRect(RECT* lpRect, WINDOW_STYLE dwStyle, BOOL bMenu);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-adjustwindowrectex))], [])
+@DllImport("USER32.dll")
+BOOL AdjustWindowRectEx(RECT* lpRect, WINDOW_STYLE dwStyle, BOOL bMenu, WINDOW_EX_STYLE dwExStyle);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxa))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxA(HWND hWnd, const(PSTR) lpText, const(PSTR) lpCaption, MESSAGEBOX_STYLE uType);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxw))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxW(HWND hWnd, const(PWSTR) lpText, const(PWSTR) lpCaption, MESSAGEBOX_STYLE uType);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxexa))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxExA(HWND hWnd, const(PSTR) lpText, const(PSTR) lpCaption, MESSAGEBOX_STYLE uType, 
+                                ushort wLanguageId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxexw))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxExW(HWND hWnd, const(PWSTR) lpText, const(PWSTR) lpCaption, MESSAGEBOX_STYLE uType, 
+                                ushort wLanguageId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxindirecta))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxIndirectA(const(MSGBOXPARAMSA)* lpmbp);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-messageboxindirectw))], [])
+@DllImport("USER32.dll")
+MESSAGEBOX_RESULT MessageBoxIndirectW(const(MSGBOXPARAMSW)* lpmbp);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showcursor))], [])
+@DllImport("USER32.dll")
+int ShowCursor(BOOL bShow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setcursorpos))], [])
+@DllImport("USER32.dll")
+BOOL SetCursorPos(int X, int Y);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setphysicalcursorpos))], [])
+@DllImport("USER32.dll")
+BOOL SetPhysicalCursorPos(int X, int Y);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setcursor))], [])
+@DllImport("USER32.dll")
+HCURSOR SetCursor(HCURSOR hCursor);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getcursorpos))], [])
+@DllImport("USER32.dll")
+BOOL GetCursorPos(POINT* lpPoint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getphysicalcursorpos))], [])
+@DllImport("USER32.dll")
+BOOL GetPhysicalCursorPos(POINT* lpPoint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclipcursor))], [])
+@DllImport("USER32.dll")
+BOOL GetClipCursor(RECT* lpRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getcursor))], [])
+@DllImport("USER32.dll")
+HCURSOR GetCursor();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createcaret))], [])
+@DllImport("USER32.dll")
+BOOL CreateCaret(HWND hWnd, HBITMAP hBitmap, int nWidth, int nHeight);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getcaretblinktime))], [])
+@DllImport("USER32.dll")
+uint GetCaretBlinkTime();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setcaretblinktime))], [])
+@DllImport("USER32.dll")
+BOOL SetCaretBlinkTime(uint uMSeconds);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroycaret))], [])
+@DllImport("USER32.dll")
+BOOL DestroyCaret();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-hidecaret))], [])
+@DllImport("USER32.dll")
+BOOL HideCaret(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-showcaret))], [])
+@DllImport("USER32.dll")
+BOOL ShowCaret(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setcaretpos))], [])
+@DllImport("USER32.dll")
+BOOL SetCaretPos(int X, int Y);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getcaretpos))], [])
+@DllImport("USER32.dll")
+BOOL GetCaretPos(POINT* lpPoint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-logicaltophysicalpoint))], [])
+@DllImport("USER32.dll")
+BOOL LogicalToPhysicalPoint(HWND hWnd, POINT* lpPoint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-physicaltologicalpoint))], [])
+@DllImport("USER32.dll")
+BOOL PhysicalToLogicalPoint(HWND hWnd, POINT* lpPoint);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-windowfrompoint))], [])
+@DllImport("USER32.dll")
+HWND WindowFromPoint(POINT Point);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-windowfromphysicalpoint))], [])
+@DllImport("USER32.dll")
+HWND WindowFromPhysicalPoint(POINT Point);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-childwindowfrompoint))], [])
+@DllImport("USER32.dll")
+HWND ChildWindowFromPoint(HWND hWndParent, POINT Point);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-clipcursor))], [])
+@DllImport("USER32.dll")
+BOOL ClipCursor(const(RECT)* lpRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-childwindowfrompointex))], [])
+@DllImport("USER32.dll")
+HWND ChildWindowFromPointEx(HWND hwnd, POINT pt, CWP_FLAGS flags);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowword))], [])
+@DllImport("USER32.dll")
+ushort GetWindowWord(HWND hWnd, int nIndex);
+
+@DllImport("USER32.dll")
+ushort SetWindowWord(HWND hWnd, int nIndex, ushort wNewWord);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowlonga))], [])
+@DllImport("USER32.dll")
+int GetWindowLongA(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowlongw))], [])
+@DllImport("USER32.dll")
+int GetWindowLongW(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowlonga))], [])
+@DllImport("USER32.dll")
+int SetWindowLongA(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex, int dwNewLong);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowlongw))], [])
+@DllImport("USER32.dll")
+int SetWindowLongW(HWND hWnd, WINDOW_LONG_PTR_INDEX nIndex, int dwNewLong);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassword))], [])
+@DllImport("USER32.dll")
+ushort GetClassWord(HWND hWnd, int nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setclassword))], [])
+@DllImport("USER32.dll")
+ushort SetClassWord(HWND hWnd, int nIndex, ushort wNewWord);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclasslonga))], [])
+@DllImport("USER32.dll")
+uint GetClassLongA(HWND hWnd, GET_CLASS_LONG_INDEX nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclasslongw))], [])
+@DllImport("USER32.dll")
+uint GetClassLongW(HWND hWnd, GET_CLASS_LONG_INDEX nIndex);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setclasslonga))], [])
+@DllImport("USER32.dll")
+uint SetClassLongA(HWND hWnd, GET_CLASS_LONG_INDEX nIndex, int dwNewLong);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setclasslongw))], [])
+@DllImport("USER32.dll")
+uint SetClassLongW(HWND hWnd, GET_CLASS_LONG_INDEX nIndex, int dwNewLong);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getprocessdefaultlayout))], [])
+@DllImport("USER32.dll")
+BOOL GetProcessDefaultLayout(uint* pdwDefaultLayout);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setprocessdefaultlayout))], [])
+@DllImport("USER32.dll")
+BOOL SetProcessDefaultLayout(uint dwDefaultLayout);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getdesktopwindow))], [])
+@DllImport("USER32.dll")
+HWND GetDesktopWindow();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getparent))], [])
+@DllImport("USER32.dll")
+HWND GetParent(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setparent))], [])
+@DllImport("USER32.dll")
+HWND SetParent(HWND hWndChild, HWND hWndNewParent);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumchildwindows))], [])
+@DllImport("USER32.dll")
+BOOL EnumChildWindows(HWND hWndParent, WNDENUMPROC lpEnumFunc, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-findwindowa))], [])
+@DllImport("USER32.dll")
+HWND FindWindowA(const(PSTR) lpClassName, const(PSTR) lpWindowName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-findwindoww))], [])
+@DllImport("USER32.dll")
+HWND FindWindowW(const(PWSTR) lpClassName, const(PWSTR) lpWindowName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-findwindowexa))], [])
+@DllImport("USER32.dll")
+HWND FindWindowExA(HWND hWndParent, HWND hWndChildAfter, const(PSTR) lpszClass, const(PSTR) lpszWindow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-findwindowexw))], [])
+@DllImport("USER32.dll")
+HWND FindWindowExW(HWND hWndParent, HWND hWndChildAfter, const(PWSTR) lpszClass, const(PWSTR) lpszWindow);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getshellwindow))], [])
+@DllImport("USER32.dll")
+HWND GetShellWindow();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registershellhookwindow))], [])
+@DllImport("USER32.dll")
+BOOL RegisterShellHookWindow(HWND hwnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-deregistershellhookwindow))], [])
+@DllImport("USER32.dll")
+BOOL DeregisterShellHookWindow(HWND hwnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumwindows))], [])
+@DllImport("USER32.dll")
+BOOL EnumWindows(WNDENUMPROC lpEnumFunc, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-enumthreadwindows))], [])
+@DllImport("USER32.dll")
+BOOL EnumThreadWindows(uint dwThreadId, WNDENUMPROC lpfn, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassnamea))], [])
+@DllImport("USER32.dll")
+int GetClassNameA(HWND hWnd, PSTR lpClassName, int nMaxCount);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getclassnamew))], [])
+@DllImport("USER32.dll")
+int GetClassNameW(HWND hWnd, PWSTR lpClassName, int nMaxCount);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-gettopwindow))], [])
+@DllImport("USER32.dll")
+HWND GetTopWindow(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: CanReturnMultipleSuccessValuesAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowthreadprocessid))], [])
+@DllImport("USER32.dll")
+uint GetWindowThreadProcessId(HWND hWnd, uint* lpdwProcessId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.1.2600))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-isguithread))], [])
+@DllImport("USER32.dll")
+BOOL IsGUIThread(BOOL bConvert);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getlastactivepopup))], [])
+@DllImport("USER32.dll")
+HWND GetLastActivePopup(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindow))], [])
+@DllImport("USER32.dll")
+HWND GetWindow(HWND hWnd, GET_WINDOW_CMD uCmd);
+
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+@DllImport("USER32.dll")
+HHOOK SetWindowsHookA(int nFilterType, HOOKPROC pfnFilterProc);
+
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+@DllImport("USER32.dll")
+HHOOK SetWindowsHookW(int nFilterType, HOOKPROC pfnFilterProc);
+
+@DllImport("USER32.dll")
+BOOL UnhookWindowsHook(int nCode, HOOKPROC pfnFilterProc);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowshookexa))], [])
+@DllImport("USER32.dll")
+HHOOK SetWindowsHookExA(WINDOWS_HOOK_ID idHook, HOOKPROC lpfn, HINSTANCE hmod, uint dwThreadId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setwindowshookexw))], [])
+@DllImport("USER32.dll")
+HHOOK SetWindowsHookExW(WINDOWS_HOOK_ID idHook, HOOKPROC lpfn, HINSTANCE hmod, uint dwThreadId);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-unhookwindowshookex))], [])
+@DllImport("USER32.dll")
+BOOL UnhookWindowsHookEx(HHOOK hhk);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-callnexthookex))], [])
+@DllImport("USER32.dll")
+LRESULT CallNextHookEx(HHOOK hhk, int nCode, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-checkmenuradioitem))], [])
+@DllImport("USER32.dll")
+BOOL CheckMenuRadioItem(HMENU hmenu, uint first, uint last, uint check, uint flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadcursora))], [])
+@DllImport("USER32.dll")
+HCURSOR LoadCursorA(HINSTANCE hInstance, const(PSTR) lpCursorName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadcursorw))], [])
+@DllImport("USER32.dll")
+HCURSOR LoadCursorW(HINSTANCE hInstance, const(PWSTR) lpCursorName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadcursorfromfilea))], [])
+@DllImport("USER32.dll")
+HCURSOR LoadCursorFromFileA(const(PSTR) lpFileName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadcursorfromfilew))], [])
+@DllImport("USER32.dll")
+HCURSOR LoadCursorFromFileW(const(PWSTR) lpFileName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createcursor))], [])
+@DllImport("USER32.dll")
+HCURSOR CreateCursor(HINSTANCE hInst, int xHotSpot, int yHotSpot, int nWidth, int nHeight, const(void)* pvANDPlane, 
+                     const(void)* pvXORPlane);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroycursor))], [])
+@DllImport("USER32.dll")
+BOOL DestroyCursor(HCURSOR hCursor);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setsystemcursor))], [])
+@DllImport("USER32.dll")
+BOOL SetSystemCursor(HCURSOR hcur, SYSTEM_CURSOR_ID id);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadicona))], [])
+@DllImport("USER32.dll")
+HICON LoadIconA(HINSTANCE hInstance, const(PSTR) lpIconName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadiconw))], [])
+@DllImport("USER32.dll")
+HICON LoadIconW(HINSTANCE hInstance, const(PWSTR) lpIconName);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-privateextracticonsa))], [])
+@DllImport("USER32.dll")
+uint PrivateExtractIconsA(const(PSTR) szFileName, int nIconIndex, int cxIcon, int cyIcon, HICON* phicon, 
+                          uint* piconid, uint nIcons, uint flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-privateextracticonsw))], [])
+@DllImport("USER32.dll")
+uint PrivateExtractIconsW(const(PWSTR) szFileName, int nIconIndex, int cxIcon, int cyIcon, HICON* phicon, 
+                          uint* piconid, uint nIcons, uint flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createicon))], [])
+@DllImport("USER32.dll")
+HICON CreateIcon(HINSTANCE hInstance, int nWidth, int nHeight, ubyte cPlanes, ubyte cBitsPixel, 
+                 const(ubyte)* lpbANDbits, const(ubyte)* lpbXORbits);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-destroyicon))], [])
+@DllImport("USER32.dll")
+BOOL DestroyIcon(HICON hIcon);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-lookupiconidfromdirectory))], [])
+@DllImport("USER32.dll")
+int LookupIconIdFromDirectory(ubyte* presbits, BOOL fIcon);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-lookupiconidfromdirectoryex))], [])
+@DllImport("USER32.dll")
+int LookupIconIdFromDirectoryEx(ubyte* presbits, BOOL fIcon, int cxDesired, int cyDesired, IMAGE_FLAGS Flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createiconfromresource))], [])
+@DllImport("USER32.dll")
+HICON CreateIconFromResource(/*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(1)))])*/ubyte* presbits, 
+                             uint dwResSize, BOOL fIcon, uint dwVer);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createiconfromresourceex))], [])
+@DllImport("USER32.dll")
+HICON CreateIconFromResourceEx(/*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(1)))])*/ubyte* presbits, 
+                               uint dwResSize, BOOL fIcon, uint dwVer, int cxDesired, int cyDesired, 
+                               IMAGE_FLAGS Flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadimagea))], [])
+@DllImport("USER32.dll")
+HANDLE LoadImageA(HINSTANCE hInst, const(PSTR) name, GDI_IMAGE_TYPE type, int cx, int cy, IMAGE_FLAGS fuLoad);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-loadimagew))], [])
+@DllImport("USER32.dll")
+HANDLE LoadImageW(HINSTANCE hInst, const(PWSTR) name, GDI_IMAGE_TYPE type, int cx, int cy, IMAGE_FLAGS fuLoad);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-copyimage))], [])
+@DllImport("USER32.dll")
+HANDLE CopyImage(HANDLE h, GDI_IMAGE_TYPE type, int cx, int cy, IMAGE_FLAGS flags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-drawiconex))], [])
+@DllImport("USER32.dll")
+BOOL DrawIconEx(HDC hdc, int xLeft, int yTop, HICON hIcon, int cxWidth, int cyWidth, uint istepIfAniCur, 
+                HBRUSH hbrFlickerFreeDraw, DI_FLAGS diFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createiconindirect))], [])
+@DllImport("USER32.dll")
+HICON CreateIconIndirect(ICONINFO* piconinfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-copyicon))], [])
+@DllImport("USER32.dll")
+HICON CopyIcon(HICON hIcon);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-geticoninfo))], [])
+@DllImport("USER32.dll")
+BOOL GetIconInfo(HICON hIcon, ICONINFO* piconinfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-geticoninfoexa))], [])
+@DllImport("USER32.dll")
+BOOL GetIconInfoExA(HICON hicon, ICONINFOEXA* piconinfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-geticoninfoexw))], [])
+@DllImport("USER32.dll")
+BOOL GetIconInfoExW(HICON hicon, ICONINFOEXW* piconinfo);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-isdialogmessagea))], [])
+@DllImport("USER32.dll")
+BOOL IsDialogMessageA(HWND hDlg, MSG* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-isdialogmessagew))], [])
+@DllImport("USER32.dll")
+BOOL IsDialogMessageW(HWND hDlg, MSG* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-mapdialogrect))], [])
+@DllImport("USER32.dll")
+BOOL MapDialogRect(HWND hDlg, RECT* lpRect);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getscrollinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetScrollInfo(HWND hwnd, SCROLLBAR_CONSTANTS nBar, SCROLLINFO* lpsi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defframeproca))], [])
+@DllImport("USER32.dll")
+LRESULT DefFrameProcA(HWND hWnd, HWND hWndMDIClient, uint uMsg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defframeprocw))], [])
+@DllImport("USER32.dll")
+LRESULT DefFrameProcW(HWND hWnd, HWND hWndMDIClient, uint uMsg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defmdichildproca))], [])
+@DllImport("USER32.dll")
+LRESULT DefMDIChildProcA(HWND hWnd, uint uMsg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-defmdichildprocw))], [])
+@DllImport("USER32.dll")
+LRESULT DefMDIChildProcW(HWND hWnd, uint uMsg, WPARAM wParam, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-translatemdisysaccel))], [])
+@DllImport("USER32.dll")
+BOOL TranslateMDISysAccel(HWND hWndClient, MSG* lpMsg);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-arrangeiconicwindows))], [])
+@DllImport("USER32.dll")
+uint ArrangeIconicWindows(HWND hWnd);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createmdiwindowa))], [])
+@DllImport("USER32.dll")
+HWND CreateMDIWindowA(const(PSTR) lpClassName, const(PSTR) lpWindowName, WINDOW_STYLE dwStyle, int X, int Y, 
+                      int nWidth, int nHeight, HWND hWndParent, HINSTANCE hInstance, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-createmdiwindoww))], [])
+@DllImport("USER32.dll")
+HWND CreateMDIWindowW(const(PWSTR) lpClassName, const(PWSTR) lpWindowName, WINDOW_STYLE dwStyle, int X, int Y, 
+                      int nWidth, int nHeight, HWND hWndParent, HINSTANCE hInstance, LPARAM lParam);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-tilewindows))], [])
+@DllImport("USER32.dll")
+ushort TileWindows(HWND hwndParent, TILE_WINDOWS_HOW wHow, const(RECT)* lpRect, uint cKids, const(HWND)* lpKids);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-cascadewindows))], [])
+@DllImport("USER32.dll")
+ushort CascadeWindows(HWND hwndParent, CASCADE_WINDOWS_HOW wHow, const(RECT)* lpRect, uint cKids, 
+                      const(HWND)* lpKids);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa))], [])
+@DllImport("USER32.dll")
+BOOL SystemParametersInfoA(SYSTEM_PARAMETERS_INFO_ACTION uiAction, uint uiParam, void* pvParam, 
+                           SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS fWinIni);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfow))], [])
+@DllImport("USER32.dll")
+BOOL SystemParametersInfoW(SYSTEM_PARAMETERS_INFO_ACTION uiAction, uint uiParam, void* pvParam, 
+                           SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS fWinIni);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-soundsentry))], [])
+@DllImport("USER32.dll")
+BOOL SoundSentry();
+
+@DllImport("USER32.dll")
+void SetDebugErrorLevel(uint dwLevel);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-internalgetwindowtext))], [])
+@DllImport("USER32.dll")
+int InternalGetWindowText(HWND hWnd, PWSTR pString, int cchMaxCount);
+
+@DllImport("USER32.dll")
+BOOL CancelShutdown();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getguithreadinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetGUIThreadInfo(uint idThread, GUITHREADINFO* pgui);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setprocessdpiaware))], [])
+@DllImport("USER32.dll")
+BOOL SetProcessDPIAware();
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-isprocessdpiaware))], [])
+@DllImport("USER32.dll")
+BOOL IsProcessDPIAware();
+
+@DllImport("USER32.dll")
+BOOL InheritWindowMonitor(HWND hwnd, HWND hwndInherit);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowmodulefilenamea))], [])
+@DllImport("USER32.dll")
+uint GetWindowModuleFileNameA(HWND hwnd, PSTR pszFileName, uint cchFileNameMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowmodulefilenamew))], [])
+@DllImport("USER32.dll")
+uint GetWindowModuleFileNameW(HWND hwnd, PWSTR pszFileName, uint cchFileNameMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getcursorinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetCursorInfo(CURSORINFO* pci);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getwindowinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetWindowInfo(HWND hwnd, WINDOWINFO* pwi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-gettitlebarinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetTitleBarInfo(HWND hwnd, TITLEBARINFO* pti);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getmenubarinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetMenuBarInfo(HWND hwnd, OBJECT_IDENTIFIER idObject, int idItem, MENUBARINFO* pmbi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getscrollbarinfo))], [])
+@DllImport("USER32.dll")
+BOOL GetScrollBarInfo(HWND hwnd, OBJECT_IDENTIFIER idObject, SCROLLBARINFO* psbi);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getancestor))], [])
+@DllImport("USER32.dll")
+HWND GetAncestor(HWND hwnd, GET_ANCESTOR_FLAGS gaFlags);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-realchildwindowfrompoint))], [])
+@DllImport("USER32.dll")
+HWND RealChildWindowFromPoint(HWND hwndParent, POINT ptParentClientCoords);
+
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-realgetwindowclassa))], [])
+@DllImport("USER32.dll")
+uint RealGetWindowClassA(HWND hwnd, PSTR ptszClassName, uint cchClassNameMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-realgetwindowclassw))], [])
+@DllImport("USER32.dll")
+uint RealGetWindowClassW(HWND hwnd, PWSTR ptszClassName, uint cchClassNameMax);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: AnsiAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getalttabinfoa))], [])
+@DllImport("USER32.dll")
+BOOL GetAltTabInfoA(HWND hwnd, int iItem, ALTTABINFO* pati, PSTR pszItemText, uint cchItemText);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows5.0))], [])
+//METH ATTR: UnicodeAttribute : CustomAttributeSig([], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-getalttabinfow))], [])
+@DllImport("USER32.dll")
+BOOL GetAltTabInfoW(HWND hwnd, int iItem, ALTTABINFO* pati, PWSTR pszItemText, uint cchItemText);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.0.6000))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-changewindowmessagefilter))], [])
+@DllImport("USER32.dll")
+BOOL ChangeWindowMessageFilter(uint message, CHANGE_WINDOW_MESSAGE_FILTER_FLAGS dwFlag);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows6.1))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-changewindowmessagefilterex))], [])
+@DllImport("USER32.dll")
+BOOL ChangeWindowMessageFilterEx(HWND hwnd, uint message, WINDOW_MESSAGE_FILTER_ACTION action, 
+                                 CHANGEFILTERSTRUCT* pChangeFilterStruct);
+
+@DllImport("USER32.dll")
+BOOL ConvertToInterceptWindow(HWND topLevelWindow);
+
+@DllImport("USER32.dll")
+BOOL IsInterceptWindow(HWND topLevelWindow, BOOL* isIntercept);
+
+@DllImport("USER32.dll")
+BOOL ApplyWindowAction(HWND hwnd, WINDOW_ACTION* pAction);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-setadditionalforegroundboostprocesses))], [])
+@DllImport("USER32.dll")
+BOOL SetAdditionalForegroundBoostProcesses(HWND topLevelWindow, uint processHandleCount, 
+                                           HANDLE* processHandleArray);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-registerfortooltipdismissnotification))], [])
+@DllImport("USER32.dll")
+BOOL RegisterForTooltipDismissNotification(HWND hWnd, TOOLTIP_DISMISS_FLAGS tdFlags);
+
+@DllImport("USER32.dll")
+BOOL ConvertPrimaryPointerToMouseDrag();
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/winmsg/winuser/nf-winuser-iswindowarranged))], [])
+@DllImport("USER32.dll")
+BOOL IsWindowArranged(HWND hwnd);
+
+@DllImport("USER32.dll")
+uint GetCurrentMonitorTopologyId();
+
+@DllImport("USER32.dll")
+BOOL RegisterCloakedNotification(HWND hwnd, BOOL fRegister);
+
+@DllImport("USER32.dll")
+BOOL EnterMoveSizeLoop(HWND hwnd, POINT ptCursor, MOVESIZE_OPERATION moveSizeCode);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows10.0.10240))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/resourceindexer/nf-resourceindexer-createresourceindexer))], [])
+@DllImport("MrmSupport.dll")
+HRESULT CreateResourceIndexer(const(PWSTR) projectRoot, const(PWSTR) extensionDllPath, void** ppResourceIndexer);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows10.0.10240))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/resourceindexer/nf-resourceindexer-destroyresourceindexer))], [])
+@DllImport("MrmSupport.dll")
+void DestroyResourceIndexer(void* resourceIndexer);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows10.0.10240))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/resourceindexer/nf-resourceindexer-indexfilepath))], [])
+@DllImport("MrmSupport.dll")
+HRESULT IndexFilePath(void* resourceIndexer, const(PWSTR) filePath, PWSTR* ppResourceUri, uint* pQualifierCount, 
+                      IndexedResourceQualifier** ppQualifiers);
+
+//METH ATTR: SupportedOSPlatformAttribute : CustomAttributeSig([FixedArgSig(ElementSig(windows10.0.10240))], [])
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/api/resourceindexer/nf-resourceindexer-destroyindexedresults))], [])
+@DllImport("MrmSupport.dll")
+void DestroyIndexedResults(PWSTR resourceUri, uint qualifierCount, IndexedResourceQualifier* qualifiers);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourceindexer))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexer(const(PWSTR) packageFamilyName, const(PWSTR) projectRoot, 
+                                 MrmPlatformVersion platformVersion, const(PWSTR) defaultQualifiers, 
+                                 MrmResourceIndexerHandle* indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourceindexerfrompreviousschemafile))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexerFromPreviousSchemaFile(const(PWSTR) projectRoot, 
+                                                       MrmPlatformVersion platformVersion, 
+                                                       const(PWSTR) defaultQualifiers, const(PWSTR) schemaFile, 
+                                                       MrmResourceIndexerHandle* indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourceindexerfrompreviousprifile))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexerFromPreviousPriFile(const(PWSTR) projectRoot, MrmPlatformVersion platformVersion, 
+                                                    const(PWSTR) defaultQualifiers, const(PWSTR) priFile, 
+                                                    MrmResourceIndexerHandle* indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourceindexerfrompreviousschemadata))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexerFromPreviousSchemaData(const(PWSTR) projectRoot, 
+                                                       MrmPlatformVersion platformVersion, 
+                                                       const(PWSTR) defaultQualifiers, 
+                                                       /*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(4)))])*/ubyte* schemaXmlData, 
+                                                       uint schemaXmlSize, MrmResourceIndexerHandle* indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourceindexerfrompreviouspridata-))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexerFromPreviousPriData(const(PWSTR) projectRoot, MrmPlatformVersion platformVersion, 
+                                                    const(PWSTR) defaultQualifiers, 
+                                                    /*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(4)))])*/ubyte* priData, 
+                                                    uint priSize, MrmResourceIndexerHandle* indexer);
+
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceIndexerWithFlags(const(PWSTR) packageFamilyName, const(PWSTR) projectRoot, 
+                                          MrmPlatformVersion platformVersion, const(PWSTR) defaultQualifiers, 
+                                          MrmIndexerFlags flags, MrmResourceIndexerHandle* indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmindexstring))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmIndexString(MrmResourceIndexerHandle indexer, const(PWSTR) resourceUri, const(PWSTR) resourceString, 
+                       const(PWSTR) qualifiers);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmindexembeddeddata))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmIndexEmbeddedData(MrmResourceIndexerHandle indexer, const(PWSTR) resourceUri, 
+                             /*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(3)))])*/const(ubyte)* embeddedData, 
+                             uint embeddedDataSize, const(PWSTR) qualifiers);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmindexfile))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmIndexFile(MrmResourceIndexerHandle indexer, const(PWSTR) resourceUri, const(PWSTR) filePath, 
+                     const(PWSTR) qualifiers);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmindexfileautoqualifiers))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmIndexFileAutoQualifiers(MrmResourceIndexerHandle indexer, const(PWSTR) filePath);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmindexresourcecontainerautoqualifiers))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmIndexResourceContainerAutoQualifiers(MrmResourceIndexerHandle indexer, const(PWSTR) containerPath);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourcefile))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceFile(MrmResourceIndexerHandle indexer, MrmPackagingMode packagingMode, 
+                              MrmPackagingOptions packagingOptions, const(PWSTR) outputDirectory);
+
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceFileWithChecksum(MrmResourceIndexerHandle indexer, MrmPackagingMode packagingMode, 
+                                          MrmPackagingOptions packagingOptions, uint checksum, 
+                                          const(PWSTR) outputDirectory);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateresourcefileinmemory))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateResourceFileInMemory(MrmResourceIndexerHandle indexer, MrmPackagingMode packagingMode, 
+                                      MrmPackagingOptions packagingOptions, ubyte** outputPriData, 
+                                      uint* outputPriSize);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmpeekresourceindexermessages))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmPeekResourceIndexerMessages(MrmResourceIndexerHandle handle, MrmResourceIndexerMessage** messages, 
+                                       uint* numMsgs);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmdestroyindexerandmessages))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmDestroyIndexerAndMessages(MrmResourceIndexerHandle indexer);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmfreememory))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmFreeMemory(ubyte* data);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmdumpprifile))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmDumpPriFile(const(PWSTR) indexFileName, const(PWSTR) schemaPriFile, MrmDumpType dumpType, 
+                       const(PWSTR) outputXmlFile);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmdumpprifileinmemory))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmDumpPriFileInMemory(const(PWSTR) indexFileName, const(PWSTR) schemaPriFile, MrmDumpType dumpType, 
+                               ubyte** outputXmlData, uint* outputXmlSize);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmdumppridatainmemory))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmDumpPriDataInMemory(/*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(1)))])*/ubyte* inputPriData, 
+                               uint inputPriSize, 
+                               /*PARAM ATTR: MemorySizeAttribute : CustomAttributeSig([], [NamedArgSig("BytesParamIndex", FixedArgSig(ElementSig(3)))])*/ubyte* schemaPriData, 
+                               uint schemaPriSize, MrmDumpType dumpType, ubyte** outputXmlData, uint* outputXmlSize);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateconfig))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateConfig(MrmPlatformVersion platformVersion, const(PWSTR) defaultQualifiers, 
+                        const(PWSTR) outputXmlFile);
+
+//METH ATTR: DocumentationAttribute : CustomAttributeSig([FixedArgSig(ElementSig(https://learn.microsoft.com/windows/win32/menurc/mrmcreateconfiginmemory))], [])
+@DllImport("MrmSupport.dll")
+HRESULT MrmCreateConfigInMemory(MrmPlatformVersion platformVersion, const(PWSTR) defaultQualifiers, 
+                                ubyte** outputXmlData, uint* outputXmlSize);
+
+@DllImport("MrmSupport.dll")
+HRESULT MrmGetPriFileContentChecksum(const(PWSTR) priFile, uint* checksum);
+
+

@@ -1,0 +1,10 @@
+{
+    "mainSourceFile":  "win32window_test.d",
+    "targetType":  "executable",
+    "name":  "win32window_test",
+    "dependencies":  {
+                         "guia4":  {
+                                       "path":  ".."
+                                   }
+                     }
+}
