@@ -4,12 +4,12 @@ import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
 import guia4.utils.logger;
+import guia4.utils.fontcache;
+import guia4.platform_win32.win32defs;
 import std.utf;
 import windows.win32.graphics.gdi;
 import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
-
-alias LONG = int;
 
 /**
  * Label control — static text display.
@@ -20,6 +20,7 @@ class Label : Control
     private string _text;
     private COLORREF _textColor = cast(COLORREF)0x00000000; // black
     private uint _fontSize = 14;
+    private bool _autoSize = true;
 
     this(string text = "Label")
     {
@@ -40,43 +41,53 @@ class Label : Control
     }
 
     string text() const @property { return _text; }
-    void text(string v) { _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) @property { _text = v; markDirty(DirtyBits.Visual); }
 
     COLORREF textColor() const @property { return _textColor; }
-    void textColor(COLORREF v) { _textColor = v; markDirty(DirtyBits.Visual); }
+    void textColor(uint v) @property { _textColor = COLORREF(v); markDirty(DirtyBits.Visual); }
 
     uint fontSize() const @property { return _fontSize; }
-    void fontSize(uint v) { _fontSize = v; markDirty(DirtyBits.Visual); }
+    void fontSize(uint v) @property { _fontSize = v; markDirty(DirtyBits.Visual); }
 
-    override void renderWithGDI(HDC hdc)
+    bool autoSize() const @property { return _autoSize; }
+    void autoSize(bool v) @property { _autoSize = v; markDirty(DirtyBits.Visual); }
+
+    /// 计算文本自动尺寸（在布局阶段调用，不在渲染阶段修改控件状态）
+    void measure(void* hdc_)
     {
+        if (!_autoSize) return;
+        auto hdc = cast(HDC)hdc_;
+        auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
+
+        wstring textW = toUTF16(_text);
+        SIZE textSize;
+        GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr, cast(int)textW.length, &textSize);
+
+        FontCache.release(hdc, fontEntry);
+
+        width = textSize.cx;
+        height = textSize.cy;
+    }
+
+    override void renderWithGDI(void* hdc_)
+    {
+        auto hdc = cast(HDC)hdc_;
         logTrace("Label.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
 
-        wstring fontName = toUTF16("Segoe UI");
-        HFONT font = CreateFontW(cast(int)_fontSize, 0, 0, 0, FW_NORMAL, 0u, 0u, 0u, DEFAULT_CHARSET,
-                                OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
-                                DEFAULT_PITCH | FF_DONTCARE, cast(const(PWSTR))fontName.ptr);
-        HFONT oldFont = cast(HFONT)SelectObject(hdc, cast(HGDIOBJ)font);
+        auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
 
         SetTextColor(hdc, _textColor);
         SetBkMode(hdc, TRANSPARENT);
 
         wstring textW = toUTF16(_text);
 
-        SIZE textSize;
-        GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr, cast(int)textW.length, &textSize);
 
         // Render at (x, y) — text flows from top-left
         TextOutW(hdc, cast(int)x(), cast(int)y(), cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
-        // Auto-size width if not explicitly set
-        if (width() == 80 && textSize.cx > 0) // default placeholder width
-            width = textSize.cx;
-        if (height() == 20)
-            height = textSize.cy;
+        // 注意：自动尺寸由 measure() 在布局阶段计算，renderWithGDI 不再修改 width/height
 
-        SelectObject(hdc, cast(HGDIOBJ)oldFont);
-        DeleteObject(cast(HGDIOBJ)font);
+        FontCache.release(hdc, fontEntry);
     }
 
     override void render()

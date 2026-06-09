@@ -4,22 +4,27 @@ import guia4.gfx;
 import guia4.gfx_d3d12;
 import guia4.platform_win32;
 import guia4.guicore;
+import guia4.guicore.menubar;
+import guia4.guicore.combobox;
 import guia4.utils.logger;
 import std.datetime;
 import std.utf;
 import std.range;
+import std.algorithm;
 import std.stdio;
 import std.string;
 import windows.win32.graphics.gdi;
 import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
 
-// Re-import the mouse event data struct from win32window so MainWindow can use it
-import guia4.platform_win32.win32window : MouseEventData, KeyEventData, VK_TAB;
+// Re-import the mouse event data struct from platform types so MainWindow can use it
+import guia4.platform.types : MouseEventData, KeyEventData, WheelEventData, CharEventData;
+import guia4.platform.iwindow : IPlatformWindow;
+import guia4.platform_win32.win32defs : VK_TAB;
 
 alias LONG = int;
 
-// Static paint callback — called from WNDPROC via module-level __gshared function pointer.
+// Static paint callback — called from WNDPROC via instance-level function pointer.
 // Casts user data (MainWindow*) back to MainWindow and calls render().
 // This is the only mechanism proven to work from WNDPROC context
 // (field function pointers → crash, delegates → body not executed).
@@ -36,8 +41,24 @@ private static void mainWindowPaintCallback(HDC hdc, int w, int h, void* data)
 private static void mainWindowTimerCallback(uint id, void* data)
 {
     auto mw = cast(MainWindow)data;
-    if (mw !is null)
+    if (mw is null) return;
+
+    if (id == MainWindow.BLINK_TIMER_ID)
     {
+        // Recurring blink timer — toggle cursor on focused TextInput
+        if (mw._focusedControl !is null)
+        {
+            auto ti = cast(TextInput)mw._focusedControl;
+            if (ti !is null)
+            {
+                ti.cursorTick();
+                mw.requestRedraw();
+            }
+        }
+    }
+    else
+    {
+        // One-shot timers (e.g. screenshot)
         mw._platformWindow.stopTimer(id);
         mw.captureScreenshot(mw._screenshotFile);
     }
@@ -136,7 +157,7 @@ class Application
  */
 class MainWindow : Control
 {
-    private Win32Window _platformWindow;
+    private IPlatformWindow _platformWindow;
     private IRenderDevice _renderDevice;
     private Application _app;
     
@@ -147,16 +168,19 @@ class MainWindow : Control
     // Focus state
     private Control _focusedControl;   // control currently holding keyboard focus
     
+    
     this(Application app, int x = 100, int y = 100, uint width = 800, uint height = 600, string title = "DGUI Window")
     {
         super();
         logTrace("MainWindow.ctor(app=", app !is null, ", x=", x, ", y=", y, ", width=", width, ", height=", height, ", title='", title, "')");
         _app = app;
         _platformWindow = new Win32Window(x, y, width, height, title);
-        _platformWindow.setPaintFunction(&mainWindowPaintCallback, cast(Object)this);
+        (cast(Win32Window)_platformWindow).setPaintFunction(&mainWindowPaintCallback, cast(Object)this);
         _platformWindow.setCloseCallback({ this.close(); this.fireClose(); });
         _platformWindow.setMouseCallback(&mouseEventHandler);
         _platformWindow.setKeyCallback(&keyEventHandler);
+        _platformWindow.setWheelCallback(&wheelEventHandler);
+        _platformWindow.setCharCallback(&charEventHandler);
         _renderDevice = null;
     }
     
@@ -277,10 +301,6 @@ class MainWindow : Control
             
             logInfo("Screenshot saved to: ", filename);
         }
-        else
-        {
-            logError("Failed to open file for screenshot: ", filename);
-        }
         
         SelectObject(hdcMemDC, hOldBitmap);
         DeleteObject(cast(HGDIOBJ)hBitmap);
@@ -293,12 +313,13 @@ class MainWindow : Control
     {
         logTrace("MainWindow.scheduleScreenshot(delayMs=", delayMs, ", '", filename, "')");
         _screenshotFile = filename;
-        Win32Window.setTimerFunction(&mainWindowTimerCallback, cast(Object)this);
+        (cast(Win32Window)_platformWindow).setTimerFunction(&mainWindowTimerCallback, cast(Object)this);
         _platformWindow.startTimer(SCREENSHOT_TIMER_ID, delayMs);
     }
     
     private string _screenshotFile;
     private static immutable uint SCREENSHOT_TIMER_ID = 1001;
+    private static immutable uint BLINK_TIMER_ID = 1002;
     
     // Immediate screenshot - call from show() before message loop
     void captureImmediate(string filename)
@@ -308,62 +329,187 @@ class MainWindow : Control
         captureScreenshot(filename);
     }
     
-    /// Compute absolute coordinates (window client space) for a control
-    private void controlAbsolutePos(Control ctrl, out int absX, out int absY)
-    {
-        absX = 0;
-        absY = 0;
-        Control cur = ctrl;
-        while (cur !is null)
-        {
-            absX += cur.x();
-            absY += cur.y();
-            cur = cur.parent();
-        }
-    }
-    
-    /// Translate client-space coordinates to control-local coordinates
+    /// Translate client-space coordinates to content-space coordinates relative to a control.
+    ///
+    /// NOTE: `_x` / `_y` are absolute window-client coordinates. However, when a
+    /// control lives inside a scrolled ScrollableContainer, the GDI viewport offset
+    /// shifts its visual position upward by `scrollY`.  To convert the client click
+    /// to the control's local content-space we must add back every ancestor's scrollY.
     private void clientToControl(Control ctrl, int clientX, int clientY, out int localX, out int localY)
     {
-        int absX, absY;
-        controlAbsolutePos(ctrl, absX, absY);
+        // 控件的 _x/_y 是相对父局部的坐标（不是绝对 MainWindow 坐标）。
+        // 当父容器使用 GDI 偏移（如 TabHost 内部 page、Panel 等）时，
+        // 视觉上的绝对 MainWindow 位置 = 子节点 _x/_y + 父容器 GDI 偏移。
+        // 这里需要累加所有祖先容器的 GDI 偏移来计算绝对位置。
+        import guia4.guicore.panel;
+        import guia4.guicore.tabhost;
+
+        int absX = ctrl.x();
+        int absY = ctrl.y();
+        int scrollY = 0;
+
+        Control cur = ctrl.parent();
+        while (cur !is null)
+        {
+            // Panel 和 ScrollableContainer 使用 (-scrollX, -scrollY) 的 GDI 偏移
+            // 子节点实际位置 = 子节点 _x/_y - scrollY
+            auto sc = cast(ScrollableContainer)cur;
+            auto pn = cast(Panel)cur;
+            if (sc !is null)
+            {
+                scrollY += sc.scrollY;
+            }
+            else if (pn !is null)
+            {
+                scrollY += pn.scrollY();
+            }
+
+            // TabHost 使用 (TabHost.x, TabHost.y) 的 GDI 偏移
+            // 子节点实际位置 = 子节点 _x/_y + TabHost._x/_y
+            auto th = cast(TabHost)cur;
+            if (th !is null)
+            {
+                absX += th.x();
+                absY += th.y();
+            }
+
+            cur = cur.parent();
+        }
+
+        // 应用 Panel/ScrollableContainer 的滚动补偿
+        absY -= scrollY;
+
         localX = clientX - absX;
         localY = clientY - absY;
     }
-    
+
+    /// Sum _scrollY from every ScrollableContainer ancestor of [ctrl].
+    /// Needed because children use absolute coordinates while GDI rendering
+    /// offsets by scrollY — event dispatch must reverse this shift.
+    private static int ancestorScrollY(Control ctrl)
+    {
+        int total = 0;
+        Control cur = ctrl.parent();
+        while (cur !is null)
+        {
+            // ScrollableContainer 和 Panel 都会向下偏移内容用于滚动。
+            // Panel 在 GDI 渲染时使用 OffsetViewportOrgEx(-_scrollX, -_scrollY)，
+            // 而子节点用绝对坐标存储，所以事件分发必须将滚动量加回去。
+            auto sc = cast(ScrollableContainer)cur;
+            if (sc !is null)
+                total += sc.scrollY;
+            else
+            {
+                import guia4.guicore.panel;
+                auto pn = cast(Panel)cur;
+                if (pn !is null)
+                    total += pn.scrollY();
+            }
+            cur = cur.parent();
+        }
+        return total;
+    }
+
     /// Mouse event dispatch from Win32Window.
     /// Performs hit-test on children, tracks capture (for click detection) and hover.
+    /// ScrollableContainer scroll offsets are transparently handled by
+    /// [ancestorScrollY] → [clientToControl].
     private void mouseEventHandler(ref MouseEventData ev)
     {
         logTrace("MainWindow.mouseEventHandler(x=", ev.x, ", y=", ev.y, ", down=", ev.down, ", move=", ev.move, ", leave=", ev.leave, ")");
         
         if (ev.leave)
         {
-            // Cursor left the window entirely — send hover-end to tracked control
             if (_hoveredControl !is null && _hoveredControl !is this)
-            {
                 _hoveredControl.fireMouseMove(-1, -1);
-            }
             _hoveredControl = null;
             _capturedControl = null;
+            requestRedraw();
             return;
         }
         
-        // Find the deepest visible child at this point (using absolute client coordinates)
+        // Find the deepest visible child at this point
         Control target = hitTestChild(this, ev.x, ev.y);
         if (target is null)
             target = this;
         
         if (ev.down)
         {
+            // 检查是否点击了 TextInput 的右键菜单
+            if (_focusedControl !is null)
+            {
+                auto ti = cast(TextInput)_focusedControl;
+                if (ti !is null && ti.contextMenuOpen)
+                {
+                    int localX, localY;
+                    clientToControl(ti, ev.x, ev.y, localX, localY);
+                    if (ti.handleContextMenuClick(localX, localY))
+                    {
+                        // 点击了菜单项，已处理
+                        requestRedraw();
+                        return;
+                    }
+                    // 点击菜单外，菜单已关闭，继续正常处理
+                }
+            }
+
             // Mouse button pressed
             _capturedControl = target;
-            // Click-to-focus: set keyboard focus to the clicked control if focusable
             if (target.focusable())
                 setFocus(target);
             int localX, localY;
             clientToControl(target, ev.x, ev.y, localX, localY);
             target.fireMouseDown(localX, localY, ev.button);
+
+            // 检查是否点击了子菜单项
+            bool clickedSubItem = false;
+            foreach (child; children())
+            {
+                auto mb = cast(MenuBar)child;
+                if (mb !is null && mb.hasOpenMenu())
+                {
+                    auto subItem = mb.hitTestSubMenu(ev.x, ev.y);
+                    if (subItem !is null)
+                    {
+                        subItem.fireClick(ev.x, ev.y);
+                        clickedSubItem = true;
+                        break;
+                    }
+                }
+            }
+
+            // 如果点击的不是菜单区域，关闭所有展开的菜单
+            if (!clickedSubItem)
+            {
+                auto targetMenuBar = cast(MenuBar)target;
+                auto targetMenuItem = cast(MenuItem)target;
+                if (targetMenuBar is null && targetMenuItem is null)
+                {
+                    // 检查 target 的父级是否是 MenuBar
+                    Control p = target.parent();
+                    bool isMenuArea = false;
+                    while (p !is null)
+                    {
+                        if (cast(MenuBar)p !is null)
+                        {
+                            isMenuArea = true;
+                            break;
+                        }
+                        p = p.parent();
+                    }
+                    if (!isMenuArea)
+                        closeAllMenus();
+                }
+            }
+
+            // 检查是否有 ComboBox 的下拉列表打开
+            auto comboHit = findOpenComboBox(ev.x, ev.y);
+            if (comboHit !is null)
+            {
+                comboHit.handleDropDownClick(ev.x, ev.y);
+                requestRedraw();
+                return;
+            }
         }
         else if (!ev.move)
         {
@@ -373,31 +519,188 @@ class MainWindow : Control
                 int localX, localY;
                 clientToControl(_capturedControl, ev.x, ev.y, localX, localY);
                 _capturedControl.fireMouseUp(localX, localY, ev.button);
-                // Click detection: mouse-up on the same control that received mouse-down
                 if (_capturedControl is target)
-                {
                     _capturedControl.fireClick(localX, localY);
-                }
             }
             _capturedControl = null;
         }
         else
         {
             // Mouse move
-            if (target !is _hoveredControl)
+            Control moveTarget = target;
+            if (_capturedControl !is null)
+                moveTarget = _capturedControl;
+
+            if (moveTarget !is _hoveredControl)
             {
-                // Leave previous hovered control — send fireMouseMove with (-1,-1) sentinel
                 if (_hoveredControl !is null && _hoveredControl !is this)
-                {
                     _hoveredControl.fireMouseMove(-1, -1);
-                }
-                // Enter new hovered control
-                _hoveredControl = target;
+                _hoveredControl = moveTarget;
             }
             int localX, localY;
-            clientToControl(target, ev.x, ev.y, localX, localY);
-            target.fireMouseMove(localX, localY);
+            clientToControl(moveTarget, ev.x, ev.y, localX, localY);
+            moveTarget.fireMouseMove(localX, localY);
+
+            // 处理子菜单项的悬停效果
+            foreach (child; children())
+            {
+                auto mb = cast(MenuBar)child;
+                if (mb !is null && mb.hasOpenMenu())
+                {
+                    updateSubMenuHover(mb, ev.x, ev.y);
+                }
+            }
+
+            // 更新 ComboBox 下拉列表悬停
+            updateComboBoxDropDownHover(ev.x, ev.y);
         }
+
+        requestRedraw();
+    }
+    
+    /// 关闭所有展开的菜单
+    private void closeAllMenus()
+    {
+        foreach (child; children())
+        {
+            auto mb = cast(MenuBar)child;
+            if (mb !is null)
+                mb.closeAll();
+        }
+    }
+
+    /// 查找打开下拉列表的 ComboBox，检查点击是否在下拉区域内
+    private ComboBox findOpenComboBox(int px, int py)
+    {
+        return findOpenComboBoxInControl(this, px, py);
+    }
+
+    private ComboBox findOpenComboBoxInControl(Control c, int px, int py)
+    {
+        foreach (child; c.children())
+        {
+            auto cb = cast(ComboBox)child;
+            if (cb !is null && cb.isDropDown())
+            {
+                // 检查点击是否在 ComboBox 或其下拉区域内
+                int dropY = cb.y() + cb.height();
+                int dropH = cast(int)cb.itemCount() * 24;
+                if (dropH > 120) dropH = 120;
+
+                if (px >= cb.x() && px < cb.x() + cb.width() &&
+                    py >= cb.y() && py < dropY + dropH)
+                {
+                    return cb;
+                }
+            }
+            // 递归查找子控件
+            auto result = findOpenComboBoxInControl(child, px, py);
+            if (result !is null)
+                return result;
+        }
+        return null;
+    }
+
+    /// 更新 ComboBox 下拉列表悬停
+    private void updateComboBoxDropDownHover(int mx, int my)
+    {
+        updateComboBoxDropDownHoverInControl(this, mx, my);
+    }
+
+    private void updateComboBoxDropDownHoverInControl(Control c, int mx, int my)
+    {
+        foreach (child; c.children())
+        {
+            auto cb = cast(ComboBox)child;
+            if (cb !is null && cb.isDropDown())
+            {
+                cb.handleDropDownMouseMove(mx, my);
+            }
+            updateComboBoxDropDownHoverInControl(child, mx, my);
+        }
+    }
+
+    /// 关闭所有 ComboBox 的下拉列表
+    private void closeAllComboBoxDropDown()
+    {
+        closeAllComboBoxDropDownInControl(this);
+    }
+
+    private void closeAllComboBoxDropDownInControl(Control c)
+    {
+        foreach (child; c.children())
+        {
+            auto cb = cast(ComboBox)child;
+            if (cb !is null && cb.isDropDown())
+            {
+                cb.handleDropDownClick(-1, -1);  // 传无效坐标，触发关闭
+            }
+            closeAllComboBoxDropDownInControl(child);
+        }
+    }
+
+    /// 更新子菜单项的悬停状态
+    private void updateSubMenuHover(MenuBar mb, int mx, int my)
+    {
+        // 遍历 MenuBar 的所有 MenuItem，更新展开子菜单的悬停状态
+        foreach (child; mb.children())
+        {
+            auto mi = cast(MenuItem)child;
+            if (mi !is null && mi.menuOpen())
+            {
+                updateSubItemHover(mi, mx, my);
+            }
+        }
+    }
+
+    /// 递归更新子菜单项的悬停状态
+    private void updateSubItemHover(MenuItem parentItem, int mx, int my)
+    {
+        foreach (subItem; parentItem.subItems())
+        {
+            bool inItem = mx >= subItem.x() && mx < subItem.x() + subItem.width() &&
+                          my >= subItem.y() && my < subItem.y() + subItem.height();
+            if (inItem && !subItem.hovered())
+            {
+                subItem.hovered(true);
+                requestRedraw();
+            }
+            else if (!inItem && subItem.hovered())
+            {
+                subItem.hovered(false);
+                requestRedraw();
+            }
+            // 递归处理子项的子菜单
+            if (subItem.menuOpen())
+            {
+                updateSubItemHover(subItem, mx, my);
+            }
+        }
+    }
+    
+    /// Wheel event handler — dispatch to hovered control (bubbling propagates to ScrollableContainer).
+    private void wheelEventHandler(ref WheelEventData ev)
+    {
+        logTrace("MainWindow.wheelEventHandler(x=", ev.x, ", y=", ev.y, ", delta=", ev.delta, ")");
+        
+        // Dispatch to hovered control — bubbling carries it to parent ScrollableContainer
+        if (_hoveredControl !is null && _hoveredControl !is this)
+            _hoveredControl.fireMouseWheel(ev.delta, ev.x, ev.y);
+
+        requestRedraw();
+    }
+    
+    /// Char event handler — dispatch char input to focused control.
+    private void charEventHandler(ref CharEventData ev)
+    {
+        logTrace("MainWindow.charEventHandler(ch='", ev.ch, "')");
+        
+        if (_focusedControl !is null)
+        {
+            _focusedControl.fireTextInput(ev.ch);
+        }
+
+        requestRedraw();
     }
     
     /// Set keyboard focus to a specific control.
@@ -406,12 +709,25 @@ class MainWindow : Control
         if (_focusedControl is ctrl) return;
         // Remove focus from previous
         if (_focusedControl !is null && _focusedControl !is this)
+        {
+            // Stop blink timer if losing focus on a TextInput
+            auto prevTi = cast(TextInput)_focusedControl;
+            if (prevTi !is null)
+                _platformWindow.stopTimer(BLINK_TIMER_ID);
             _focusedControl.hasFocus(false);
+        }
         // Grant focus to new
         _focusedControl = ctrl;
         if (_focusedControl !is null && _focusedControl !is this)
+        {
             _focusedControl.hasFocus(true);
+            // Start blink timer for TextInput
+            auto newTi = cast(TextInput)_focusedControl;
+            if (newTi !is null)
+                _platformWindow.startTimer(BLINK_TIMER_ID, 530);
+        }
         logTrace("MainWindow.setFocus() -> ", _focusedControl !is null ? _focusedControl.toString() : "null");
+        requestRedraw();
     }
     
     /// Collect all focusable controls in tab order via depth-first traversal.
@@ -455,58 +771,161 @@ class MainWindow : Control
         if (!ev.down) return; // we only care about key-down events
         
         // Tab / Shift+Tab → cycle focus
+        // 但如果 focused control 正在编辑（如 GridWidgetBase），让控件自己处理 Tab
         if (ev.keyCode == VK_TAB)
         {
+            auto grid = cast(GridWidgetBase)_focusedControl;
+            if (grid !is null && grid.isEditing())
+            {
+                // 传给控件处理（GridWidgetBase 会在编辑模式下确认并移到下一格）
+                _focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
+                requestRedraw();
+                return;
+            }
             cycleFocus(ev.shift);
+            requestRedraw();
             return;
         }
         
-        // Forward to focused control
+        // Ctrl+A 全选由 TextInput 内部处理，需要传递修饰键
+        // Forward to focused control (with shift/control modifiers)
         if (_focusedControl !is null)
         {
-            _focusedControl.fireKeyDown(ev.keyCode);
+            _focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
         }
+
+        requestRedraw();
     }
     
     /// Hit-test children recursively.
-    /// px,py are relative to `parent`. Returns deepest matching Control or null.
+    /// px,py are absolute window-client coordinates. Returns deepest matching Control or null.
+    /// 按层级从高到低遍历，同层级内从后往前（后添加的优先），确保弹出控件优先命中。
     private Control hitTestChild(Control parent, int px, int py)
     {
-        // Iterate in reverse (last child drawn on top = first to receive events)
         auto children = parent.children();
-        for (int i = cast(int)children.length - 1; i >= 0; i--)
+        if (children.length == 0)
+            return null;
+
+        // 找出最大层级值
+        int maxLayer = 0;
+        foreach (child; children)
         {
-            auto child = children[i];
-            if (!child.visible())
-                continue;
-            // child.hitTest uses child's own coordinate space (relative to its parent)
-            if (child.hitTest(px, py))
+            if (cast(int)child.layer() > maxLayer)
+                maxLayer = cast(int)child.layer();
+        }
+
+        // 按层级从高到低遍历，同层级内从后往前（后添加的优先）
+        for (int layer = maxLayer; layer >= 0; layer--)
+        {
+            for (int i = cast(int)children.length - 1; i >= 0; i--)
             {
-                // Recurse with coordinates relative to this child
-                auto deeper = hitTestChild(child, px - child.x(), py - child.y());
-                if (deeper !is null)
-                    return deeper;
-                return child;
+                auto child = children[i];
+                if (!child.visible())
+                    continue;
+                if (cast(int)child.layer() != layer)
+                    continue;
+
+                // child.x()/y() 已经是绝对坐标（相对于窗口客户区），直接用 hitTest 判断
+                if (child.hitTest(px, py))
+                {
+                    // TabHost 透传命中测试：TabHost 不直接接收事件，返回其父控件让 TabWidget 分发
+                    auto th = cast(guia4.guicore.tabhost.TabHost)child;
+                    if (th !is null)
+                        return parent;
+
+                    // 递归进入子控件时，如果是 ScrollableContainer/Panel，
+                    // 需要将 py 加上 scrollY，因为子控件的 y 坐标是"未滚动"的绝对值，
+                    // 而 px/py 是"屏幕上"的坐标（已经减去了滚动偏移）
+                    int nextPy = py;
+                    int nextPx = px;
+                    auto sc = cast(ScrollableContainer)child;
+                    if (sc !is null)
+                    {
+                        nextPy = py + sc.scrollY;
+                    }
+                    else
+                    {
+                        import guia4.guicore.panel;
+                        auto pn = cast(Panel)child;
+                        if (pn !is null)
+                        {
+                            nextPy = py + pn.scrollY();
+                        }
+                    }
+
+                    auto deeper = hitTestChild(child, nextPx, nextPy);
+                    if (deeper !is null)
+                        return deeper;
+                    return child;
+                }
             }
         }
         return null;
     }
     
+    /// 请求重绘 — 标记窗口客户区为需要更新，触发 WM_PAINT
+    void requestRedraw()
+    {
+        HWND hwnd = cast(HWND)nativeHandle();
+        if (hwnd.Value !is null)
+        {
+            InvalidateRect(hwnd, null, BOOL());
+        }
+    }
+
+    // ── Rendering ──
+    
     void render(HDC hdc, int width, int height)
     {
+        // ── Double-buffering: draw everything to an off-screen bitmap, then BitBlt at once ──
+        HDC memDC = CreateCompatibleDC(hdc);
+        HBITMAP memBmp = CreateCompatibleBitmap(hdc, width, height);
+        HGDIOBJ oldBmp = SelectObject(memDC, cast(HGDIOBJ)memBmp);
+
+        // Fill background
         RECT rect = {0, 0, width, height};
-        
         HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
-        FillRect(hdc, &rect, brush);
+        FillRect(memDC, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
-        
-        foreach (child; children())
+
+        // 按 Layer 层级排序渲染：低层级先渲染（背景），高层级后渲染（弹出菜单在最上）
+        auto sorted = children();
+        sorted.sort!((a, b) => a.layer() < b.layer());
+        foreach (child; sorted)
         {
             if (child.visible())
+                child.renderWithGDI(memDC.Value);
+        }
+
+        // 在所有子控件渲染完毕后，渲染 TextInput 上下文菜单（确保在最上层）
+        renderContextMenus(memDC);
+
+        // Blit the complete off-screen buffer to the screen in one shot
+        BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
+
+        // Cleanup
+        SelectObject(memDC, oldBmp);
+        DeleteObject(cast(HGDIOBJ)memBmp);
+        DeleteDC(memDC);
+    }
+    
+    /// 渲染所有打开的 TextInput 上下文菜单（在所有其他内容之上）
+    private void renderContextMenus(HDC hdc)
+    {
+        // 遍历所有子控件，查找打开上下文菜单的 TextInput
+        void scanControls(Control ctrl)
+        {
+            auto ti = cast(TextInput)ctrl;
+            if (ti !is null && ti.contextMenuOpen)
             {
-                child.renderWithGDI(hdc);
+                ti.renderContextMenuOnly(hdc);
+            }
+            foreach (child; ctrl.children())
+            {
+                scanControls(child);
             }
         }
+        scanControls(this);
     }
     
     void captureWindow()

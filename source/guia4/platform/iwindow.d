@@ -1,8 +1,8 @@
 module guia4.platform.iwindow;
 
-import guia4.platform.events;
+import guia4.platform.types;
 
-// Window style flags
+// 窗口样式标志
 enum WindowStyle : uint
 {
     None      = 0,
@@ -14,22 +14,24 @@ enum WindowStyle : uint
     Default   = Titled | Closable | Minimizable | Maximizable | Resizable,
 }
 
-// Delegate types for window events
-alias MouseEventDelegate = void delegate(MouseEvent);
-alias KeyEventDelegate = void delegate(KeyEvent);
-alias ResizeEventDelegate = void delegate(ResizeEvent);
-alias CloseEventDelegate = void delegate(ref CloseEvent);
-alias PaintEventDelegate = void delegate();
-alias MouseMoveEventDelegate = void delegate(MouseMoveEvent);
+// 事件回调 delegate 类型 — 使用 platform.types 的平台事件数据结构
+alias MouseEventCallback = void delegate(ref MouseEventData);
+alias KeyEventCallback = void delegate(ref KeyEventData);
+alias WheelEventCallback = void delegate(ref WheelEventData);
+alias CharEventCallback = void delegate(ref CharEventData);
+alias CloseEventCallback = void delegate();
+alias RedrawEventCallback = void delegate();
 
+/// 平台窗口接口 — 抽象平台相关的窗口操作
+/// 实现类：Win32Window (Windows), 未来可扩展 X11Window (Linux) 等
 interface IPlatformWindow
 {
-    // Show/hide
+    // 显示/隐藏
     void show();
     void hide();
-    bool isVisible() const nothrow;
+    bool visible() const;
 
-    // Position and size
+    // 位置和尺寸
     void setPosition(int x, int y);
     void setSize(uint width, uint height);
     int x() const nothrow;
@@ -37,18 +39,25 @@ interface IPlatformWindow
     uint width() const nothrow;
     uint height() const nothrow;
 
-    // Title
+    // 标题
     void title(string title);
     string title() const;
 
-    // Native handle (platform-specific, e.g. HWND on Windows)
+    // 原生句柄（平台特定，如 Windows 的 HWND）
     void* nativeHandle() const nothrow;
 
-    // Event handlers
-    void onMouseInput(MouseEventDelegate dlg);
-    void onKeyInput(KeyEventDelegate dlg);
-    void onResize(ResizeEventDelegate dlg);
-    void onClose(CloseEventDelegate dlg);
-    void onPaint(PaintEventDelegate dlg);
-    void onMouseMove(MouseMoveEventDelegate dlg);
+    // 事件回调设置
+    void setMouseCallback(MouseEventCallback callback);
+    void setKeyCallback(KeyEventCallback callback);
+    void setWheelCallback(WheelEventCallback callback);
+    void setCharCallback(CharEventCallback callback);
+    void setCloseCallback(CloseEventCallback callback);
+    void setRedrawCallback(RedrawEventCallback callback);
+
+    // 定时器
+    void startTimer(uint id, uint delayMs);
+    void stopTimer(uint id);
+
+    // 销毁原生窗口
+    void destroy();
 }

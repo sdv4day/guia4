@@ -1,5 +1,8 @@
 module guia4.platform_win32.win32window;
 
+import guia4.platform.iwindow;
+import guia4.platform.types;
+import guia4.platform_win32.win32defs;
 import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
 import windows.win32.graphics.gdi;
@@ -18,17 +21,9 @@ enum WM_MOUSELEAVE = 0x02A3;
 enum WM_KEYDOWN = 0x0100;
 enum WM_SYSKEYDOWN = 0x0104;
 enum WM_KEYUP = 0x0101;
+enum WM_CHAR = 0x0102;
 
-// Virtual key codes we care about
-enum VK_TAB     = 0x09;
-enum VK_RETURN  = 0x0D;
-enum VK_SPACE   = 0x20;
-enum VK_LEFT    = 0x25;
-enum VK_UP      = 0x26;
-enum VK_RIGHT   = 0x27;
-enum VK_DOWN    = 0x28;
-enum VK_SHIFT   = 0x10;
-enum VK_CONTROL = 0x11;
+enum WM_MOUSEWHEEL = 0x020A;
 
 enum GWLP_USERDATA = -21;
 
@@ -50,29 +45,7 @@ enum TME_QUERY   = 0x40000000;
 enum TME_CANCEL  = 0x80000000;
 enum HOVER_DEFAULT = 0xFFFFFFFF;
 
-alias LONG = int;
-alias LONG_PTR = long;
-
-// Mouse event data forwarded from Win32 messages to the MainWindow layer
-struct MouseEventData
-{
-    int x;
-    int y;
-    int button;  // 0=left, 1=right, 2=middle
-    bool down;   // true = button press, false = button release (for button messages only)
-    bool move;   // true for WM_MOUSEMOVE
-    bool leave;  // true for WM_MOUSELEAVE
-}
-
-// Key event data forwarded from Win32 messages
-struct KeyEventData
-{
-    uint keyCode;   // virtual key code (VK_*)
-    bool down;      // true = key pressed, false = key released
-    bool alt;       // alt key held
-    bool shift;     // shift held
-    bool control;   // control held
-}
+// 事件数据结构已移至 guia4.platform.types，此处通过 import guia4.platform.types 引用
 
 extern(Windows) HINSTANCE GetModuleHandleW(const(PWSTR) lpModuleName);
 extern(Windows) LONG_PTR GetWindowLongPtrW(HWND hWnd, int nIndex);
@@ -112,13 +85,6 @@ private __gshared
     Object[MAX_WINDOWS] _windowTable;
     int _windowTableCount = 0;
 
-    // Paint callback: static function + GC-scoped data ref (same pattern as before)
-    void function(HDC hdc, int w, int h, void* data) _paintFunc;
-    Object _paintDataRef;
-
-    // Timer callback
-    void function(uint id, void* data) _timerFunc;
-    Object _timerDataRef;
 }
 
 private enum MAX_WINDOWS = 64;
@@ -148,7 +114,7 @@ private void forgetWindow(int idx)
         _windowTable[idx] = null;
 }
 
-class Win32Window
+class Win32Window : IPlatformWindow
 {
     HWND _hwnd;
     string _title;
@@ -156,6 +122,12 @@ class Win32Window
     uint _width, _height;
     bool _visible;
     bool _destroyed = false; // true after DestroyWindow called
+
+    // 实例级回调 — 每个窗口独立，支持多窗口
+    private void function(HDC hdc, int w, int h, void* data) _paintFunc;
+    private Object _paintDataRef;
+    private void function(uint id, void* data) _timerFunc;
+    private Object _timerDataRef;
     
     // Index into __gshared _windowTable for GC-safe Win32→D lookup.
     // -1 = not registered in the table.
@@ -164,6 +136,9 @@ class Win32Window
     void delegate() _closeCallback;
     void delegate(ref MouseEventData) _mouseCallback;
     void delegate(ref KeyEventData) _keyCallback;
+    void delegate(ref WheelEventData) _wheelCallback;
+    void delegate(ref CharEventData) _charCallback;
+    void delegate() _redrawCallback;
     
     private static bool _classRegistered = false;
     private static wchar[] _className;
@@ -377,6 +352,31 @@ class Win32Window
                 return LRESULT(0);
             }
             
+            case WM_CHAR:
+            {
+                if (window !is null)
+                {
+                    wchar code = cast(wchar)(wparam.Value & 0xFFFF);
+                    window.internalChar(cast(dchar)code);
+                }
+                return LRESULT(0);
+            }
+            
+            case WM_MOUSEWHEEL:
+            {
+                if (window !is null)
+                {
+                    int delta = cast(short)((wparam.Value >> 16) & 0xFFFF);
+                    // WM_MOUSEWHEEL gives screen coordinates; convert to client
+                    POINT pt;
+                    pt.x = lParamX(lparam);
+                    pt.y = lParamY(lparam);
+                    ScreenToClient(hwnd, &pt);
+                    window.internalWheel(cast(int)pt.x, cast(int)pt.y, delta);
+                }
+                return LRESULT(0);
+            }
+            
             default:
                 break;
         }
@@ -389,16 +389,18 @@ class Win32Window
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         
-        RECT rect = {0, 0, cast(LONG)_width, cast(LONG)_height};
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
-        FillRect(hdc, &rect, brush);
-        DeleteObject(cast(HGDIOBJ)brush);
+        // Use GetClientRect for correct client-area dimensions (not the window dimensions
+        // which include title bar and borders).
+        RECT cr;
+        GetClientRect(hwnd, &cr);
+        int cw = cr.right - cr.left;
+        int ch = cr.bottom - cr.top;
         
         if (_paintFunc !is null)
         {
             // Derive void* from GC-scanned Object ref — ensures the address is always valid
             // even after GC compaction moves the object in memory.
-            _paintFunc(hdc, cast(int)_width, cast(int)_height, cast(void*)_paintDataRef);
+            _paintFunc(hdc, cw, ch, cast(void*)_paintDataRef);
         }
         
         EndPaint(hwnd, &ps);
@@ -413,8 +415,8 @@ class Win32Window
     }
     
     /// Set paint callback using static function pointer + user data.
-    /// This is the ONLY mechanism verified to work reliably from WNDPROC context.
-    static void setPaintFunction(void function(HDC hdc, int w, int h, void* data) func, Object data)
+    /// Instance method — each window has its own paint callback, supporting multi-window.
+    void setPaintFunction(void function(HDC hdc, int w, int h, void* data) func, Object data)
     {
         _paintFunc = func;
         _paintDataRef = data;
@@ -445,6 +447,21 @@ class Win32Window
     void setKeyCallback(void delegate(ref KeyEventData) callback)
     {
         _keyCallback = callback;
+    }
+    
+    void setWheelCallback(void delegate(ref WheelEventData) callback)
+    {
+        _wheelCallback = callback;
+    }
+    
+    void setCharCallback(void delegate(ref CharEventData) callback)
+    {
+        _charCallback = callback;
+    }
+    
+    void setRedrawCallback(void delegate() callback)
+    {
+        _redrawCallback = callback;
     }
     
     // Mouse event forwarders — called from wndProcWrapper, dispatch via delegate
@@ -523,8 +540,33 @@ class Win32Window
         }
     }
     
+    // Wheel event forwarder — called from wndProcWrapper
+    private void internalWheel(int x, int y, int delta)
+    {
+        if (_wheelCallback !is null)
+        {
+            WheelEventData ev;
+            ev.x = x;
+            ev.y = y;
+            ev.delta = delta;
+            _wheelCallback(ev);
+        }
+    }
+    
+    // Char event forwarder — called from wndProcWrapper
+    private void internalChar(dchar ch)
+    {
+        if (_charCallback !is null)
+        {
+            CharEventData ev;
+            ev.ch = ch;
+            _charCallback(ev);
+        }
+    }
+    
     /// Set timer callback using static function pointer + user data.
-    static void setTimerFunction(void function(uint id, void* data) func, Object data)
+    /// Instance method — each window has its own timer callback, supporting multi-window.
+    void setTimerFunction(void function(uint id, void* data) func, Object data)
     {
         _timerFunc = func;
         _timerDataRef = data;
@@ -580,12 +622,12 @@ class Win32Window
         _visible = false;
     }
     
-    bool visible() const
+    bool visible() const nothrow
     {
         return _visible;
     }
     
-    void* nativeHandle() const
+    void* nativeHandle() const nothrow
     {
         return cast(void*)_hwnd.Value;
     }
@@ -607,6 +649,33 @@ class Win32Window
         _width = width;
         _height = height;
         SetWindowPos(_hwnd, HWND.init, 0, 0, cast(int)width, cast(int)height, SWP_NOMOVE | SWP_NOZORDER);
+    }
+    
+    void setPosition(int x, int y)
+    {
+        _x = x;
+        _y = y;
+        SetWindowPos(_hwnd, HWND.init, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    }
+    
+    int x() const nothrow
+    {
+        return _x;
+    }
+    
+    int y() const nothrow
+    {
+        return _y;
+    }
+    
+    uint width() const nothrow
+    {
+        return _width;
+    }
+    
+    uint height() const nothrow
+    {
+        return _height;
     }
     
     ~this()

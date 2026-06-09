@@ -1,7 +1,7 @@
 module guia4.guicore.layout;
 
 import guia4.guicore.control;
-import guia4.guicore.layoutdata;
+
 
 interface ILayout
 {
@@ -106,34 +106,4 @@ class GridLayout : ILayout
     
     int rows() const @property { return _rows; }
     int cols() const @property { return _cols; }
-}
-
-template StaticLayout(Control[] controls, int width, int height, string layoutType = "vertical")
-{
-    LayoutData[controls.length] calculateLayout()
-    {
-        LayoutData[controls.length] result;
-        int x = 4, y = 4;
-        
-        static if (layoutType == "vertical")
-        {
-            foreach (i, c; controls)
-            {
-                result[i] = LayoutData(x, y, width - 8, c.height());
-                y += c.height() + 4;
-            }
-        }
-        else static if (layoutType == "horizontal")
-        {
-            foreach (i, c; controls)
-            {
-                result[i] = LayoutData(x, y, c.width(), height - 8);
-                x += c.width() + 4;
-            }
-        }
-        
-        return result;
-    }
-    
-    enum StaticLayout = calculateLayout();
 }

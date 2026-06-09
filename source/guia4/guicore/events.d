@@ -14,6 +14,7 @@ enum EventId
     Resize,
     Paint,
     Close,
+    MouseWheel,
     Count,
 }
 
@@ -51,6 +52,9 @@ struct KeyEvent
     bool handled = false;
     uint keyCode;
     bool pressed;
+    bool shift;     /// Shift 键是否按下
+    bool control;   /// Ctrl 键是否按下
+    bool alt;       /// Alt 键是否按下
 }
 
 struct ResizeEvent
@@ -76,83 +80,15 @@ alias KeyHandler = void delegate(ref KeyEvent);
 alias ResizeHandler = void delegate(ref ResizeEvent);
 alias CloseHandler = void delegate(ref CloseEvent);
 
-template EventRouter(Control T, EventId eventId)
+struct MouseWheelEvent
 {
-    static if (eventId == EventId.Click)
-    {
-        alias HandlerType = ClickHandler;
-    }
-    else static if (eventId == EventId.MouseDown || eventId == EventId.MouseUp || eventId == EventId.MouseMove)
-    {
-        alias HandlerType = MouseHandler;
-    }
-    else static if (eventId == EventId.KeyDown || eventId == EventId.KeyUp)
-    {
-        alias HandlerType = KeyHandler;
-    }
-    else static if (eventId == EventId.Resize)
-    {
-        alias HandlerType = ResizeHandler;
-    }
-    else static if (eventId == EventId.Close)
-    {
-        alias HandlerType = CloseHandler;
-    }
+    EventId id = EventId.MouseWheel;
+    Control target;
+    bool handled = false;
+    int delta;      /// 正值 = 向上滚动, 负值 = 向下滚动
+    int x;          /// 滚轮事件 x 坐标
+    int y;          /// 滚轮事件 y 坐标
 }
 
-struct EventDispatcher
-{
-    static void dispatch(T)(ref ClickEvent event)
-    {
-        if (T._clickHandlers[EventId.Click] !is null)
-        {
-            T._clickHandlers[EventId.Click](event);
-        }
-    }
-    
-    static void dispatch(T)(ref MouseEvent event)
-    {
-        if (T._mouseHandlers[event.id] !is null)
-        {
-            T._mouseHandlers[event.id](event);
-        }
-    }
-    
-    static void dispatch(T)(ref KeyEvent event)
-    {
-        if (T._keyHandlers[event.id] !is null)
-        {
-            T._keyHandlers[event.id](event);
-        }
-    }
-    
-    static void dispatch(T)(ref ResizeEvent event)
-    {
-        if (T._resizeHandlers[EventId.Resize] !is null)
-        {
-            T._resizeHandlers[EventId.Resize](event);
-        }
-    }
-    
-    static void dispatch(T)(ref CloseEvent event)
-    {
-        if (T._closeHandlers[EventId.Close] !is null)
-        {
-            T._closeHandlers[EventId.Close](event);
-        }
-    }
-}
-
-bool bubbleEvent(Control target, EventId id)
-{
-    Control current = target;
-    while (current !is null)
-    {
-        if (current.isDirty())
-        {
-            return true;
-        }
-        current = current.parent();
-    }
-    return false;
-}
+alias MouseWheelHandler = void delegate(ref MouseWheelEvent);
+alias TextInputHandler = void delegate(dchar ch);
