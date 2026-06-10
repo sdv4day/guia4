@@ -451,6 +451,10 @@ class LongList : Control
             _scrollY = (_scrollY - step).clamp(0, maxScroll());
         else
             _scrollY = (_scrollY + step).clamp(0, maxScroll());
+
+        // 对齐到行高整数倍，避免半行显示
+        _scrollY = (_scrollY / _defaultItemHeight) * _defaultItemHeight;
+
         updateAtBottomState();
         markDirty(DirtyBits.Visual);
     }
@@ -483,6 +487,10 @@ class LongList : Control
                 {
                     float ratio = cast(float)my / cast(float)trackH;
                     _scrollY = cast(int)(maxS * ratio).clamp(0, maxS);
+
+                    // 对齐到行高整数倍，避免半行显示
+                    _scrollY = (_scrollY / _defaultItemHeight) * _defaultItemHeight;
+
                     updateAtBottomState();
                 }
             }
@@ -544,6 +552,10 @@ class LongList : Control
                 int delta = my - _scrollbarDragStart;
                 float valueDelta = cast(float)delta * cast(float)maxS / cast(float)movableRange;
                 _scrollY = cast(int)(_scrollbarDragStartScrollY + valueDelta).clamp(0, maxS);
+
+                // 对齐到行高整数倍，避免半行显示
+                _scrollY = (_scrollY / _defaultItemHeight) * _defaultItemHeight;
+
                 updateAtBottomState();
             }
             markDirty(DirtyBits.Visual);

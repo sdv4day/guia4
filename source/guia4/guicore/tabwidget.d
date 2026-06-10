@@ -35,6 +35,13 @@ class TabWidget : Control
         addChild(_tabHost);
     }
 
+    this(Control parent)
+    {
+        this();
+        if (parent)
+            parent.addChild(this);
+    }
+
     /// 添加标签页（标签 + 页面内容），返回索引
     int addTab(string label, Control page)
     {

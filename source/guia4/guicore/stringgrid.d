@@ -37,6 +37,13 @@ class StringGrid : GridWidgetBase
         _rowCount = cast(int)data.length;
     }
 
+    this(Control parent, string[] headers, string[][] data)
+    {
+        this(headers, data);
+        if (parent)
+            parent.addChild(this);
+    }
+
     /// 设置数据（表头 + 数据）
     void setData(string[] headers, string[][] data)
     {

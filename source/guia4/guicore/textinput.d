@@ -73,6 +73,13 @@ class TextInput : Control
         logTrace("TextInput.ctor(text='", text, "', placeholder='", placeholder, "')");
     }
 
+    this(Control parent, string text = "", string placeholder = "")
+    {
+        this(text, placeholder);
+        if (parent)
+            parent.addChild(this);
+    }
+
     // ── 属性 ────────────────────────────────────────────────
 
     string text() const @property { return _text; }
@@ -185,6 +192,27 @@ class TextInput : Control
         if (ctrl && event.keyCode == 'A')
         {
             selectAll();
+            return;
+        }
+
+        // Ctrl+C 复制
+        if (ctrl && event.keyCode == 'C')
+        {
+            copy();
+            return;
+        }
+
+        // Ctrl+V 粘贴
+        if (ctrl && event.keyCode == 'V')
+        {
+            paste();
+            return;
+        }
+
+        // Ctrl+X 剪切
+        if (ctrl && event.keyCode == 'X')
+        {
+            cut();
             return;
         }
 
@@ -728,10 +756,10 @@ class TextInput : Control
     }
 
     /// 渲染右键上下文菜单（由 MainWindow 在所有内容之上调用）
-    public void renderContextMenuOnly(HDC hdc)
+    public void renderContextMenuOnly(HDC hdc, int absX, int absY)
     {
-        int menuX = x() + _rightClickX;
-        int menuY = y() + _rightClickY;
+        int menuX = absX + _rightClickX;
+        int menuY = absY + _rightClickY;
         int menuW = 120;
         int menuH = 4 * 24; // 4项：剪切、复制、粘贴、全选
 

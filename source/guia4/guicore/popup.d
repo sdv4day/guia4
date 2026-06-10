@@ -25,6 +25,14 @@ class Popup : Control
     private COLORREF _bgColor = cast(COLORREF)0x00FFFFFF;
     private COLORREF _borderColor = cast(COLORREF)0x00888888;
     private int _shadowOffset = 3;
+    private string _title;                    /// 标题文本
+    private int _titleBarHeight = 28;         /// 标题栏高度
+    private bool _closeBtnHovered = false;    /// 关闭按钮悬停状态
+    private bool _isDragging = false;         /// 标题栏拖拽状态
+    private int _dragStartAbsX = 0;           /// 拖拽起始窗口绝对X
+    private int _dragStartAbsY = 0;           /// 拖拽起始窗口绝对Y
+    private int _dragStartPopupX = 0;         /// 拖拽起始Popup.x()
+    private int _dragStartPopupY = 0;         /// 拖拽起始Popup.y()
 
     this()
     {
@@ -32,7 +40,12 @@ class Popup : Control
         height = 150;
         visible = false;
         layer = Layer.Popup;
+        _title = "弹出窗口";
     }
+
+    /// 标题文本
+    string title() const @property { return _title; }
+    void title(string v) @property { _title = v; markDirty(DirtyBits.Visual); }
 
     /// 弹出窗口是否打开
     bool isOpen() const @property { return _isOpen; }
@@ -53,6 +66,16 @@ class Popup : Control
         _isOpen = false;
         visible = false;
         markDirty(DirtyBits.Visual);
+    }
+
+    /// 是否正在拖拽
+    bool isDragging() const @property { return _isDragging; }
+
+    /// 开始拖拽（由MainWindow调用，传入窗口绝对坐标）
+    void startDrag(int absX, int absY)
+    {
+        _dragStartAbsX = absX;
+        _dragStartAbsY = absY;
     }
 
     /// 设置内容控件
@@ -79,11 +102,95 @@ class Popup : Control
             return;
         }
 
-        // 转发给内容控件
+        // 检查是否点击了关闭按钮（标题栏右侧的X按钮）
+        int closeBtnSize = _titleBarHeight - 6;
+        int closeBtnX = width() - closeBtnSize - 3;
+        int closeBtnY = 3;
+        if (mx >= closeBtnX && mx < closeBtnX + closeBtnSize &&
+            my >= closeBtnY && my < closeBtnY + closeBtnSize)
+        {
+            close();
+            return;
+        }
+
+        // 检查是否在标题栏区域（非关闭按钮）→ 启动拖拽
+        if (my >= 0 && my < _titleBarHeight)
+        {
+            _isDragging = true;
+            _dragStartPopupX = x();
+            _dragStartPopupY = y();
+            // 使用本地坐标+Popup位置作为窗口绝对坐标的初始值
+            // MainWindow 会通过 startDrag() 覆盖为更精确的值
+            _dragStartAbsX = x() + mx;
+            _dragStartAbsY = y() + my;
+            return;
+        }
+
+        // 转发给内容控件（内容区域在标题栏下方）
         if (_content)
         {
-            _content.fireMouseDown(mx, my, button);
+            _content.fireMouseDown(mx, my - _titleBarHeight, button);
         }
+    }
+
+    override void fireMouseMove(int mx, int my)
+    {
+        // 标题栏拖拽移动（mx/my 在拖拽时为窗口绝对坐标，由 MainWindow 传入）
+        if (_isDragging)
+        {
+            int deltaX = mx - _dragStartAbsX;
+            int deltaY = my - _dragStartAbsY;
+            int newX = _dragStartPopupX + deltaX;
+            int newY = _dragStartPopupY + deltaY;
+
+            // 边界限制：确保标题栏始终可见（至少留_titleBarHeight像素在窗口内）
+            int minVisible = _titleBarHeight;
+            int maxX = -width() + minVisible;   // 左边界：右边缘至少minVisible宽度可见
+            int maxY = -height() + minVisible;   // 上边界：底部至少minVisible高度可见
+
+            // 获取父窗口尺寸
+            int parentW = 800;  // 默认值
+            int parentH = 600;  // 默认值
+            if (parent() !is null)
+            {
+                parentW = parent().width();
+                parentH = parent().height();
+            }
+
+            // 限制范围
+            if (newX < maxX) newX = maxX;                       // 不能太左
+            if (newX > parentW - minVisible) newX = parentW - minVisible;  // 不能太右
+            if (newY < maxY) newY = maxY;                       // 不能太上
+            if (newY > parentH - minVisible) newY = parentH - minVisible;  // 不能太下
+
+            x(newX);
+            y(newY);
+            markDirty(DirtyBits.Visual);
+            return;
+        }
+
+        // 关闭按钮悬停检测
+        int closeBtnSize = _titleBarHeight - 6;
+        int closeBtnX = width() - closeBtnSize - 3;
+        int closeBtnY = 3;
+        bool wasHovered = _closeBtnHovered;
+        _closeBtnHovered = (mx >= closeBtnX && mx < closeBtnX + closeBtnSize &&
+                            my >= closeBtnY && my < closeBtnY + closeBtnSize);
+        if (_closeBtnHovered != wasHovered)
+            markDirty(DirtyBits.Visual);
+
+        super.fireMouseMove(mx, my);
+    }
+
+    override void fireMouseUp(int mx, int my, int button)
+    {
+        if (_isDragging)
+        {
+            _isDragging = false;
+            markDirty(DirtyBits.Visual);
+            return;
+        }
+        super.fireMouseUp(mx, my, button);
     }
 
     override void renderWithGDI(void* hdc_)
@@ -108,9 +215,56 @@ class Popup : Control
         FillRect(hdc, &shadowRect, shadowBrush);
         DeleteObject(cast(HGDIOBJ)shadowBrush);
 
-        // ── 白色背景 ──
-        RECT bgRect = {
+        // ── 标题栏背景 ──
+        RECT titleRect = {
             cast(LONG)rx, cast(LONG)ry,
+            cast(LONG)(rx + rw), cast(LONG)(ry + _titleBarHeight)
+        };
+        HBRUSH titleBrush = CreateSolidBrush(cast(COLORREF)0x00E8E8E8);
+        FillRect(hdc, &titleRect, titleBrush);
+        DeleteObject(cast(HGDIOBJ)titleBrush);
+
+        // ── 标题文字 ──
+        auto fontEntry = FontCache.get(hdc, "Segoe UI", 12);
+        SetTextColor(hdc, cast(COLORREF)0x00333333);
+        SetBkMode(hdc, TRANSPARENT);
+        if (_title.length > 0)
+        {
+            wstring titleW = toUTF16(_title);
+            TextOutW(hdc, rx + 8, ry + (_titleBarHeight - 12) / 2,
+                     cast(const(PWSTR))titleW.ptr, cast(int)titleW.length);
+        }
+        FontCache.release(hdc, fontEntry);
+
+        // ── 关闭按钮（X） ──
+        int closeBtnSize = _titleBarHeight - 6;
+        int closeBtnX = rx + rw - closeBtnSize - 3;
+        int closeBtnY = ry + 3;
+        if (_closeBtnHovered)
+        {
+            RECT closeRect = {
+                cast(LONG)closeBtnX, cast(LONG)closeBtnY,
+                cast(LONG)(closeBtnX + closeBtnSize), cast(LONG)(closeBtnY + closeBtnSize)
+            };
+            HBRUSH closeBrush = CreateSolidBrush(cast(COLORREF)0x00E04040);
+            FillRect(hdc, &closeRect, closeBrush);
+            DeleteObject(cast(HGDIOBJ)closeBrush);
+        }
+        // X 符号
+        auto closeFontEntry = FontCache.get(hdc, "Segoe UI", closeBtnSize);
+        SetTextColor(hdc, _closeBtnHovered ? cast(COLORREF)0x00FFFFFF : cast(COLORREF)0x00666666);
+        SetBkMode(hdc, TRANSPARENT);
+        wstring closeSym = "✕"w;
+        SIZE closeSize;
+        GetTextExtentPointW(hdc, cast(const(PWSTR))closeSym.ptr, cast(int)closeSym.length, &closeSize);
+        TextOutW(hdc, closeBtnX + (closeBtnSize - closeSize.cx) / 2,
+                 closeBtnY + (closeBtnSize - closeSize.cy) / 2,
+                 cast(const(PWSTR))closeSym.ptr, cast(int)closeSym.length);
+        FontCache.release(hdc, closeFontEntry);
+
+        // ── 内容区域白色背景（标题栏下方） ──
+        RECT bgRect = {
+            cast(LONG)rx, cast(LONG)(ry + _titleBarHeight),
             cast(LONG)(rx + rw), cast(LONG)(ry + rh)
         };
         HBRUSH bgBrush = CreateSolidBrush(_bgColor);
@@ -126,13 +280,13 @@ class Popup : Control
         SelectObject(hdc, oldBrush);
         DeleteObject(cast(HGDIOBJ)borderPen);
 
-        // ── 渲染内容控件 ──
+        // ── 渲染内容控件（标题栏下方） ──
         if (_content && _content.visible())
         {
             _content.x(rx);
-            _content.y(ry);
+            _content.y(ry + _titleBarHeight);
             _content.width(rw);
-            _content.height(rh);
+            _content.height(rh - _titleBarHeight);
             _content.renderWithGDI(hdc.Value);
         }
     }

@@ -6,6 +6,7 @@ import guia4.platform_win32;
 import guia4.guicore;
 import guia4.guicore.menubar;
 import guia4.guicore.combobox;
+import guia4.guicore.popup;
 import guia4.utils.logger;
 import std.datetime;
 import std.utf;
@@ -45,13 +46,19 @@ private static void mainWindowTimerCallback(uint id, void* data)
 
     if (id == MainWindow.BLINK_TIMER_ID)
     {
-        // Recurring blink timer — toggle cursor on focused TextInput
+        // Recurring blink timer — toggle cursor on focused TextInput / EditBox
         if (mw._focusedControl !is null)
         {
             auto ti = cast(TextInput)mw._focusedControl;
             if (ti !is null)
             {
                 ti.cursorTick();
+                mw.requestRedraw();
+            }
+            auto eb = cast(EditBox)mw._focusedControl;
+            if (eb !is null)
+            {
+                eb.cursorTick();
                 mw.requestRedraw();
             }
         }
@@ -329,23 +336,15 @@ class MainWindow : Control
         captureScreenshot(filename);
     }
     
-    /// Translate client-space coordinates to content-space coordinates relative to a control.
-    ///
-    /// NOTE: `_x` / `_y` are absolute window-client coordinates. However, when a
-    /// control lives inside a scrolled ScrollableContainer, the GDI viewport offset
-    /// shifts its visual position upward by `scrollY`.  To convert the client click
-    /// to the control's local content-space we must add back every ancestor's scrollY.
-    private void clientToControl(Control ctrl, int clientX, int clientY, out int localX, out int localY)
+    /// 计算控件在窗口客户区中的绝对坐标
+    /// 控件的 x()/y() 是相对父控件的坐标，需要累加所有祖先的偏移来得到绝对位置
+    private void controlToClient(Control ctrl, out int absX, out int absY)
     {
-        // 控件的 _x/_y 是相对父局部的坐标（不是绝对 MainWindow 坐标）。
-        // 当父容器使用 GDI 偏移（如 TabHost 内部 page、Panel 等）时，
-        // 视觉上的绝对 MainWindow 位置 = 子节点 _x/_y + 父容器 GDI 偏移。
-        // 这里需要累加所有祖先容器的 GDI 偏移来计算绝对位置。
         import guia4.guicore.panel;
         import guia4.guicore.tabhost;
 
-        int absX = ctrl.x();
-        int absY = ctrl.y();
+        absX = ctrl.x();
+        absY = ctrl.y();
         int scrollY = 0;
 
         Control cur = ctrl.parent();
@@ -378,6 +377,18 @@ class MainWindow : Control
 
         // 应用 Panel/ScrollableContainer 的滚动补偿
         absY -= scrollY;
+    }
+
+    /// Translate client-space coordinates to content-space coordinates relative to a control.
+    ///
+    /// NOTE: `_x` / `_y` are absolute window-client coordinates. However, when a
+    /// control lives inside a scrolled ScrollableContainer, the GDI viewport offset
+    /// shifts its visual position upward by `scrollY`.  To convert the client click
+    /// to the control's local content-space we must add back every ancestor's scrollY.
+    private void clientToControl(Control ctrl, int clientX, int clientY, out int localX, out int localY)
+    {
+        int absX, absY;
+        controlToClient(ctrl, absX, absY);
 
         localX = clientX - absX;
         localY = clientY - absY;
@@ -453,6 +464,22 @@ class MainWindow : Control
                 }
             }
 
+            // 检查是否点击了 EditBox 的右键菜单
+            if (_focusedControl !is null)
+            {
+                auto eb = cast(EditBox)_focusedControl;
+                if (eb !is null && eb.contextMenuOpen)
+                {
+                    int localX, localY;
+                    clientToControl(eb, ev.x, ev.y, localX, localY);
+                    if (eb.handleContextMenuClick(localX, localY))
+                    {
+                        requestRedraw();
+                        return;
+                    }
+                }
+            }
+
             // Mouse button pressed
             _capturedControl = target;
             if (target.focusable())
@@ -460,6 +487,13 @@ class MainWindow : Control
             int localX, localY;
             clientToControl(target, ev.x, ev.y, localX, localY);
             target.fireMouseDown(localX, localY, ev.button);
+
+            // 如果Popup开始拖拽，设置窗口绝对坐标起点（避免clientToControl导致的抖动）
+            auto popupTarget = cast(Popup)target;
+            if (popupTarget !is null && popupTarget.isDragging())
+            {
+                popupTarget.startDrag(ev.x, ev.y);
+            }
 
             // 检查是否点击了子菜单项
             bool clickedSubItem = false;
@@ -506,7 +540,20 @@ class MainWindow : Control
             auto comboHit = findOpenComboBox(ev.x, ev.y);
             if (comboHit !is null)
             {
-                comboHit.handleDropDownClick(ev.x, ev.y);
+                int comboAbsX, comboAbsY;
+                controlToClient(comboHit, comboAbsX, comboAbsY);
+
+                // 如果点击在ComboBox自身区域内（非下拉列表区域），说明已经通过fireMouseDown处理了展开/收起
+                // 不应再调用handleDropDownClick（否则会立即关闭刚展开的下拉列表）
+                if (ev.y >= comboAbsY && ev.y < comboAbsY + comboHit.height() &&
+                    ev.x >= comboAbsX && ev.x < comboAbsX + comboHit.width())
+                {
+                    // 点击在ComboBox自身区域，已由fireMouseDown处理，跳过
+                    requestRedraw();
+                    return;
+                }
+
+                comboHit.handleDropDownClick(ev.x, ev.y, comboAbsX, comboAbsY);
                 requestRedraw();
                 return;
             }
@@ -538,7 +585,18 @@ class MainWindow : Control
                 _hoveredControl = moveTarget;
             }
             int localX, localY;
-            clientToControl(moveTarget, ev.x, ev.y, localX, localY);
+
+            // Popup拖拽时使用窗口绝对坐标，避免clientToControl导致的抖动
+            auto popupMove = cast(Popup)moveTarget;
+            if (popupMove !is null && popupMove.isDragging())
+            {
+                localX = ev.x;
+                localY = ev.y;
+            }
+            else
+            {
+                clientToControl(moveTarget, ev.x, ev.y, localX, localY);
+            }
             moveTarget.fireMouseMove(localX, localY);
 
             // 处理子菜单项的悬停效果
@@ -575,26 +633,29 @@ class MainWindow : Control
         return findOpenComboBoxInControl(this, px, py);
     }
 
-    private ComboBox findOpenComboBoxInControl(Control c, int px, int py)
+    private ComboBox findOpenComboBoxInControl(Control c, int px, int py, int offsetX = 0, int offsetY = 0)
     {
         foreach (child; c.children())
         {
+            int childAbsX, childAbsY;
+            controlToClient(child, childAbsX, childAbsY);
+
             auto cb = cast(ComboBox)child;
             if (cb !is null && cb.isDropDown())
             {
                 // 检查点击是否在 ComboBox 或其下拉区域内
-                int dropY = cb.y() + cb.height();
+                int dropY = childAbsY + cb.height();
                 int dropH = cast(int)cb.itemCount() * 24;
                 if (dropH > 120) dropH = 120;
 
-                if (px >= cb.x() && px < cb.x() + cb.width() &&
-                    py >= cb.y() && py < dropY + dropH)
+                if (px >= childAbsX && px < childAbsX + cb.width() &&
+                    py >= childAbsY && py < dropY + dropH)
                 {
                     return cb;
                 }
             }
             // 递归查找子控件
-            auto result = findOpenComboBoxInControl(child, px, py);
+            auto result = findOpenComboBoxInControl(child, px, py, childAbsX, childAbsY);
             if (result !is null)
                 return result;
         }
@@ -614,7 +675,9 @@ class MainWindow : Control
             auto cb = cast(ComboBox)child;
             if (cb !is null && cb.isDropDown())
             {
-                cb.handleDropDownMouseMove(mx, my);
+                int childAbsX, childAbsY;
+                controlToClient(cb, childAbsX, childAbsY);
+                cb.handleDropDownMouseMove(mx, my, childAbsX, childAbsY);
             }
             updateComboBoxDropDownHoverInControl(child, mx, my);
         }
@@ -633,7 +696,9 @@ class MainWindow : Control
             auto cb = cast(ComboBox)child;
             if (cb !is null && cb.isDropDown())
             {
-                cb.handleDropDownClick(-1, -1);  // 传无效坐标，触发关闭
+                int childAbsX, childAbsY;
+                controlToClient(cb, childAbsX, childAbsY);
+                cb.handleDropDownClick(-1, -1, childAbsX, childAbsY);  // 传无效坐标，触发关闭
             }
             closeAllComboBoxDropDownInControl(child);
         }
@@ -695,6 +760,11 @@ class MainWindow : Control
     {
         logTrace("MainWindow.charEventHandler(ch='", ev.ch, "')");
         
+        // 过滤控制字符（Ctrl+X产生的WM_CHAR控制字符，如Ctrl+A=0x01, Ctrl+C=0x03等）
+        // 允许正常的空白字符通过（Tab=0x09, LF=0x0A, CR=0x0D）
+        if (ev.ch < 0x20 && ev.ch != 0x09 && ev.ch != 0x0A && ev.ch != 0x0D)
+            return;
+        
         if (_focusedControl !is null)
         {
             _focusedControl.fireTextInput(ev.ch);
@@ -710,9 +780,10 @@ class MainWindow : Control
         // Remove focus from previous
         if (_focusedControl !is null && _focusedControl !is this)
         {
-            // Stop blink timer if losing focus on a TextInput
+            // Stop blink timer if losing focus on a TextInput / EditBox
             auto prevTi = cast(TextInput)_focusedControl;
-            if (prevTi !is null)
+            auto prevEb = cast(EditBox)_focusedControl;
+            if (prevTi !is null || prevEb !is null)
                 _platformWindow.stopTimer(BLINK_TIMER_ID);
             _focusedControl.hasFocus(false);
         }
@@ -721,9 +792,10 @@ class MainWindow : Control
         if (_focusedControl !is null && _focusedControl !is this)
         {
             _focusedControl.hasFocus(true);
-            // Start blink timer for TextInput
+            // Start blink timer for TextInput / EditBox
             auto newTi = cast(TextInput)_focusedControl;
-            if (newTi !is null)
+            auto newEb = cast(EditBox)_focusedControl;
+            if (newTi !is null || newEb !is null)
                 _platformWindow.startTimer(BLINK_TIMER_ID, 530);
         }
         logTrace("MainWindow.setFocus() -> ", _focusedControl !is null ? _focusedControl.toString() : "null");
@@ -900,6 +972,9 @@ class MainWindow : Control
         // 在所有子控件渲染完毕后，渲染 TextInput 上下文菜单（确保在最上层）
         renderContextMenus(memDC);
 
+        // 在所有子控件渲染完毕后，渲染 ComboBox 下拉列表（确保下拉列表不被其他控件遮挡）
+        renderComboBoxDropDowns(memDC);
+
         // Blit the complete off-screen buffer to the screen in one shot
         BitBlt(hdc, 0, 0, width, height, memDC, 0, 0, SRCCOPY);
 
@@ -909,19 +984,48 @@ class MainWindow : Control
         DeleteDC(memDC);
     }
     
-    /// 渲染所有打开的 TextInput 上下文菜单（在所有其他内容之上）
+    /// 渲染所有打开的 TextInput / EditBox 上下文菜单（在所有其他内容之上）
     private void renderContextMenus(HDC hdc)
     {
-        // 遍历所有子控件，查找打开上下文菜单的 TextInput
+        // 遍历所有子控件，查找打开上下文菜单的 TextInput 或 EditBox
         void scanControls(Control ctrl)
         {
             auto ti = cast(TextInput)ctrl;
             if (ti !is null && ti.contextMenuOpen)
             {
-                ti.renderContextMenuOnly(hdc);
+                int absX, absY;
+                controlToClient(ti, absX, absY);
+                ti.renderContextMenuOnly(hdc, absX, absY);
+            }
+            auto eb = cast(EditBox)ctrl;
+            if (eb !is null && eb.contextMenuOpen)
+            {
+                int absX, absY;
+                controlToClient(eb, absX, absY);
+                eb.renderContextMenuOnly(hdc, absX, absY);
             }
             foreach (child; ctrl.children())
             {
+                scanControls(child);
+            }
+        }
+        scanControls(this);
+    }
+
+    /// 渲染所有打开的 ComboBox 下拉列表（在所有其他内容之上，避免被其他控件遮挡）
+    private void renderComboBoxDropDowns(HDC hdc)
+    {
+        void scanControls(Control ctrl)
+        {
+            foreach (child; ctrl.children())
+            {
+                auto cb = cast(ComboBox)child;
+                if (cb !is null && cb.isDropDown())
+                {
+                    int childAbsX, childAbsY;
+                    controlToClient(cb, childAbsX, childAbsY);
+                    cb.renderDropDownOnly(hdc, childAbsX, childAbsY);
+                }
                 scanControls(child);
             }
         }

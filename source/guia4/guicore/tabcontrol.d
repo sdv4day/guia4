@@ -37,6 +37,13 @@ class TabControl : Control
         _tabLabels = labels;
     }
 
+    this(Control parent, string[] labels)
+    {
+        this(labels);
+        if (parent)
+            parent.addChild(this);
+    }
+
     /// 添加标签，返回索引
     int addTab(string label)
     {

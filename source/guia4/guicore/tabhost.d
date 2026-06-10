@@ -27,6 +27,13 @@ class TabHost : Control
         height = 200;
     }
 
+    this(Control parent)
+    {
+        this();
+        if (parent)
+            parent.addChild(this);
+    }
+
     /// 当前活跃页面索引
     int activeIndex() const @property { return _activeIndex; }
     void activeIndex(int v) @property

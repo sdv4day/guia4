@@ -504,6 +504,111 @@ void main()
     sectionY += 90;
 
     // ════════════════════════════════════════════════
+    // Section 7b2: UTF-8 多语言支持
+    // ════════════════════════════════════════════════
+    sectionY += 4;
+    makeHeader("—— UTF-8 多语言支持 ——");
+
+    auto utf8Info = new Label("框架支持 UTF-8 编码，可正确显示和编辑多语言文本：");
+    utf8Info.x(28); utf8Info.y(sectionY); utf8Info.width(600);
+    utf8Info.fontSize(12); utf8Info.textColor(0x00444444);
+    plan.addChild(utf8Info);
+    sectionY += 22;
+
+    // 中文
+    auto lblCN = new Label("中文：你好世界！简体繁體都能正確顯示");
+    lblCN.x(28); lblCN.y(sectionY); lblCN.width(500);
+    plan.addChild(lblCN);
+    sectionY += 22;
+
+    // 日文
+    auto lblJP = new Label("日本語：こんにちは世界！ひらがなカタカナ漢字混じり");
+    lblJP.x(28); lblJP.y(sectionY); lblJP.width(500);
+    plan.addChild(lblJP);
+    sectionY += 22;
+
+    // 韩文
+    auto lblKR = new Label("한국어：안녕하세요！한글 표시가 정상적으로 됩니다");
+    lblKR.x(28); lblKR.y(sectionY); lblKR.width(500);
+    plan.addChild(lblKR);
+    sectionY += 22;
+
+    // 俄文
+    auto lblRU = new Label("Русский：Привет мир! Кириллица работает");
+    lblRU.x(28); lblRU.y(sectionY); lblRU.width(500);
+    plan.addChild(lblRU);
+    sectionY += 22;
+
+    // 阿拉伯文
+    auto lblAR = new Label("العربية：مرحبا بالعالم! النص من اليمين لليسار");
+    lblAR.x(28); lblAR.y(sectionY); lblAR.width(500);
+    plan.addChild(lblAR);
+    sectionY += 22;
+
+    // 泰文
+    auto lblTH = new Label("ไทย：สวัสดีชาวโลก! ภาษาไทยแสดงผลได้");
+    lblTH.x(28); lblTH.y(sectionY); lblTH.width(500);
+    plan.addChild(lblTH);
+    sectionY += 22;
+
+    // 希腊文
+    auto lblGR = new Label("Ελληνικά：Γεια σου κόσμε! Ελληνικά γράμματα");
+    lblGR.x(28); lblGR.y(sectionY); lblGR.width(500);
+    plan.addChild(lblGR);
+    sectionY += 22;
+
+    // Emoji
+    auto lblEmoji = new Label("Emoji：😀🎉🚀❤️🌟👍🎵🎨🔥💡✅🌈");
+    lblEmoji.x(28); lblEmoji.y(sectionY); lblEmoji.width(500);
+    plan.addChild(lblEmoji);
+    sectionY += 22;
+
+    // 数学符号
+    auto lblMath = new Label("Math：∑∏∫√∞≈≠≤≥±×÷∂∇");
+    lblMath.x(28); lblMath.y(sectionY); lblMath.width(500);
+    plan.addChild(lblMath);
+    sectionY += 22;
+
+    // 特殊符号
+    auto lblSymbols = new Label("Symbols：©®™€£¥§¶†‡★☆♠♣♥♦");
+    lblSymbols.x(28); lblSymbols.y(sectionY); lblSymbols.width(500);
+    plan.addChild(lblSymbols);
+    sectionY += 30;
+
+    // 多语言 TextInput 展示
+    auto utf8InputInfo = new Label("多语言 TextInput 输入测试：");
+    utf8InputInfo.x(28); utf8InputInfo.y(sectionY); utf8InputInfo.width(400);
+    utf8InputInfo.fontSize(12); utf8InputInfo.textColor(0x00444444);
+    plan.addChild(utf8InputInfo);
+    sectionY += 20;
+
+    auto tiCN = new TextInput("输入中文测试");
+    tiCN.x(28); tiCN.y(sectionY); tiCN.width(300);
+    plan.addChild(tiCN);
+
+    auto tiJP = new TextInput("日本語入力");
+    tiJP.x(340); tiJP.y(sectionY); tiJP.width(300);
+    plan.addChild(tiJP);
+    sectionY += 34;
+
+    auto tiMix = new TextInput("Hello 你世界 123");
+    tiMix.x(28); tiMix.y(sectionY); tiMix.width(300);
+    plan.addChild(tiMix);
+    sectionY += 40;
+
+    // 多语言 EditBox 展示
+    auto utf8EditInfo = new Label("多语言 EditBox 多行编辑测试：");
+    utf8EditInfo.x(28); utf8EditInfo.y(sectionY); utf8EditInfo.width(400);
+    utf8EditInfo.fontSize(12); utf8EditInfo.textColor(0x00444444);
+    plan.addChild(utf8EditInfo);
+    sectionY += 20;
+
+    auto editBoxUTF8 = new EditBox("多语言多行编辑测试：\nChinese: 你好世界\nJapanese: こんにちは\nKorean: 안녕하세요\nRussian: Привет\nEmoji: 😀🎉🚀");
+    editBoxUTF8.x(28); editBoxUTF8.y(sectionY); editBoxUTF8.width(400); editBoxUTF8.height(100);
+    plan.addChild(editBoxUTF8);
+    sectionY += 110;
+
+    // ════════════════════════════════════════════════
     // Section 7c: TabWidget
     // ════════════════════════════════════════════════
     sectionY += 4;

@@ -41,6 +41,13 @@ class ComboBox : Control
         _items = items;
     }
 
+    this(Control parent, string[] items = [])
+    {
+        this(items);
+        if (parent)
+            parent.addChild(this);
+    }
+
     /// 添加列表项
     void addItem(string item)
     {
@@ -132,17 +139,18 @@ class ComboBox : Control
 
     /// 处理下拉列表区域的点击（由 MainWindow 调用，当点击在控件边界外但在下拉列表内时）
     /// ax, ay 是窗口绝对坐标
-    bool handleDropDownClick(int ax, int ay)
+    /// comboAbsX, comboAbsY 是 ComboBox 在窗口客户区中的绝对坐标
+    bool handleDropDownClick(int ax, int ay, int comboAbsX, int comboAbsY)
     {
         if (!_isDropDown || _items.length == 0)
             return false;
 
         // 检查是否在下拉列表区域内
-        int dropY = y() + height();
+        int dropY = comboAbsY + height();
         int dropH = cast(int)_items.length * _itemHeight;
         if (dropH > _dropDownHeight) dropH = _dropDownHeight;
 
-        if (ax >= x() && ax < x() + width() && ay >= dropY && ay < dropY + dropH)
+        if (ax >= comboAbsX && ax < comboAbsX + width() && ay >= dropY && ay < dropY + dropH)
         {
             int itemIdx = (ay - dropY) / _itemHeight;
             if (itemIdx >= 0 && itemIdx < cast(int)_items.length)
@@ -164,12 +172,13 @@ class ComboBox : Control
 
     /// 处理下拉列表区域的鼠标移动（由 MainWindow 调用）
     /// ax, ay 是窗口绝对坐标
-    void handleDropDownMouseMove(int ax, int ay)
+    /// comboAbsX, comboAbsY 是 ComboBox 在窗口客户区中的绝对坐标
+    void handleDropDownMouseMove(int ax, int ay, int comboAbsX, int comboAbsY)
     {
         if (!_isDropDown) return;
 
-        int dropY = y() + height();
-        if (ax >= x() && ax < x() + width() && ay >= dropY)
+        int dropY = comboAbsY + height();
+        if (ax >= comboAbsX && ax < comboAbsX + width() && ay >= dropY)
         {
             int itemIdx = (ay - dropY) / _itemHeight;
             if (itemIdx != _hoveredItem)
@@ -263,19 +272,17 @@ class ComboBox : Control
         TextOutW(hdc, arrowX, arrowY, cast(const(PWSTR))arrow.ptr, cast(int)arrow.length);
 
         FontCache.release(hdc, fontEntry);
-
-        // ── 下拉列表 ──
-        if (_isDropDown && _items.length > 0)
-        {
-            renderDropDown(hdc);
-        }
     }
 
-    /// 渲染下拉列表
-    private void renderDropDown(HDC hdc)
+    /// 渲染下拉列表（由 MainWindow 在所有控件渲染完毕后统一调用，确保下拉列表在最上层）
+    /// absX, absY 是 ComboBox 在窗口客户区中的绝对坐标
+    public void renderDropDownOnly(HDC hdc, int absX, int absY)
     {
-        int rx = x();
-        int ry = y() + height();
+        if (!_isDropDown || _items.length == 0)
+            return;
+
+        int rx = absX;
+        int ry = absY + height();
         int rw = width();
         int totalH = cast(int)_items.length * _itemHeight;
         if (totalH > _dropDownHeight)
