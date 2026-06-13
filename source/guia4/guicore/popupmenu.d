@@ -32,8 +32,9 @@ class PopupMenu : Control
     private uint _fontSize = 14;
     private int _itemHeight = 24;
 
-    this()
+    this(Control parent)
     {
+        super(parent);
         width = 160;
         height = 0;
         visible = false;
@@ -63,8 +64,7 @@ class PopupMenu : Control
     /// 在指定位置弹出菜单
     void popup(int px, int py)
     {
-        x(px);
-        y(py);
+        setXY(px, py);
         _isOpen = true;
         visible = true;
         markDirty(DirtyBits.Visual);
@@ -138,10 +138,11 @@ class PopupMenu : Control
         if (!_isOpen)
             return;
 
-        logTrace("PopupMenu.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("PopupMenu.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

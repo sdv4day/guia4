@@ -65,9 +65,9 @@ class Panel : Control
     // ── 自动内容尺寸 ──
     private bool _autoSizeContent = false;  /// 自动计算内容尺寸
 
-    this()
+    this(Control parent)
     {
-        super();
+        super(parent);
         width = 200;
         height = 150;
         padding(8);  // 默认内边距
@@ -75,26 +75,16 @@ class Panel : Control
         logTrace("Panel.ctor()");
     }
 
-    this(Control parent)
-    {
-        this();
-        if (parent)
-            parent.addChild(this);
-    }
-
-    this(string title)
-    {
-        this();
-        _title = title;
-        _titleHeight = 24;
-        logTrace("Panel.ctor(title='", title, "')");
-    }
-
     this(Control parent, string title)
     {
-        this(title);
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        _title = title;
+        _titleHeight = 24;
+        width = 200;
+        height = 150;
+        padding(8);  // 默认内边距
+        onMouseWheel(&handleMouseWheel);
+        logTrace("Panel.ctor(title='", title, "')");
     }
 
     // ── 属性 ─────────────────────────────────────────────────────
@@ -139,8 +129,8 @@ class Panel : Control
     /// 获取内容区域尺寸（减去 padding 和滚动条占位）
     private void getContentArea(out int cx, out int cy, out int cw, out int ch)
     {
-        cx = x() + paddingLeft();
-        cy = y() + _titleHeight + paddingTop();
+        cx = position().x() + paddingLeft();
+        cy = position().y() + _titleHeight + paddingTop();
         cw = width() - paddingLeft() - paddingRight() - (_vScroll ? _scrollbarWidth : 0);
         ch = height() - _titleHeight - paddingTop() - paddingBottom() - (_hScroll ? _scrollbarWidth : 0);
     }
@@ -161,14 +151,14 @@ class Panel : Control
     {
         int maxRight = 0;
         int maxBottom = 0;
-        int contentOriginX = x() + paddingLeft();
-        int contentOriginY = y() + _titleHeight + paddingTop();
+        int contentOriginX = position().x() + paddingLeft();
+        int contentOriginY = position().y() + _titleHeight + paddingTop();
 
         foreach (child; children())
         {
             if (!child.visible()) continue;
-            int childRight = child.x() + child.width() - contentOriginX;
-            int childBottom = child.y() + child.height() - contentOriginY;
+            int childRight = child.position().x() + child.width() - contentOriginX;
+            int childBottom = child.position().y() + child.height() - contentOriginY;
             if (childRight > maxRight) maxRight = childRight;
             if (childBottom > maxBottom) maxBottom = childBottom;
         }
@@ -235,10 +225,13 @@ class Panel : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("Panel.renderWithGDI() at (", x(), ",", y(), ") ", width(), "x", height());
+        logTrace("Panel.renderWithGDI() at (", position().x(), ",", position().y(), ") ", width(), "x", height());
 
-        int rx = x();
-        int ry = y();
+        // 确保布局已执行
+        ensureLayout();
+
+        int rx = position().x();
+        int ry = position().y();
         int rw = width();
         int rh = height();
 
@@ -318,7 +311,8 @@ class Panel : Control
             int savedDC = SaveDC(hdc);
             IntersectClipRect(hdc, contentX, contentY, contentX + contentW, contentY + contentH);
             POINT oldOrigin;
-            OffsetViewportOrgEx(hdc, -_scrollX, -_scrollY, &oldOrigin);
+            // 偏移原点：先到 Panel 位置，再减去滚动偏移
+            OffsetViewportOrgEx(hdc, rx - _scrollX, ry - _scrollY, &oldOrigin);
 
             foreach (child; children())
             {
@@ -336,12 +330,18 @@ class Panel : Control
         }
         else
         {
-            // ── 无滚动，直接渲染子控件 ──
+            // ── 无滚动，使用 DC 偏移渲染子控件 ──
+            int savedDC = SaveDC(hdc);
+            POINT oldOrigin;
+            OffsetViewportOrgEx(hdc, rx, ry, &oldOrigin);
+            
             foreach (child; children())
             {
                 if (child.visible())
                     child.renderWithGDI(hdc.Value);
             }
+            
+            RestoreDC(hdc, savedDC);
         }
     }
 

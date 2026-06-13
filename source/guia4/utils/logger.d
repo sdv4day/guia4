@@ -1,10 +1,10 @@
 module guia4.utils.logger;
 
-import std.logger;
-public import std.logger: LogLevel;
-import std.stdio;
+// 直接重导出std.logger的所有功能
+public import std.logger;
 
-private Logger _logger;
+// 提供初始化函数
+import std.stdio;
 
 /**
  * 初始化全局日志系统
@@ -14,27 +14,18 @@ private Logger _logger;
  */
 void initLogger(LogLevel level = LogLevel.info)
 {
-    _logger = new FileLogger(stdout, level);
-    _logger.info("Logger initialized with level: ", level);
+    auto logger = new FileLogger(stdout, level);
+    sharedLog = cast(shared) logger;
+    logger.info("Logger initialized with level: ", level);
 }
 
 /**
- * 获取全局日志器
+ * 快捷日志函数 - 直接别名到std.logger的全局函数
+ * 这样不会改变调用位置
  */
-Logger logger() @property
-{
-    if (_logger is null)
-    {
-        initLogger();
-    }
-    return _logger;
-}
-
-/**
- * 快捷日志函数
- */
-void logTrace(T...)(T args) { logger.trace(args); }
-void logInfo(T...)(T args) { logger.info(args); }
-void logWarning(T...)(T args) { logger.warning(args); }
-void logError(T...)(T args) { logger.error(args); }
-void logCritical(T...)(T args) { logger.critical(args); }
+alias logDebug = trace;
+alias logTrace = trace;
+alias logInfo = info;
+alias logWarning = warning;
+alias logError = error;
+alias logCritical = critical;

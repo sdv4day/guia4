@@ -26,25 +26,13 @@ class TextImageButton : Control
     private bool _pressed = false;
     private bool _hovered = false;
 
-    this(string text = "Button")
-    {
-        super();
-        _text = text;
-        width = 120;
-        height = 30;
-        focusable = true;
-        logTrace("TextImageButton.ctor(text='", text, "')");
-    }
-
     this(Control parent, string text)
     {
-        super();
+        super(parent);
         _text = text;
         width = 120;
         height = 30;
         focusable = true;
-        if (parent)
-            parent.addChild(this);
         logTrace("TextImageButton.ctor(parent=", parent !is null, ", text='", text, "')");
     }
 
@@ -125,7 +113,7 @@ class TextImageButton : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TextImageButton.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        logTrace("TextImageButton.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
         // 选择颜色
         COLORREF bgColor;
@@ -148,10 +136,11 @@ class TextImageButton : Control
             borderColor = cast(COLORREF)0x003333AA;
         }
 
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         // 绘制按钮背景（RoundRect）
         RECT rect = {
-            cast(LONG)x(), cast(LONG)y(),
-            cast(LONG)(x() + width()), cast(LONG)(y() + height())
+            0, 0,
+            cast(LONG)width(), cast(LONG)height()
         };
 
         HBRUSH bgBrush = CreateSolidBrush(bgColor);
@@ -164,14 +153,14 @@ class TextImageButton : Control
         DeleteObject(cast(HGDIOBJ)bgBrush);
         DeleteObject(cast(HGDIOBJ)borderPen);
 
-        int contentX = x() + 8; // 左侧内边距
+        int contentX = 8; // 左侧内边距
 
         // 绘制图标
         if (_icon.Value !is null)
         {
             HDC memDC = CreateCompatibleDC(hdc);
             HGDIOBJ oldBmp = SelectObject(memDC, cast(HGDIOBJ)_icon);
-            int iconY = y() + (height() - _iconHeight) / 2;
+            int iconY = (height() - _iconHeight) / 2;
             BitBlt(hdc, contentX, iconY, _iconWidth, _iconHeight, memDC, 0, 0, SRCCOPY);
             SelectObject(memDC, oldBmp);
             DeleteDC(memDC);
@@ -188,7 +177,7 @@ class TextImageButton : Control
         GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr, cast(int)textW.length, &textSize);
 
         int textX = contentX;
-        int textY = y() + (height() - textSize.cy) / 2;
+        int textY = (height() - textSize.cy) / 2;
         TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
         FontCache.release(hdc, fontEntry);
@@ -199,7 +188,7 @@ class TextImageButton : Control
             HPEN focusPen = CreatePen(PS_DOT, 1, cast(COLORREF)0x00000000);
             HGDIOBJ oldPen2 = SelectObject(hdc, cast(HGDIOBJ)focusPen);
             HGDIOBJ oldBrush2 = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-            Rectangle(hdc, x() + 2, y() + 2, x() + width() - 2, y() + height() - 2);
+            Rectangle(hdc, 2, 2, width() - 2, height() - 2);
             SelectObject(hdc, oldBrush2);
             SelectObject(hdc, oldPen2);
             DeleteObject(cast(HGDIOBJ)focusPen);

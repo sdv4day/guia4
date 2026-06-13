@@ -22,22 +22,12 @@ class Label : Control
     private uint _fontSize = 14;
     private bool _autoSize = true;
 
-    this(string text = "Label")
-    {
-        super();
-        _text = text;
-        width = 80;
-        height = 20;
-    }
-
     this(Control parent, string text)
     {
-        super();
+        super(parent);
         _text = text;
         width = 80;
         height = 20;
-        if (parent)
-            parent.addChild(this);
     }
 
     string text() const @property { return _text; }
@@ -72,7 +62,7 @@ class Label : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("Label.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        logTrace("Label.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
         auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
 
@@ -81,9 +71,8 @@ class Label : Control
 
         wstring textW = toUTF16(_text);
 
-
-        // Render at (x, y) — text flows from top-left
-        TextOutW(hdc, cast(int)x(), cast(int)y(), cast(const(PWSTR))textW.ptr, cast(int)textW.length);
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 而不是 position()
+        TextOutW(hdc, 0, 0, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
         // 注意：自动尺寸由 measure() 在布局阶段计算，renderWithGDI 不再修改 width/height
 

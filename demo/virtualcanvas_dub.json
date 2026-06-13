@@ -1,0 +1,8 @@
+{
+    "name": "virtualcanvas_demo",
+    "targetType": "executable",
+    "mainSourceFile": "virtualcanvas_demo.d",
+    "dependencies": {
+        "guia4": {"path": ".."}
+    }
+}

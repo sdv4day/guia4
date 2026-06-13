@@ -24,25 +24,13 @@ class RadioButton : Control
     private int _groupId = 0;
     private bool _hovered = false;
 
-    this(string text = "Radio")
-    {
-        super();
-        _text = text;
-        width = 120;
-        height = 24;
-        focusable = true;
-        logTrace("RadioButton.ctor(text='", text, "')");
-    }
-
     this(Control parent, string text)
     {
-        super();
+        super(parent);
         _text = text;
         width = 120;
         height = 24;
         focusable = true;
-        if (parent)
-            parent.addChild(this);
         logTrace("RadioButton.ctor(parent=", parent !is null, ", text='", text, "')");
     }
 
@@ -146,10 +134,11 @@ class RadioButton : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("RadioButton.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        logTrace("RadioButton.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        int cx = x() + 10;         // 圆圈中心 X
-        int cy = y() + height() / 2; // 圆圈中心 Y
+        int cx = 10;         // 圆圈中心 X
+        int cy = height() / 2; // 圆圈中心 Y
         int radius = 7;            // 圆圈半径
         int textX = cx + radius + 6; // 文字起始 X
 
@@ -188,7 +177,7 @@ class RadioButton : Control
         SetBkMode(hdc, TRANSPARENT);
 
         wstring textW = toUTF16(_text);
-        int textY = y() + (height() - 14) / 2;
+        int textY = (height() - 14) / 2;
         TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
         FontCache.release(hdc, fontEntry);
@@ -199,7 +188,7 @@ class RadioButton : Control
             HPEN focusPen = CreatePen(PS_DOT, 1, cast(COLORREF)0x00000000);
             HGDIOBJ oldPen3 = SelectObject(hdc, cast(HGDIOBJ)focusPen);
             HGDIOBJ oldBrush3 = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-            Rectangle(hdc, x() + 1, y() + 1, x() + width() - 1, y() + height() - 1);
+            Rectangle(hdc, 1, 1, width() - 1, height() - 1);
             SelectObject(hdc, oldBrush3);
             SelectObject(hdc, oldPen3);
             DeleteObject(cast(HGDIOBJ)focusPen);

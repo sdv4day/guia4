@@ -31,6 +31,7 @@ alias LONG = int;
 // (field function pointers → crash, delegates → body not executed).
 private static void mainWindowPaintCallback(HDC hdc, int w, int h, void* data)
 {
+    logInfo("mainWindowPaintCallback: w=", w, " h=", h);
     auto mw = cast(MainWindow)data;
     if (mw !is null)
     {
@@ -63,11 +64,36 @@ private static void mainWindowTimerCallback(uint id, void* data)
             }
         }
     }
+    else if (id == MainWindow.ASYNC_POLL_TIMER_ID)
+    {
+        // AsyncTask 进度轮询 — 非阻塞收取后台线程消息
+        if (mw._asyncTask !is null)
+        {
+            mw._asyncTask.poll();
+            if (mw._asyncTask.isComplete())
+            {
+                // 先保存回调，再停止轮询（stopAsyncPoll 会清空回调）
+                auto onComplete = mw._asyncOnComplete;
+                mw.stopAsyncPoll();
+                if (onComplete !is null)
+                    onComplete();
+            }
+            else if (mw._asyncOnProgress !is null)
+            {
+                mw._asyncOnProgress();
+            }
+        }
+    }
     else
     {
         // One-shot timers (e.g. screenshot)
         mw._platformWindow.stopTimer(id);
         mw.captureScreenshot(mw._screenshotFile);
+        if (mw._closeAfterScreenshot)
+        {
+            mw._closeAfterScreenshot = false;
+            mw.close();
+        }
     }
 }
 
@@ -175,6 +201,11 @@ class MainWindow : Control
     // Focus state
     private Control _focusedControl;   // control currently holding keyboard focus
     
+    // ── Layer-based渲染系统 ────────────────────────────────────────
+    import guia4.guicore.layercompositor;
+    private LayerCompositor _compositor;   // Layer合并引擎
+    private bool _layerSystemInitialized = false;
+    
     
     this(Application app, int x = 100, int y = 100, uint width = 800, uint height = 600, string title = "DGUI Window")
     {
@@ -204,7 +235,35 @@ class MainWindow : Control
             _renderDevice = Application.createRenderDeviceStatic(_platformWindow.nativeHandle());
         }
         _platformWindow.show();
-        logInfo("Window shown");
+        
+        // 获取窗口客户区大小并设置到自身
+        HWND hwnd = cast(HWND)nativeHandle();
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int w = rect.right - rect.left;
+        int h = rect.bottom - rect.top;
+        
+        // 设置 MainWindow 自身的大小（布局系统依赖这个）
+        // 注意：使用 super.width/height 来设置基类的私有字段
+        super.width(w);
+        super.height(h);
+        
+        // 初始化Layer-based渲染系统
+        if (!_layerSystemInitialized)
+        {
+            HDC hdc = GetDC(hwnd);
+            
+            // 创建Layer合并引擎
+            _compositor = new LayerCompositor();
+            _compositor.init(w, h, hdc);
+            
+            ReleaseDC(hwnd, hdc);
+            _layerSystemInitialized = true;
+            
+            logInfo("Layer-based rendering system initialized: ", w, "x", h);
+        }
+        
+        logInfo("MainWindow.show() - size set to ", w, "x", h);
     }
     
     void hide()
@@ -320,14 +379,54 @@ class MainWindow : Control
     {
         logTrace("MainWindow.scheduleScreenshot(delayMs=", delayMs, ", '", filename, "')");
         _screenshotFile = filename;
+        _closeAfterScreenshot = false;
+        (cast(Win32Window)_platformWindow).setTimerFunction(&mainWindowTimerCallback, cast(Object)this);
+        _platformWindow.startTimer(SCREENSHOT_TIMER_ID, delayMs);
+    }
+
+    /// 延迟截图，截图完成后自动关闭窗口
+    void scheduleScreenshotAndClose(int delayMs = 500, string filename = "screenshot.bmp")
+    {
+        logTrace("MainWindow.scheduleScreenshotAndClose(delayMs=", delayMs, ", '", filename, "')");
+        _screenshotFile = filename;
+        _closeAfterScreenshot = true;
         (cast(Win32Window)_platformWindow).setTimerFunction(&mainWindowTimerCallback, cast(Object)this);
         _platformWindow.startTimer(SCREENSHOT_TIMER_ID, delayMs);
     }
     
     private string _screenshotFile;
+    private bool _closeAfterScreenshot = false;
     private static immutable uint SCREENSHOT_TIMER_ID = 1001;
     private static immutable uint BLINK_TIMER_ID = 1002;
-    
+    private static immutable uint ASYNC_POLL_TIMER_ID = 1003;
+
+    // ── AsyncTask 轮询支持 ──
+    import guia4.guicore.asynctask : AsyncTask;
+    private AsyncTask _asyncTask;
+    private void delegate() _asyncOnProgress;
+    private void delegate() _asyncOnComplete;
+
+    /// 启动异步任务轮询定时器
+    void startAsyncTask(AsyncTask task, void delegate() onProgress, void delegate() onComplete)
+    {
+        _asyncTask = task;
+        _asyncOnProgress = onProgress;
+        _asyncOnComplete = onComplete;
+        (cast(Win32Window)_platformWindow).setTimerFunction(&mainWindowTimerCallback, cast(Object)this);
+        _platformWindow.startTimer(ASYNC_POLL_TIMER_ID, 50); // 50ms 轮询间隔
+        logInfo("AsyncTask polling started");
+    }
+
+    /// 停止异步任务轮询
+    void stopAsyncPoll()
+    {
+        _platformWindow.stopTimer(ASYNC_POLL_TIMER_ID);
+        _asyncTask = null;
+        _asyncOnProgress = null;
+        _asyncOnComplete = null;
+        logInfo("AsyncTask polling stopped");
+    }
+
     // Immediate screenshot - call from show() before message loop
     void captureImmediate(string filename)
     {
@@ -343,15 +442,22 @@ class MainWindow : Control
         import guia4.guicore.panel;
         import guia4.guicore.tabhost;
 
-        absX = ctrl.x();
-        absY = ctrl.y();
+        absX = ctrl.position().x();
+        absY = ctrl.position().y();
         int scrollY = 0;
 
         Control cur = ctrl.parent();
         while (cur !is null)
         {
-            // Panel 和 ScrollableContainer 使用 (-scrollX, -scrollY) 的 GDI 偏移
-            // 子节点实际位置 = 子节点 _x/_y - scrollY
+            // 累加所有父容器的位置偏移
+            // 子控件的 position 是相对于直接父容器的坐标
+            // 窗口绝对坐标 = 子控件 position + 所有祖先 position 之和
+            absX += cur.position().x();
+            absY += cur.position().y();
+
+            // Panel 和 ScrollableContainer 使用 GDI 视口偏移渲染
+            // 滚动时子控件的视觉位置上移了 scrollY
+            // 所以窗口绝对 y 需要减去滚动偏移
             auto sc = cast(ScrollableContainer)cur;
             auto pn = cast(Panel)cur;
             if (sc !is null)
@@ -361,15 +467,6 @@ class MainWindow : Control
             else if (pn !is null)
             {
                 scrollY += pn.scrollY();
-            }
-
-            // TabHost 使用 (TabHost.x, TabHost.y) 的 GDI 偏移
-            // 子节点实际位置 = 子节点 _x/_y + TabHost._x/_y
-            auto th = cast(TabHost)cur;
-            if (th !is null)
-            {
-                absX += th.x();
-                absY += th.y();
             }
 
             cur = cur.parent();
@@ -488,12 +585,13 @@ class MainWindow : Control
             clientToControl(target, ev.x, ev.y, localX, localY);
             target.fireMouseDown(localX, localY, ev.button);
 
-            // 如果Popup开始拖拽，设置窗口绝对坐标起点（避免clientToControl导致的抖动）
+            // 如果Popup开始拖拽，设置窗口绝对坐标起点
             auto popupTarget = cast(Popup)target;
             if (popupTarget !is null && popupTarget.isDragging())
             {
-                popupTarget.startDrag(ev.x, ev.y);
+                popupTarget.setDragOrigin(ev.x, ev.y);
             }
+
 
             // 检查是否点击了子菜单项
             bool clickedSubItem = false;
@@ -578,11 +676,14 @@ class MainWindow : Control
             if (_capturedControl !is null)
                 moveTarget = _capturedControl;
 
+            bool needRedraw = false;
+            
             if (moveTarget !is _hoveredControl)
             {
                 if (_hoveredControl !is null && _hoveredControl !is this)
                     _hoveredControl.fireMouseMove(-1, -1);
                 _hoveredControl = moveTarget;
+                needRedraw = true;  // hover改变需要重绘
             }
             int localX, localY;
 
@@ -592,6 +693,7 @@ class MainWindow : Control
             {
                 localX = ev.x;
                 localY = ev.y;
+                needRedraw = true;  // Popup拖拽需要重绘
             }
             else
             {
@@ -606,14 +708,25 @@ class MainWindow : Control
                 if (mb !is null && mb.hasOpenMenu())
                 {
                     updateSubMenuHover(mb, ev.x, ev.y);
+                    needRedraw = true;  // MenuBar菜单悬停需要重绘
                 }
             }
 
             // 更新 ComboBox 下拉列表悬停
-            updateComboBoxDropDownHover(ev.x, ev.y);
+            foreach (child; children())
+            {
+                auto cb = cast(ComboBox)child;
+                if (cb !is null && cb.isDropDown())
+                {
+                    updateComboBoxDropDownHover(ev.x, ev.y);
+                    needRedraw = true;  // ComboBox下拉悬停需要重绘
+                    break;
+                }
+            }
+            
+            if (needRedraw)
+                requestRedraw();
         }
-
-        requestRedraw();
     }
     
     /// 关闭所有展开的菜单
@@ -723,8 +836,8 @@ class MainWindow : Control
     {
         foreach (subItem; parentItem.subItems())
         {
-            bool inItem = mx >= subItem.x() && mx < subItem.x() + subItem.width() &&
-                          my >= subItem.y() && my < subItem.y() + subItem.height();
+            bool inItem = mx >= subItem.position().x() && mx < subItem.position().x() + subItem.width() &&
+                          my >= subItem.position().y() && my < subItem.position().y() + subItem.height();
             if (inItem && !subItem.hovered())
             {
                 subItem.hovered(true);
@@ -872,11 +985,18 @@ class MainWindow : Control
     /// Hit-test children recursively.
     /// px,py are absolute window-client coordinates. Returns deepest matching Control or null.
     /// 按层级从高到低遍历，同层级内从后往前（后添加的优先），确保弹出控件优先命中。
-    private Control hitTestChild(Control parent, int px, int py)
+    /// parentOffset: 父控件的绝对位置（相对于窗口客户区），用于坐标转换
+    private Control hitTestChild(Control parent, int px, int py, int parentOffsetX = 0, int parentOffsetY = 0)
     {
         auto children = parent.children();
         if (children.length == 0)
             return null;
+
+        // 计算相对于当前父控件的坐标
+        int relX = px - parentOffsetX;
+        int relY = py - parentOffsetY;
+        
+        logTrace("hitTestChild: parent=", typeid(parent).name, " mouse=(", px, ",", py, ") parentOffset=(", parentOffsetX, ",", parentOffsetY, ") rel=(", relX, ",", relY, ")");
 
         // 找出最大层级值
         int maxLayer = 0;
@@ -897,23 +1017,25 @@ class MainWindow : Control
                 if (cast(int)child.layer() != layer)
                     continue;
 
-                // child.x()/y() 已经是绝对坐标（相对于窗口客户区），直接用 hitTest 判断
-                if (child.hitTest(px, py))
+                // 使用相对于父控件的坐标进行命中测试
+                // child.position() 是相对于 parent 的坐标
+                // relX, relY 是相对于 parent 的坐标
+                logTrace("  checking child: ", typeid(child).name, " position=(", child.position().x(), ",", child.position().y(), ") size=(", child.width(), ",", child.height(), ")");
+                if (child.hitTest(relX, relY))
                 {
-                    // TabHost 透传命中测试：TabHost 不直接接收事件，返回其父控件让 TabWidget 分发
-                    auto th = cast(guia4.guicore.tabhost.TabHost)child;
-                    if (th !is null)
-                        return parent;
+                    logTrace("    HIT! child: ", typeid(child).name);
+                    // 计算子控件的绝对位置（用于递归时的坐标转换）
+                    int childAbsX = parentOffsetX + child.position().x();
+                    int childAbsY = parentOffsetY + child.position().y();
 
-                    // 递归进入子控件时，如果是 ScrollableContainer/Panel，
-                    // 需要将 py 加上 scrollY，因为子控件的 y 坐标是"未滚动"的绝对值，
-                    // 而 px/py 是"屏幕上"的坐标（已经减去了滚动偏移）
-                    int nextPy = py;
-                    int nextPx = px;
+                    // ScrollableContainer/Panel 使用 GDI 视口偏移渲染子控件
+                    // 渲染时，视口原点被偏移 -scrollY，使得子控件的 position() 被解释为相对于内容区域的坐标
+                    // 命中测试时，需要相应调整 parentOffsetY，使命中测试使用相同的坐标系
+                    int adjustedParentOffsetY = childAbsY;
                     auto sc = cast(ScrollableContainer)child;
                     if (sc !is null)
                     {
-                        nextPy = py + sc.scrollY;
+                        adjustedParentOffsetY -= sc.scrollY;
                     }
                     else
                     {
@@ -921,11 +1043,34 @@ class MainWindow : Control
                         auto pn = cast(Panel)child;
                         if (pn !is null)
                         {
-                            nextPy = py + pn.scrollY();
+                            adjustedParentOffsetY -= pn.scrollY();
                         }
                     }
 
-                    auto deeper = hitTestChild(child, nextPx, nextPy);
+                    // TabHost 特殊处理：递归进入 activeIndex 对应的 page
+                    auto th = cast(guia4.guicore.tabhost.TabHost)child;
+                    if (th !is null)
+                    {
+                        auto pages = th.children();
+                        int activeIdx = th.activeIndex();
+                        if (activeIdx >= 0 && activeIdx < cast(int)pages.length)
+                        {
+                            auto activePage = pages[activeIdx];
+                            if (activePage.visible())
+                            {
+                                // TabHost 使用 DC 偏移渲染，page 的坐标相对于 TabHost
+                                auto deeper = hitTestChild(activePage, px, py, childAbsX, adjustedParentOffsetY);
+                                if (deeper !is null)
+                                    return deeper;
+                                // 如果没有找到更深的子控件，返回 activePage
+                                return activePage;
+                            }
+                        }
+                        // 没有活跃页面，返回 parent
+                        return parent;
+                    }
+
+                    auto deeper = hitTestChild(child, px, py, childAbsX, adjustedParentOffsetY);
                     if (deeper !is null)
                         return deeper;
                     return child;
@@ -941,14 +1086,108 @@ class MainWindow : Control
         HWND hwnd = cast(HWND)nativeHandle();
         if (hwnd.Value !is null)
         {
-            InvalidateRect(hwnd, null, BOOL());
+            // 使用RedrawWindow立即重绘，避免WM_PAINT延迟
+            // RDW_INVALIDATE: 标记整个窗口为无效
+            // RDW_UPDATENOW: 立即发送WM_PAINT
+            RedrawWindow(hwnd, null, cast(HRGN)null, RDW_INVALIDATE | RDW_UPDATENOW);
         }
     }
 
     // ── Rendering ──
-    
+
     void render(HDC hdc, int width, int height)
     {
+        logInfo("MainWindow.render: width=", width, " height=", height, " _layerSystemInitialized=", _layerSystemInitialized);
+        
+        // 更新 MainWindow 自身的大小（处理窗口大小变化）
+        if (this.width() != width || this.height() != height)
+        {
+            super.width(width);
+            super.height(height);
+            logInfo("MainWindow.render: size updated to ", width, "x", height);
+        }
+        
+        // 执行 MainWindow 自身的布局（停靠布局）
+        // 这会调用 layoutChildren() 来布局 MenuBar 和 ScrollableContainer
+        this.ensureLayout();
+        
+        // 如果Layer系统未初始化，使用传统渲染
+        if (!_layerSystemInitialized || _compositor is null)
+        {
+            renderTraditional(hdc, width, height);
+            return;
+        }
+        
+        // 检查是否有脏标记
+        bool hasDirty = isDirty();
+        
+        void checkDirtyRecursive(Control ctrl)
+        {
+            if (ctrl.dirtyFlag().isDirty(DirtyBits.Visual))
+            {
+                hasDirty = true;
+            }
+            foreach (child; ctrl.children())
+            {
+                checkDirtyRecursive(child);
+            }
+        }
+        
+        foreach (child; children())
+        {
+            checkDirtyRecursive(child);
+        }
+        
+        if (!hasDirty)
+        {
+            // 没有脏标记，直接输出历史buffer
+            BitBlt(hdc, 0, 0, width, height, _compositor.historyDC(), 0, 0, SRCCOPY);
+            return;
+        }
+        
+        // ── Layer-based渲染流程 ──
+        
+        // 1. 收集所有需要渲染的控件
+        auto allControls = children();
+        
+        // 2. 使用compositor合成所有layer（传入脏标记状态）
+        _compositor.render(hdc, allControls, hasDirty);
+        
+        // 3. 清除所有脏标记
+        clearDirty();
+        foreach (child; children())
+        {
+            clearDirtyRecursive(child);
+        }
+    }
+    
+
+    /// 传统渲染方式（无虚拟画布）
+    private void renderTraditional(HDC hdc, int width, int height)
+    {
+        logTrace("renderTraditional: width=", width, " height=", height);
+        
+        // 注意：布局已在 render() 中通过 this.ensureLayout() 执行
+        
+        // 检查是否有任何脏标记，如果没有则跳过渲染
+        bool hasDirty = isDirty();
+        if (!hasDirty)
+        {
+            foreach (child; children())
+            {
+                if (child.isDirty())
+                {
+                    hasDirty = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!hasDirty)
+        {
+            return;  // 没有脏标记，跳过渲染
+        }
+        
         // ── Double-buffering: draw everything to an off-screen bitmap, then BitBlt at once ──
         HDC memDC = CreateCompatibleDC(hdc);
         HBITMAP memBmp = CreateCompatibleBitmap(hdc, width, height);
@@ -965,8 +1204,7 @@ class MainWindow : Control
         sorted.sort!((a, b) => a.layer() < b.layer());
         foreach (child; sorted)
         {
-            if (child.visible())
-                child.renderWithGDI(memDC.Value);
+            renderControlRecursive(child, memDC);
         }
 
         // 在所有子控件渲染完毕后，渲染 TextInput 上下文菜单（确保在最上层）
@@ -982,6 +1220,79 @@ class MainWindow : Control
         SelectObject(memDC, oldBmp);
         DeleteObject(cast(HGDIOBJ)memBmp);
         DeleteDC(memDC);
+        
+        // 渲染完成后清除所有脏标记
+        clearDirty();
+        foreach (child; children())
+        {
+            clearDirtyRecursive(child);
+        }
+    }
+    
+    /// 递归渲染控件（检查rendersChildren标志）
+    private void renderControlRecursive(Control ctrl, HDC hdc)
+    {
+        logInfo("renderControlRecursive: ctrl=", typeid(ctrl).name, " position=(", ctrl.position().x(), ",", ctrl.position().y(), ") size=(", ctrl.width(), ",", ctrl.height(), ")");
+        
+        if (!ctrl.visible())
+            return;
+        
+        // 确保布局已执行
+        ctrl.ensureLayout();
+        
+        // 注意：不检查脏标记，让所有可见控件都渲染
+        // 脏标记优化在renderTraditional和LayerCompositor中实现
+        
+        // 关键修复：在渲染控件之前，先偏移视口到控件位置
+        // 这样控件使用 (0, 0) 渲染，而不是 position()
+        POINT oldOrigin;
+        OffsetViewportOrgEx(hdc, ctrl.position().x(), ctrl.position().y(), &oldOrigin);
+        
+        // 渲染控件本身
+        ctrl.renderWithGDI(hdc.Value);
+        
+        // 恢复视口
+        SetViewportOrgEx(hdc, oldOrigin.x, oldOrigin.y, null);
+        
+        // 只当控件不自己渲染子控件时，才递归渲染子控件
+        if (!ctrl.rendersChildren())
+        {
+            auto children = ctrl.children();
+            
+            // 按Z轴排序渲染（z值小的先渲染，大的后渲染覆盖）
+            if (children.length > 1)
+            {
+                // 创建索引数组用于排序
+                import std.algorithm : sort;
+                
+                // 按z值排序子控件
+                auto sortedChildren = children.dup;
+                sortedChildren.sort!((a, b) => a.z() < b.z());
+                
+                foreach (child; sortedChildren)
+                {
+                    renderControlRecursive(child, hdc);
+                }
+            }
+            else
+            {
+                // 单个子控件或无子控件，直接渲染
+                foreach (child; children)
+                {
+                    renderControlRecursive(child, hdc);
+                }
+            }
+        }
+    }
+    
+    /// 递归清除脏标记
+    private void clearDirtyRecursive(Control ctrl)
+    {
+        ctrl.clearDirty();
+        foreach (child; ctrl.children())
+        {
+            clearDirtyRecursive(child);
+        }
     }
     
     /// 渲染所有打开的 TextInput / EditBox 上下文菜单（在所有其他内容之上）

@@ -78,8 +78,9 @@ abstract class GridWidgetBase : Control
     private int _lastClickRow = -1;
     private int _lastClickCol = -1;
 
-    this()
+    this(Control parent)
     {
+        super(parent);
         width = 300;
         height = 200;
         focusable = true;
@@ -825,10 +826,11 @@ abstract class GridWidgetBase : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("GridWidgetBase.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("GridWidgetBase.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

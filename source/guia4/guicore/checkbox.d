@@ -23,25 +23,13 @@ class CheckBox : Control
     private bool _checked = false;
     private bool _hovered = false;
 
-    this(string text = "CheckBox")
-    {
-        super();
-        _text = text;
-        width = 120;
-        height = 24;
-        focusable = true;
-        logTrace("CheckBox.ctor(text='", text, "')");
-    }
-
     this(Control parent, string text)
     {
-        super();
+        super(parent);
         _text = text;
         width = 120;
         height = 24;
         focusable = true;
-        if (parent)
-            parent.addChild(this);
         logTrace("CheckBox.ctor(parent=", parent !is null, ", text='", text, "')");
     }
 
@@ -113,10 +101,11 @@ class CheckBox : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("CheckBox.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        logTrace("CheckBox.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        int bx = x() + 2;          // 方框左上角 X
-        int by = y() + 3;          // 方框左上角 Y
+        int bx = 2;          // 方框左上角 X
+        int by = 3;          // 方框左上角 Y
         int boxSize = 16;          // 方框尺寸
         int textX = bx + boxSize + 6; // 文字起始 X
 
@@ -164,7 +153,7 @@ class CheckBox : Control
         SetBkMode(hdc, TRANSPARENT);
 
         wstring textW = toUTF16(_text);
-        int textY = y() + (height() - 14) / 2;
+        int textY = (height() - 14) / 2;
         TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
         FontCache.release(hdc, fontEntry);
@@ -175,7 +164,7 @@ class CheckBox : Control
             HPEN focusPen = CreatePen(PS_DOT, 1, cast(COLORREF)0x00000000);
             HGDIOBJ oldPen3 = SelectObject(hdc, cast(HGDIOBJ)focusPen);
             HGDIOBJ oldBrush3 = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-            Rectangle(hdc, x() + 1, y() + 1, x() + width() - 1, y() + height() - 1);
+            Rectangle(hdc, 1, 1, width() - 1, height() - 1);
             SelectObject(hdc, oldBrush3);
             SelectObject(hdc, oldPen3);
             DeleteObject(cast(HGDIOBJ)focusPen);

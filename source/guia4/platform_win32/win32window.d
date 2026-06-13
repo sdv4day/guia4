@@ -3,6 +3,7 @@ module guia4.platform_win32.win32window;
 import guia4.platform.iwindow;
 import guia4.platform.types;
 import guia4.platform_win32.win32defs;
+import guia4.utils.logger;
 import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
 import windows.win32.graphics.gdi;
@@ -198,10 +199,14 @@ class Win32Window : IPlatformWindow
     private void createWindow()
     {
         wstring titleW = toUTF16(_title);
+        // 创建可变的wchar数组以匹配PWSTR类型
+        wchar[] classNameBuf = _className.dup;
+        wchar[] titleBuf = titleW.dup;
+        
         _hwnd = CreateWindowExW(
             0,
-            cast(const(PWSTR))_className.ptr,
-            cast(const(PWSTR))titleW.ptr,
+            cast(const(PWSTR))classNameBuf.ptr,
+            cast(const(PWSTR))titleBuf.ptr,
             WS_OVERLAPPEDWINDOW,
             _x, _y, cast(int)_width, cast(int)_height,
             HWND.init,
@@ -386,6 +391,7 @@ class Win32Window : IPlatformWindow
     
     private void internalPaint(HWND hwnd)
     {
+        logInfo("Win32Window.internalPaint called");
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         
@@ -636,7 +642,8 @@ class Win32Window : IPlatformWindow
     {
         _title = title;
         wstring titleW = toUTF16(title);
-        SetWindowTextW(_hwnd, cast(const(PWSTR))titleW.ptr);
+        wchar[] titleBuf = titleW.dup;
+        SetWindowTextW(_hwnd, cast(const(PWSTR))titleBuf.ptr);
     }
     
     string title() const

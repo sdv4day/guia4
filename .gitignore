@@ -20,3 +20,7 @@ guia4-test-*
 *.bmp
 .omo/
 .*/
+*.puml
+*.md
+*.png
+tags

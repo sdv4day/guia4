@@ -25,23 +25,12 @@ class ImageButton : Control
     private bool _pressed = false;
     private bool _hovered = false;
 
-    this()
-    {
-        super();
-        width = 32;
-        height = 32;
-        focusable = true;
-        logTrace("ImageButton.ctor()");
-    }
-
     this(Control parent)
     {
-        super();
+        super(parent);
         width = 32;
         height = 32;
         focusable = true;
-        if (parent)
-            parent.addChild(this);
         logTrace("ImageButton.ctor(parent=", parent !is null, ")");
     }
 
@@ -150,7 +139,7 @@ class ImageButton : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("ImageButton.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("ImageButton.renderWithGDI() size=(", width(), ",", height(), ")");
 
         // 根据状态选择位图
         HBITMAP currentBmp;
@@ -164,10 +153,11 @@ class ImageButton : Control
         if (currentBmp.Value is null)
             return;
 
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         // BitBlt 绘制
         HDC memDC = CreateCompatibleDC(hdc);
         HGDIOBJ oldBmp = SelectObject(memDC, cast(HGDIOBJ)currentBmp);
-        BitBlt(hdc, x(), y(), width(), height(), memDC, 0, 0, SRCCOPY);
+        BitBlt(hdc, 0, 0, width(), height(), memDC, 0, 0, SRCCOPY);
         SelectObject(memDC, oldBmp);
         DeleteDC(memDC);
 
@@ -177,7 +167,7 @@ class ImageButton : Control
             HPEN focusPen = CreatePen(PS_DOT, 1, cast(COLORREF)0x00000000);
             HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)focusPen);
             HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-            Rectangle(hdc, x() + 2, y() + 2, x() + width() - 2, y() + height() - 2);
+            Rectangle(hdc, 2, 2, width() - 2, height() - 2);
             SelectObject(hdc, oldBrush);
             SelectObject(hdc, oldPen);
             DeleteObject(cast(HGDIOBJ)focusPen);

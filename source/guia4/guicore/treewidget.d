@@ -63,18 +63,12 @@ class TreeWidget : Control
     private int _dragStartY = 0;          // 拖拽起始Y
     private int _dragStartScrollY = 0;    // 拖拽起始scrollY
 
-    this()
+    this(Control parent)
     {
+        super(parent);
         width = 200;
         height = 200;
         onMouseWheel(&handleWheel);
-    }
-
-    this(Control parent)
-    {
-        this();
-        if (parent)
-            parent.addChild(this);
     }
 
     /// 根节点
@@ -279,10 +273,11 @@ class TreeWidget : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TreeWidget.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("TreeWidget.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 
@@ -386,7 +381,7 @@ class TreeWidget : Control
         if (currentY > clipBottom)
             return;
 
-        int rx = x();
+        int rx = position().x();
         int itemY = currentY;
 
         // 只渲染可见范围内的项

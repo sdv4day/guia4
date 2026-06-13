@@ -28,24 +28,13 @@ class ComboBox : Control
     private int _hoveredItem = -1;
     private uint _fontSize = 14;
 
-    this()
+    this(Control parent, string[] items = [])
     {
+        super(parent);
         width = 150;
         height = 28;
         focusable = true;
-    }
-
-    this(string[] items)
-    {
-        this();
         _items = items;
-    }
-
-    this(Control parent, string[] items = [])
-    {
-        this(items);
-        if (parent)
-            parent.addChild(this);
     }
 
     /// 添加列表项
@@ -200,10 +189,11 @@ class ComboBox : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("ComboBox.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("ComboBox.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

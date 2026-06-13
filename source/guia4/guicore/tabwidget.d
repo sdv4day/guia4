@@ -25,21 +25,13 @@ class TabWidget : Control
     private TabHost _tabHost;
     private int _tabBarHeight = 28;
 
-    this()
-    {
-        width = 300;
-        height = 250;
-        _tabControl = new TabControl();
-        _tabHost = new TabHost();
-        addChild(_tabControl);
-        addChild(_tabHost);
-    }
-
     this(Control parent)
     {
-        this();
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        width = 300;
+        height = 250;
+        _tabControl = new TabControl(this, []);
+        _tabHost = new TabHost(this);
     }
 
     /// 添加标签页（标签 + 页面内容），返回索引
@@ -49,8 +41,7 @@ class TabWidget : Control
         _tabHost.addPage(page);
 
         // 立即同步 _tabHost 的大小与位置（首次渲染前 hitTest 才能正确）
-        _tabHost.x(x());
-        _tabHost.y(y() + _tabBarHeight);
+        _tabHost.setXY(position().x(), position().y() + _tabBarHeight);
         _tabHost.width(width());
         _tabHost.height(height() - _tabBarHeight);
 
@@ -73,16 +64,15 @@ class TabWidget : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TabWidget.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("TabWidget.renderWithGDI() size=(", width(), ",", height(), ")");
 
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         // 布局：tabControl 在顶部，tabHost 在下方
-        _tabControl.x(x());
-        _tabControl.y(y());
+        _tabControl.setXY(0, 0);
         _tabControl.width(width());
         _tabControl.height(_tabBarHeight);
 
-        _tabHost.x(x());
-        _tabHost.y(y() + _tabBarHeight);
+        _tabHost.setXY(0, _tabBarHeight);
         _tabHost.width(width());
         _tabHost.height(height() - _tabBarHeight);
 
@@ -101,8 +91,18 @@ class TabWidget : Control
             // 点击在标签栏区域 — 转发到 tabControl
             _tabControl.fireMouseDown(mx, my, button);
         }
-        // 标签页内容区域的点击通过 hitTestChild 找到最深子节点后直接分发，
-        // 此处无需再处理（避免双重分发）
+        else if (my >= _tabBarHeight)
+        {
+            // 点击在内容区域 — 转发到 TabHost 当前活跃页面
+            auto kids = _tabHost.children();
+            int idx = _tabControl.selectedIndex();
+            if (idx >= 0 && idx < cast(int)kids.length)
+            {
+                int pageLocalX = mx;
+                int pageLocalY = my - _tabBarHeight;
+                kids[idx].fireMouseDown(pageLocalX, pageLocalY, button);
+            }
+        }
     }
 
     override void fireMouseMove(int mx, int my)

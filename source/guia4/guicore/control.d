@@ -4,6 +4,10 @@ import guia4.guicore.dirtyflag;
 import guia4.guicore.layer;
 import guia4.guicore.layout;
 import guia4.guicore.events;
+import guia4.guicore.position;
+import guia4.platform_win32.win32defs;
+import guia4.utils.logger;
+import windows.win32.graphics.gdi;
 // 注意：guicore 基类不直接依赖平台 GDI，renderWithGDI 使用 void* 以解耦
 // 各控件子类内部可自行 import GDI 并 cast(HDC)hdc
 
@@ -59,7 +63,7 @@ class Control
 {
     // ── 字段 ──────────────────────────────────────────────────────
 
-    private int _x, _y;
+    private Position _position;
     private int _width, _height;
     private bool _visible = true;
     private Layer _layer = Layer.Content;
@@ -67,10 +71,18 @@ class Control
     private Control[] _children;
     private DirtyFlag _dirty;
     private ILayout _layout;
+    private bool _layoutRequested = false;  /// 布局请求标志
 
     private bool _focusable = false;
     private bool _hasFocus = false;
+    private bool _rendersChildren = false;  /// 控件自己渲染子控件（防止LayerCompositor递归）
 
+    // ── Layer Buffer（独立缓冲区）────────────────────────────────
+    protected HDC _layerDC;              // 控件独立的layer buffer DC
+    protected HBITMAP _layerBmp;         // 控件独立的layer buffer位图
+    protected HGDIOBJ _layerOldBmp;      // 原始位图
+    protected bool _layerBufferValid = false;  // buffer是否有效
+    
     private ClickHandler _clickHandler;
     private MouseHandler _mouseDownHandler;
     private MouseHandler _mouseUpHandler;
@@ -107,18 +119,58 @@ class Control
 
     // ── 位置 ──────────────────────────────────────────────────────
 
-    int x() const nothrow @nogc @property { return _x; }
-    int y() const nothrow @nogc @property { return _y; }
 
-    void x(int v) nothrow @nogc @property
+    /// Z轴层级
+    int z() const nothrow @nogc @property { return _position.z(); }
+    void z(int v) nothrow @nogc @property
     {
-        if (_x != v) { _x = v; _dirty.mark(DirtyBits.Position); propagateDirty(); }
+        if (_position.z() != v) { _position.z(v); _dirty.mark(DirtyBits.Position); propagateDirty(); }
+    }
+    
+    /// Position对象访问
+    Position position() const nothrow @nogc @property { return _position; }
+    void position(Position pos) nothrow @nogc @property
+    {
+        if (_position != pos) { _position = pos; _dirty.mark(DirtyBits.Position); propagateDirty(); }
     }
 
-    void y(int v) nothrow @nogc @property
+    /// 便捷方法：设置XY坐标
+    void setXY(int x, int y) nothrow @nogc
     {
-        if (_y != v) { _y = v; _dirty.mark(DirtyBits.Position); propagateDirty(); }
+        _position.setXY(x, y);
+        _dirty.mark(DirtyBits.Position);
+        propagateDirty();
     }
+
+    /// 便捷方法：设置XYZ坐标
+    void setXYZ(int x, int y, int z) nothrow @nogc
+    {
+        _position.set(x, y, z, _position.mode());
+        _dirty.mark(DirtyBits.Position);
+        propagateDirty();
+    }
+
+    /// 定位模式
+    PositionMode positionMode() const nothrow @nogc @property { return _position.mode(); }
+    void positionMode(PositionMode mode) nothrow @nogc @property
+    {
+        if (_position.mode() != mode) { _position.mode(mode); _dirty.mark(DirtyBits.Visual); propagateDirty(); }
+    }
+    
+    /// 是否静态定位
+    bool isStaticPosition() const nothrow @nogc @property { return _position.isStatic(); }
+    /// 是否相对定位
+    bool isRelativePosition() const nothrow @nogc @property { return _position.isRelative(); }
+    /// 是否绝对定位
+    bool isAbsolutePosition() const nothrow @nogc @property { return _position.isAbsolute(); }
+    /// 是否固定定位
+    bool isFixedPosition() const nothrow @nogc @property { return _position.isFixed(); }
+    /// 是否粘性定位
+    bool isStickyPosition() const nothrow @nogc @property { return _position.isSticky(); }
+    /// 是否脱离文档流
+    bool isOutOfFlowPosition() const nothrow @nogc @property { return _position.isOutOfFlow(); }
+    /// 是否参与布局
+    bool participatesInLayout() const nothrow @nogc @property { return _position.participatesInLayout(); }
 
     // ── 尺寸 ──────────────────────────────────────────────────────
 
@@ -142,6 +194,13 @@ class Control
     {
         if (_visible != v) { _visible = v; _dirty.mark(DirtyBits.Visibility); propagateDirty(); }
     }
+
+    // ── 子控件渲染控制 ─────────────────────────────────────────────
+
+    /// 控件是否自己渲染子控件（如MenuBar、ScrollableContainer）
+    /// 如果为true，LayerCompositor不递归渲染其children
+    bool rendersChildren() const nothrow @nogc @property { return _rendersChildren; }
+    void rendersChildren(bool v) nothrow @nogc @property { _rendersChildren = v; }
 
     // ── 层级 ──────────────────────────────────────────────────────
 
@@ -179,18 +238,18 @@ class Control
         _children ~= child;
 
         // 未指定大小的控件默认填充父容器
-        // 条件：width==0 && height==0 且 dock 未设置
-        // 这样 layoutChildren() 会将其填充到父容器剩余空间
-        if (child._width == 0 && child._height == 0 && child._dock == DockStyle.None)
+        // 条件：width==0 && height==0 且 dock 未设置 且 父容器没有布局管理器
+        // 有布局管理器时，由布局管理器负责子控件的大小
+        if (child._width == 0 && child._height == 0 && child._dock == DockStyle.None && _layout is null)
         {
             child._dock = DockStyle.Fill;
         }
 
         _dirty.mark(DirtyBits.Children);
         propagateDirty();
-
-        // 对有停靠属性的子控件应用布局
-        layoutChildren();
+        
+        // 请求重新布局
+        requestLayout();
     }
 
     void removeChild(Control child) nothrow
@@ -211,7 +270,46 @@ class Control
     // ── 布局 ──────────────────────────────────────────────────────
 
     ILayout layout() nothrow @property { return _layout; }
-    void layout(ILayout l) nothrow @property { _layout = l; }
+    void layout(ILayout l) nothrow @property 
+    { 
+        _layout = l; 
+        requestLayout();
+    }
+    
+    /// 请求重新布局（延迟执行）
+    void requestLayout() nothrow @nogc
+    {
+        _layoutRequested = true;
+        // 向父控件传播布局请求
+        if (_parent !is null)
+        {
+            _parent.requestLayout();
+        }
+    }
+    
+    /// 确保布局已执行（在渲染前调用）
+    void ensureLayout()
+    {
+        // 先执行子控件的布局（自底向上）
+        foreach (child; _children)
+        {
+            child.ensureLayout();
+        }
+        
+        // 总是执行布局（不检查 _layoutRequested）
+        // 这样可以确保停靠布局总是被应用
+        if (_layout !is null)
+        {
+            _layout.layout(this);
+        }
+        else
+        {
+            // 无布局管理器时，应用停靠布局
+            layoutChildren();
+        }
+        
+        _layoutRequested = false;
+    }
 
     // ── 脏标记 ────────────────────────────────────────────────────
 
@@ -236,6 +334,68 @@ class Control
         {
             _parent.markDirty(DirtyBits.Children);
         }
+    }
+    
+    // ── Layer Buffer管理 ───────────────────────────────────────────
+    
+    /**
+     * 初始化Layer Buffer
+     * 每个控件可以有独立的buffer用于layer-based渲染
+     */
+    void initLayerBuffer(HDC refDC)
+    {
+        // 释放旧的buffer
+        destroyLayerBuffer();
+        
+        if (_width <= 0 || _height <= 0)
+            return;
+        
+        // 创建控件独立的buffer
+        _layerDC = CreateCompatibleDC(refDC);
+        _layerBmp = CreateCompatibleBitmap(refDC, _width, _height);
+        _layerOldBmp = SelectObject(_layerDC, cast(HGDIOBJ)_layerBmp);
+        
+        // 填充透明背景（白色，后续可改为真正的alpha通道）
+        RECT rect = {0, 0, _width, _height};
+        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        FillRect(_layerDC, &rect, brush);
+        DeleteObject(cast(HGDIOBJ)brush);
+        
+        _layerBufferValid = true;
+    }
+    
+    /// 销毁Layer Buffer
+    void destroyLayerBuffer()
+    {
+        if (_layerDC.Value !is null)
+        {
+            if (_layerOldBmp.Value !is null)
+                SelectObject(_layerDC, _layerOldBmp);
+            if (_layerBmp.Value !is null)
+                DeleteObject(cast(HGDIOBJ)_layerBmp);
+            DeleteDC(_layerDC);
+        }
+        _layerBufferValid = false;
+    }
+    
+    /// 检查Layer Buffer是否有效
+    bool hasLayerBuffer() const @property { return _layerBufferValid; }
+    
+    /// 获取Layer Buffer DC（用于渲染）
+    HDC layerBufferDC() @property { return _layerDC; }
+    
+    /// 更新Layer Buffer（将控件内容渲染到自己的buffer）
+    void updateLayerBuffer()
+    {
+        if (!_layerBufferValid)
+            return;
+        
+        // 子类应该重写这个方法来渲染自己的内容
+        // 默认实现：填充背景
+        RECT rect = {0, 0, _width, _height};
+        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        FillRect(_layerDC, &rect, brush);
+        DeleteObject(cast(HGDIOBJ)brush);
     }
 
     // ── 事件注册 ──────────────────────────────────────────────────
@@ -332,7 +492,6 @@ class Control
             event.pressed = true;
             event.shift = shift;
             event.control = control;
-            event.alt = alt;
             _keyDownHandler(event);
         }
     }
@@ -348,7 +507,6 @@ class Control
             event.pressed = false;
             event.shift = shift;
             event.control = control;
-            event.alt = alt;
             _keyUpHandler(event);
         }
     }
@@ -380,6 +538,7 @@ class Control
         if (_mouseWheelHandler !is null)
         {
             MouseWheelEvent event;
+            event.id = EventId.MouseWheel;
             event.target = this;
             event.delta = delta;
             event.x = x;
@@ -477,10 +636,23 @@ class Control
 
     // ── 构造/渲染/命中测试 ────────────────────────────────────────
 
-    this()
+    /// 无参构造函数（仅限 MainWindow 和派生类使用）
+    protected this()
     {
         _children = [];
         _dirty.mark(DirtyBits.All);
+    }
+
+    /// 带父级参数的构造函数（推荐使用）
+    /// 创建控件并自动添加到父级
+    this(Control parent)
+    {
+        _children = [];
+        _dirty.mark(DirtyBits.All);
+        if (parent !is null)
+        {
+            parent.addChild(this);
+        }
     }
 
     void render() {}
@@ -518,30 +690,25 @@ class Control
                 applyAlignment(availX, availY, availW, availH);
                 break;
             case DockStyle.Top:
-                x(availX);
-                y(availY);
+                setXY(availX, availY);
                 width(availW);
                 // height 保持控件自身值
                 break;
             case DockStyle.Bottom:
-                x(availX);
-                y(availY + availH - height());
+                setXY(availX, availY + availH - height());
                 width(availW);
                 break;
             case DockStyle.Left:
-                x(availX);
-                y(availY);
+                setXY(availX, availY);
                 // width 保持控件自身值
                 height(availH);
                 break;
             case DockStyle.Right:
-                x(availX + availW - width());
-                y(availY);
+                setXY(availX + availW - width(), availY);
                 height(availH);
                 break;
             case DockStyle.Fill:
-                x(availX);
-                y(availY);
+                setXY(availX, availY);
                 width(availW);
                 height(availH);
                 break;
@@ -552,19 +719,21 @@ class Control
     private void applyAlignment(int availX, int availY, int availW, int availH)
     {
         // 水平对齐
+        int newX = position().x();
+        int newY = position().y();
         final switch (_hAlign)
         {
             case HAlign.Left:
-                x(availX);
+                newX = availX;
                 break;
             case HAlign.Center:
-                x(availX + (availW - width()) / 2);
+                newX = availX + (availW - width()) / 2;
                 break;
             case HAlign.Right:
-                x(availX + availW - width());
+                newX = availX + availW - width();
                 break;
             case HAlign.Stretch:
-                x(availX);
+                newX = availX;
                 width(availW);
                 break;
         }
@@ -573,28 +742,32 @@ class Control
         final switch (_vAlign)
         {
             case VAlign.Top:
-                y(availY);
+                newY = availY;
                 break;
             case VAlign.Center:
-                y(availY + (availH - height()) / 2);
+                newY = availY + (availH - height()) / 2;
                 break;
             case VAlign.Bottom:
-                y(availY + availH - height());
+                newY = availY + availH - height();
                 break;
             case VAlign.Stretch:
-                y(availY);
+                newY = availY;
                 height(availH);
                 break;
         }
+        setXY(newX, newY);
     }
 
     /// 对所有子控件应用停靠布局（由容器控件在布局时调用）
     void layoutChildren()
     {
+        logInfo("layoutChildren: parent=", typeid(this).name, " size=(", _width, ",", _height, ") children=", _children.length);
+        
         // 停靠布局：按 DockStyle 顺序（Top→Bottom→Left→Right→Fill）依次分配空间
         // 剩余空间逐步被停靠控件占据
-        int remainingX = _x + _paddingLeft;
-        int remainingY = _y + _paddingTop;
+        // 注意：子控件坐标是相对于父控件的，不包含父控件的绝对位置
+        int remainingX = _paddingLeft;
+        int remainingY = _paddingTop;
         int remainingW = _width - _paddingLeft - _paddingRight;
         int remainingH = _height - _paddingTop - _paddingBottom;
 
@@ -609,16 +782,14 @@ class Control
 
             if (child.dock() == DockStyle.Top)
             {
-                child.x(remainingX + child.marginLeft());
-                child.y(remainingY + child.marginTop());
+                child.setXY(remainingX + child.marginLeft(), remainingY + child.marginTop());
                 child.width(remainingW - child.marginLeft() - child.marginRight());
                 remainingY += child.height() + child.marginTop() + child.marginBottom();
                 remainingH -= child.height() + child.marginTop() + child.marginBottom();
             }
             else if (child.dock() == DockStyle.Bottom)
             {
-                child.x(remainingX + child.marginLeft());
-                child.y(remainingY + remainingH - child.height() - child.marginBottom());
+                child.setXY(remainingX + child.marginLeft(), remainingY + remainingH - child.height() - child.marginBottom());
                 child.width(remainingW - child.marginLeft() - child.marginRight());
                 remainingH -= child.height() + child.marginTop() + child.marginBottom();
             }
@@ -632,16 +803,14 @@ class Control
 
             if (child.dock() == DockStyle.Left)
             {
-                child.x(remainingX + child.marginLeft());
-                child.y(remainingY + child.marginTop());
+                child.setXY(remainingX + child.marginLeft(), remainingY + child.marginTop());
                 child.height(remainingH - child.marginTop() - child.marginBottom());
                 remainingX += child.width() + child.marginLeft() + child.marginRight();
                 remainingW -= child.width() + child.marginLeft() + child.marginRight();
             }
             else if (child.dock() == DockStyle.Right)
             {
-                child.x(remainingX + remainingW - child.width() - child.marginRight());
-                child.y(remainingY + child.marginTop());
+                child.setXY(remainingX + remainingW - child.width() - child.marginRight(), remainingY + child.marginTop());
                 child.height(remainingH - child.marginTop() - child.marginBottom());
                 remainingW -= child.width() + child.marginLeft() + child.marginRight();
             }
@@ -655,8 +824,7 @@ class Control
 
             if (child.dock() == DockStyle.Fill)
             {
-                child.x(remainingX + child.marginLeft());
-                child.y(remainingY + child.marginTop());
+                child.setXY(remainingX + child.marginLeft(), remainingY + child.marginTop());
                 child.width(remainingW - child.marginLeft() - child.marginRight());
                 child.height(remainingH - child.marginTop() - child.marginBottom());
             }
@@ -682,13 +850,13 @@ class Control
     bool hitTest(int px, int py) const nothrow @nogc
     {
         if (!_visible) return false;
-        return px >= _x && px < _x + _width && py >= _y && py < _y + _height;
+        return px >= _position.x() && px < _position.x() + _width && py >= _position.y() && py < _position.y() + _height;
     }
 
     // 返回控件类型和位置信息，便于调试日志输出
     override string toString() const
     {
         import std.conv : to;
-        return typeid(this).name ~ " at (" ~ _x.to!string ~ "," ~ _y.to!string ~ ") " ~ _width.to!string ~ "x" ~ _height.to!string;
+        return typeid(this).name ~ " at (" ~ _position.x().to!string ~ "," ~ _position.y().to!string ~ ") " ~ _width.to!string ~ "x" ~ _height.to!string;
     }
 }

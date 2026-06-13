@@ -23,25 +23,13 @@ class ImageWidget : Control
     private HBITMAP _bitmap;
     private bool _autoSize = true;
 
-    this(string filePath = "")
-    {
-        super();
-        width = 64;
-        height = 64;
-        if (filePath.length > 0)
-            loadBitmap(filePath);
-        logTrace("ImageWidget.ctor(filePath='", filePath, "')");
-    }
-
     this(Control parent, string filePath)
     {
-        super();
+        super(parent);
         width = 64;
         height = 64;
         if (filePath.length > 0)
             loadBitmap(filePath);
-        if (parent)
-            parent.addChild(this);
         logTrace("ImageWidget.ctor(parent=", parent !is null, ", filePath='", filePath, "')");
     }
 
@@ -120,15 +108,16 @@ class ImageWidget : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("ImageWidget.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("ImageWidget.renderWithGDI() size=(", width(), ",", height(), ")");
 
         if (_bitmap.Value is null)
             return;
 
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         // 创建兼容内存 DC，选入位图，BitBlt 绘制
         HDC memDC = CreateCompatibleDC(hdc);
         HGDIOBJ oldBmp = SelectObject(memDC, cast(HGDIOBJ)_bitmap);
-        BitBlt(hdc, x(), y(), width(), height(), memDC, 0, 0, SRCCOPY);
+        BitBlt(hdc, 0, 0, width(), height(), memDC, 0, 0, SRCCOPY);
         SelectObject(memDC, oldBmp);
         DeleteDC(memDC);
     }

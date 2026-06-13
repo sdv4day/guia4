@@ -57,9 +57,9 @@ class TextInput : Control
     private int _rightClickY = 0;
     private bool _contextMenuOpen = false; /// 右键菜单是否打开
 
-    this(string text = "", string placeholder = "")
+    this(Control parent, string text = "", string placeholder = "")
     {
-        super();
+        super(parent);
         _text = text;
         _placeholder = placeholder;
         _cursorPos = cast(int)_text.length;
@@ -70,14 +70,7 @@ class TextInput : Control
         onKeyDown(&handleKeyEvent);
         onTextInput(&handleTextInput);
 
-        logTrace("TextInput.ctor(text='", text, "', placeholder='", placeholder, "')");
-    }
-
-    this(Control parent, string text = "", string placeholder = "")
-    {
-        this(text, placeholder);
-        if (parent)
-            parent.addChild(this);
+        logTrace("TextInput.ctor(parent=", parent !is null, ", text='", text, "', placeholder='", placeholder, "')");
     }
 
     // ── 属性 ────────────────────────────────────────────────
@@ -656,10 +649,11 @@ class TextInput : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TextInput.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        logTrace("TextInput.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

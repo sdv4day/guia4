@@ -21,17 +21,11 @@ class TabHost : Control
 {
     private int _activeIndex = 0;
 
-    this()
-    {
-        width = 300;
-        height = 200;
-    }
-
     this(Control parent)
     {
-        this();
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        width = 300;
+        height = 200;
     }
 
     /// 当前活跃页面索引
@@ -53,14 +47,17 @@ class TabHost : Control
     {
         addChild(page);
         // 页面位置固定为 (0,0)，大小在 renderWithGDI 中同步
-        page.x(0);
-        page.y(0);
+        page.setXY(0, 0);
     }
 
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TabHost.renderWithGDI() at (", x(), ",", y(), ") activeIndex=", _activeIndex);
+        logTrace("TabHost.renderWithGDI() size=(", width(), ",", height(), ") activeIndex=", _activeIndex);
+        
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        // 确保布局已执行
+        ensureLayout();
 
         // 只渲染 activeIndex 对应的子控件
         auto kids = children();
@@ -69,8 +66,8 @@ class TabHost : Control
             auto page = kids[_activeIndex];
             if (page.visible())
             {
-                int pageX = x();
-                int pageY = y();
+                int pageX = 0;
+                int pageY = 0;
                 int pageW = width();
                 int pageH = height();
 
@@ -91,10 +88,9 @@ class TabHost : Control
 
                 // 临时将 page 位置设为 (0,0)，这样 page.renderWithGDI 
                 // 内部使用 x()/y() 渲染时坐标是相对的
-                int origPageX = page.x();
-                int origPageY = page.y();
-                page.x(0);
-                page.y(0);
+                int origPageX = page.position().x();
+                int origPageY = page.position().y();
+                page.setXY(0, 0);
 
                 // 渲染 page 本身（如果有自定义渲染）
                 page.renderWithGDI(hdc.Value);
@@ -107,8 +103,7 @@ class TabHost : Control
                 }
 
                 // 恢复 page 原始位置
-                page.x(origPageX);
-                page.y(origPageY);
+                page.setXY(origPageX, origPageY);
 
                 // 恢复 DC 状态
                 RestoreDC(hdc, savedDC);

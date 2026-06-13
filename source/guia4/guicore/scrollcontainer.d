@@ -48,35 +48,21 @@ class ScrollableContainer : Control
     private bool _isDragging = false;
     private int _dragStartY = 0;       // mouse Y at drag start (container-local)
     private int _dragStartScrollY = 0; // scrollY at drag start
-
-    this()
-    {
-        super();
-        logTrace("ScrollableContainer.ctor()");
-
-        // Register mouse handlers
-        onMouseWheel(&handleMouseWheel);
-        onMouseDown(&handleMouseDown);
-        onMouseUp(&handleMouseUp);
-        onMouseMove(&handleMouseMove);
-    }
+    
+    // ── Layer buffer state ──
+    private bool _layerBufferInitialized = false;
 
     this(Control parent)
     {
-        this();
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        rendersChildren(true);  // ScrollableContainer自己渲染children
+        dock(DockStyle.Fill);   // 默认填充父容器剩余空间
     }
-
-    /// Convenience constructor: contentHeight, width, height
-    this(int contentHeight_, int width_, int height_)
+    
+    ~this()
     {
-        this();
-        _contentHeight = contentHeight_;
-        width = width_;
-        height = height_;
-        logTrace("ScrollableContainer.ctor(contentHeight=", contentHeight_,
-                 ", w=", width_, ", h=", height_, ")");
+        // 释放layer buffer资源
+        destroyLayerBuffer();
     }
 
     // ── Properties ────────────────────────────────────────────────
@@ -243,7 +229,7 @@ class ScrollableContainer : Control
         int maxBottom = 0;
         foreach (child; children())
         {
-            int childBottom = child.y() + child.height() - y();
+            int childBottom = child.position().y() + child.height() - position().y();
             if (childBottom > maxBottom)
                 maxBottom = childBottom;
         }
@@ -272,6 +258,10 @@ class ScrollableContainer : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
+        
+        // 确保布局已执行
+        ensureLayout();
+        
         // Recompute content height before drawing — this makes the scrollbar
         // self-adapt to any out-of-band child repositioning.
         int prevContentH = _contentHeight;
@@ -280,27 +270,103 @@ class ScrollableContainer : Control
         if (_contentHeight != prevContentH)
             logTrace("ScrollableContainer.renderWithGDI: contentH ", prevContentH, " → ", _contentHeight);
 
-        // ── now delegate to the real rendering ──
-        renderContent(hdc);
+        // ── 确保layer buffer已初始化 ──
+        logTrace("ScrollableContainer.renderWithGDI: checking buffer, _layerBufferInitialized=", _layerBufferInitialized, " _layerBufferValid=", _layerBufferValid);
+        if (!_layerBufferInitialized || !_layerBufferValid)
+        {
+            logTrace("  initializing layer buffer...");
+            initLayerBuffer(hdc);
+            _layerBufferInitialized = true;
+            logTrace("  after initLayerBuffer: _layerBufferValid=", _layerBufferValid);
+            
+            // 初始化后立即渲染一次内容
+            if (_layerBufferValid)
+            {
+                logTrace("  calling renderContentToBuffer...");
+                renderContentToBuffer(_layerDC);
+            }
+            else
+            {
+                logTrace("  ERROR: initLayerBuffer failed, _layerBufferValid is still false!");
+            }
+        }
+        
+        // ── 检查是否需要重建buffer（尺寸变化）──
+        if (_layerBufferValid)
+        {
+            // 获取当前buffer尺寸
+            BITMAP bm;
+            GetObjectW(cast(HGDIOBJ)_layerBmp, bm.sizeof, &bm);
+            if (bm.bmWidth != width() || bm.bmHeight != height())
+            {
+                // 尺寸变化，重建buffer
+                initLayerBuffer(hdc);
+                
+                // 重建后立即渲染一次内容
+                if (_layerBufferValid)
+                {
+                    renderContentToBuffer(_layerDC);
+                }
+            }
+        }
+        
+        // ── 将layer buffer合成到父DC ──
+        // 注意：不在这里调用updateLayerBuffer()
+        // LayerCompositor会根据脏标记调用updateLayerBuffer()
+        logTrace("ScrollableContainer.renderWithGDI: _layerBufferValid=", _layerBufferValid, " position=(", position().x(), ",", position().y(), ") size=", width(), "x", height());
+        if (_layerBufferValid)
+        {
+            BitBlt(hdc, position().x(), position().y(), width(), height(), _layerDC, 0, 0, SRCCOPY);
+            logTrace("  BitBlt executed: dst=(", position().x(), ",", position().y(), ") size=", width(), "x", height());
+        }
+        else
+        {
+            logTrace("  ERROR: _layerBufferValid is false, BitBlt skipped!");
+        }
     }
-
-    /// The actual rendering logic, extracted so renderWithGDI can insert
-    /// the auto-adaptive recalc before it.
-    private void renderContent(HDC hdc)
+    
+    /// 重写updateLayerBuffer：将内容渲染到layer buffer
+    override void updateLayerBuffer()
     {
-        logTrace("ScrollableContainer.renderContent() at (", x(), ",", y(),
-                 ") size=", width(), "x", height(), " scrollY=", _scrollY);
+        // ── 确保layer buffer已初始化 ──
+        // 注意：这里需要refDC，但我们无法直接获取，使用_layerDC作为参考
+        // 如果buffer未初始化，先创建一个临时的兼容DC
+        if (!_layerBufferInitialized || !_layerBufferValid)
+        {
+            // 无法在这里初始化，因为没有refDC
+            // 这种情况下应该由renderWithGDI来初始化
+            return;
+        }
+        
+        // ── 检查是否需要重建buffer（尺寸变化）──
+        if (_layerBufferValid)
+        {
+            // 获取当前buffer尺寸
+            BITMAP bm;
+            GetObjectW(cast(HGDIOBJ)_layerBmp, bm.sizeof, &bm);
+            if (bm.bmWidth != width() || bm.bmHeight != height())
+            {
+                // 尺寸变化，但无法重建（没有refDC）
+                // 标记为无效，等待renderWithGDI重建
+                _layerBufferValid = false;
+                return;
+            }
+        }
+        
+        // 渲染内容到layer buffer（坐标原点为(0,0)）
+        renderContentToBuffer(_layerDC);
+    }
+    
+    /// 渲染内容到layer buffer（坐标原点为(0,0)）
+    private void renderContentToBuffer(HDC hdc)
+    {
+        logTrace("ScrollableContainer.renderContentToBuffer() size=", width(), "x", height(), " scrollY=", _scrollY, " position=(", position().x(), ",", position().y(), ")");
 
-        int rx = x();
-        int ry = y();
         int rw = width();
         int rh = height();
 
-        // ── Draw container background (BEFORE clip/offset so it stays fixed) ──
-        RECT bgRect = {
-            cast(LONG)rx, cast(LONG)ry,
-            cast(LONG)(rx + rw), cast(LONG)(ry + rh)
-        };
+        // ── Draw container background ──
+        RECT bgRect = {0, 0, rw, rh};
         HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00F8F8F8);
         FillRect(hdc, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
@@ -309,20 +375,25 @@ class ScrollableContainer : Control
         int savedDC = SaveDC(hdc);
 
         // ── Clip to container bounds ──
-        IntersectClipRect(hdc, rx, ry, rx + rw, ry + rh);
+        IntersectClipRect(hdc, 0, 0, rw, rh);
 
         // ── Apply scroll offset for children ──
         POINT oldOrigin;
+        // 偏移原点：减去滚动偏移（相对于buffer的(0,0)）
         OffsetViewportOrgEx(hdc, 0, -_scrollY, &oldOrigin);
 
-        // ── Render each visible child ──
+        // ── Render each visible child (递归渲染) ──
+        // 传递 ScrollableContainer 的绝对位置作为初始偏移
+        int containerAbsX = position().x();
+        int containerAbsY = position().y();
         foreach (child; children())
         {
             if (child.visible())
             {
-                child.renderWithGDI(hdc.Value);
+                renderChildRecursive(child, hdc, containerAbsX, containerAbsY);
             }
         }
+
 
         // ── Restore DC (removes clip rect and viewport offset) ──
         RestoreDC(hdc, savedDC);
@@ -332,27 +403,68 @@ class ScrollableContainer : Control
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
 
-        Rectangle(hdc, rx, ry, rx + rw, ry + rh);
+        Rectangle(hdc, 0, 0, rw, rh);
 
         SelectObject(hdc, oldPen);
         SelectObject(hdc, oldBrush);
         DeleteObject(cast(HGDIOBJ)borderPen);
 
-        // ── Draw scrollbar (on top, unclipped, after RestoreDC) ──
+        // ── Draw scrollbar (on top, unclipped) ──
         if (needsScrollbar())
         {
-            drawScrollbar(hdc, rx, ry, rw, rh);
+            drawScrollbarOnBuffer(hdc, rw, rh);
         }
     }
-
-    /// Draw a vertical scrollbar on the right side
-    private void drawScrollbar(HDC hdc, int rx, int ry, int rw, int rh)
+    
+    /// 递归渲染子控件（处理容器控件的子控件）
+    /// 关键修复：在渲染控件之前先偏移视口到控件位置
+    /// 这样控件使用 position() 渲染时，实际设备坐标是正确的
+    /// absX, absY: 父控件的绝对位置
+    private void renderChildRecursive(Control ctrl, HDC hdc, int absX = 0, int absY = 0)
     {
-        logTrace("ScrollableContainer.drawScrollbar() called — needsScrollbar=", needsScrollbar(),
-                 " contentH=", _contentHeight, " viewH=", height(),
-                 " thumbH=", _thumbHeight, " maxScroll=", maxScroll());
-        int sbLeft = rx + rw - _scrollbarWidth;
-        int sbTop = ry;
+        // 确保控件布局已执行
+        ctrl.ensureLayout();
+        
+        // 计算控件的绝对位置
+        int ctrlAbsX = absX + ctrl.position().x();
+        int ctrlAbsY = absY + ctrl.position().y();
+        
+        logTrace("  renderChildRecursive: ", typeid(ctrl).name, " absPos=(", ctrlAbsX, ",", ctrlAbsY, ") relPos=(", ctrl.position().x(), ",", ctrl.position().y(), ")");
+        
+        // 关键修复：在渲染控件之前，先偏移视口到控件位置
+        POINT oldOrigin;
+        OffsetViewportOrgEx(hdc, ctrl.position().x(), ctrl.position().y(), &oldOrigin);
+        
+        // 渲染控件本身
+        // 由于视口已经偏移，控件应该使用 (0, 0) 而不是 position() 来渲染
+        // 但为了兼容现有代码，我们让控件继续使用 position() 渲染
+        // 这需要在控件的 renderWithGDI 中调整
+        ctrl.renderWithGDI(hdc.Value);
+        
+        // 如果控件不自己渲染子控件，递归渲染其子控件
+        // 注意：视口已经偏移，子控件的渲染会在此基础上继续偏移
+        if (!ctrl.rendersChildren())
+        {
+            foreach (child; ctrl.children())
+            {
+                if (child.visible())
+                {
+                    renderChildRecursive(child, hdc, ctrlAbsX, ctrlAbsY);
+                }
+            }
+        }
+        
+        // 恢复GDI视口
+        SetViewportOrgEx(hdc, oldOrigin.x, oldOrigin.y, null);
+    }
+
+    
+    /// 在buffer上绘制滚动条（坐标原点为(0,0)）
+    private void drawScrollbarOnBuffer(HDC hdc, int rw, int rh)
+    {
+
+        int sbLeft = rw - _scrollbarWidth;
+        int sbTop = 0;
         int sbWidth = _scrollbarWidth;
         int sbHeight = rh;
 
@@ -394,6 +506,7 @@ class ScrollableContainer : Control
             DeleteObject(cast(HGDIOBJ)thumbPen);
         }
     }
+
 
     override void render()
     {

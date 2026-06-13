@@ -29,13 +29,15 @@ class Popup : Control
     private int _titleBarHeight = 28;         /// 标题栏高度
     private bool _closeBtnHovered = false;    /// 关闭按钮悬停状态
     private bool _isDragging = false;         /// 标题栏拖拽状态
-    private int _dragStartAbsX = 0;           /// 拖拽起始窗口绝对X
-    private int _dragStartAbsY = 0;           /// 拖拽起始窗口绝对Y
-    private int _dragStartPopupX = 0;         /// 拖拽起始Popup.x()
-    private int _dragStartPopupY = 0;         /// 拖拽起始Popup.y()
+    private bool _dragOriginSet = false;      /// setDragOrigin是否已被调用
+    private int _lastAbsX = 0;                /// 上一次鼠标窗口绝对X
+    private int _lastAbsY = 0;                /// 上一次鼠标窗口绝对Y
+    private int _dragStartX = 0;              /// 拖拽开始时的Popup.x()
+    private int _dragStartY = 0;              /// 拖拽开始时的Popup.y()
 
-    this()
+    this(Control parent)
     {
+        super(parent);
         width = 200;
         height = 150;
         visible = false;
@@ -53,8 +55,7 @@ class Popup : Control
     /// 在指定位置打开弹出窗口
     void open(int px, int py)
     {
-        x(px);
-        y(py);
+        setXY(px, py);
         _isOpen = true;
         visible = true;
         markDirty(DirtyBits.Visual);
@@ -71,12 +72,14 @@ class Popup : Control
     /// 是否正在拖拽
     bool isDragging() const @property { return _isDragging; }
 
-    /// 开始拖拽（由MainWindow调用，传入窗口绝对坐标）
-    void startDrag(int absX, int absY)
+    /// 设置拖拽起始坐标（由MainWindow调用，传入窗口绝对坐标）
+    void setDragOrigin(int absX, int absY)
     {
-        _dragStartAbsX = absX;
-        _dragStartAbsY = absY;
+        _lastAbsX = absX;
+        _lastAbsY = absY;
+        _dragOriginSet = true;
     }
+
 
     /// 设置内容控件
     void content(Control c) @property
@@ -117,12 +120,10 @@ class Popup : Control
         if (my >= 0 && my < _titleBarHeight)
         {
             _isDragging = true;
-            _dragStartPopupX = x();
-            _dragStartPopupY = y();
-            // 使用本地坐标+Popup位置作为窗口绝对坐标的初始值
-            // MainWindow 会通过 startDrag() 覆盖为更精确的值
-            _dragStartAbsX = x() + mx;
-            _dragStartAbsY = y() + my;
+            // 记录拖拽开始时的Popup位置
+            _dragStartX = position().x();
+            _dragStartY = position().y();
+            // _lastAbsX/Y 将由 MainWindow 通过 setDragOrigin() 设置为窗口绝对坐标
             return;
         }
 
@@ -138,10 +139,21 @@ class Popup : Control
         // 标题栏拖拽移动（mx/my 在拖拽时为窗口绝对坐标，由 MainWindow 传入）
         if (_isDragging)
         {
-            int deltaX = mx - _dragStartAbsX;
-            int deltaY = my - _dragStartAbsY;
-            int newX = _dragStartPopupX + deltaX;
-            int newY = _dragStartPopupY + deltaY;
+            // 检查setDragOrigin是否已被调用
+            if (!_dragOriginSet)
+            {
+                return;
+            }
+            
+            // 计算相对于拖拽起始点的偏移
+            // _lastAbsX/Y 由 setDragOrigin 设置为鼠标按下时的窗口绝对坐标
+            // 当前鼠标位置 mx/my 减去起始位置得到拖拽距离
+            int offsetX = mx - _lastAbsX;
+            int offsetY = my - _lastAbsY;
+
+            // 新位置 = 拖拽起始位置 + 拖拽距离
+            int newX = _dragStartX + offsetX;
+            int newY = _dragStartY + offsetY;
 
             // 边界限制：确保标题栏始终可见（至少留_titleBarHeight像素在窗口内）
             int minVisible = _titleBarHeight;
@@ -163,8 +175,7 @@ class Popup : Control
             if (newY < maxY) newY = maxY;                       // 不能太上
             if (newY > parentH - minVisible) newY = parentH - minVisible;  // 不能太下
 
-            x(newX);
-            y(newY);
+            setXY(newX, newY);
             markDirty(DirtyBits.Visual);
             return;
         }
@@ -187,6 +198,7 @@ class Popup : Control
         if (_isDragging)
         {
             _isDragging = false;
+            _dragOriginSet = false;
             markDirty(DirtyBits.Visual);
             return;
         }
@@ -199,10 +211,10 @@ class Popup : Control
         if (!_isOpen)
             return;
 
-        logTrace("Popup.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("Popup.renderWithGDI() at (", position().x(), ",", position().y(), ")");
 
-        int rx = x();
-        int ry = y();
+        int rx = position().x();
+        int ry = position().y();
         int rw = width();
         int rh = height();
 
@@ -283,8 +295,7 @@ class Popup : Control
         // ── 渲染内容控件（标题栏下方） ──
         if (_content && _content.visible())
         {
-            _content.x(rx);
-            _content.y(ry + _titleBarHeight);
+            _content.setXY(rx, ry + _titleBarHeight);
             _content.width(rw);
             _content.height(rh - _titleBarHeight);
             _content.renderWithGDI(hdc.Value);

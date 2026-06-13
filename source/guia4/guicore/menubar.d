@@ -23,26 +23,61 @@ class MenuBar : Control
     private uint _fontSize = 14;
     private int _itemPadding = 12;    /// horizontal padding per item
     private int _sidePadding = 8;     /// left/right padding for the whole bar
-
-    this()
-    {
-        height = 24;
-        logTrace("MenuBar.ctor()");
-    }
+    private int _borderHeight = 1;    /// 底部边框高度
+    private int _itemHeight = 20;     /// 默认 item 高度
 
     this(Control parent)
     {
-        this();
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        rendersChildren(true);  // MenuBar自己渲染MenuItem
+        dock(DockStyle.Top);    // 默认停靠在顶部，宽度自适应父容器
+        updateHeight();         // 根据item高度计算MenuBar高度
+        logTrace("MenuBar.ctor()");
+    }
+
+    /// 设置 item 高度（会自动更新 MenuBar 高度）
+    void itemHeight(int v) @property
+    {
+        _itemHeight = v;
+        updateHeight();
+    }
+
+    /// 获取 item 高度
+    int itemHeight() const @property { return _itemHeight; }
+
+    /// 设置边框高度（会自动更新 MenuBar 高度）
+    void borderHeight(int v) @property
+    {
+        _borderHeight = v;
+        updateHeight();
+    }
+
+    /// 获取边框高度
+    int borderHeight() const @property { return _borderHeight; }
+
+    /// 根据 item 高度和边框计算 MenuBar 高度
+    private void updateHeight()
+    {
+        // 检查是否有自定义高度的 item
+        int maxItemHeight = _itemHeight;
+        foreach (slot; _slots)
+        {
+            if (slot.item.hasCustomHeight())
+            {
+                int h = slot.item.height();
+                if (h > maxItemHeight)
+                    maxItemHeight = h;
+            }
+        }
+        height = maxItemHeight + _borderHeight;
     }
 
     /// 添加菜单项
     MenuItem add(string text)
     {
-        auto item = new MenuItem(text);
-        this.addChild(item);
+        auto item = new MenuItem(this, text);
         _slots ~= ItemSlot(item, 0);
+        updateHeight();  // 添加 item 后更新高度
         return item;
     }
 
@@ -85,10 +120,11 @@ class MenuBar : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("MenuBar.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("MenuBar.renderWithGDI() size=(", width(), ",", height(), ") slots=", _slots.length);
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 
@@ -118,19 +154,33 @@ class MenuBar : Control
 
         foreach (ref slot; _slots)
         {
-            wstring textW = toUTF16(slot.item._text);
-            SIZE textSize;
-            GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr,
-                                cast(int)textW.length, &textSize);
+            // 计算宽度：如果 MenuItem 有自定义宽度则使用，否则自动计算
+            int itemW;
+            if (slot.item.hasCustomWidth())
+            {
+                itemW = slot.item.width();
+            }
+            else
+            {
+                wstring textW = toUTF16(slot.item._text);
+                SIZE textSize;
+                GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr,
+                                    cast(int)textW.length, &textSize);
+                itemW = textSize.cx + _itemPadding * 2;
+            }
 
-            slot.width = textSize.cx + _itemPadding * 2;
-            int itemW = slot.width;
+            // 计算高度：如果 MenuItem 有自定义高度则使用，否则使用默认 item 高度
+            int itemH = slot.item.hasCustomHeight() ? slot.item.height() : _itemHeight;
+
+            slot.width = itemW;
 
             // Position the MenuItem control (absolute coords)
-            slot.item.x(itemX);
-            slot.item.y(itemY);
-            slot.item.width(itemW);
-            slot.item.height(rh);
+            slot.item.setXY(itemX, itemY);
+            // 只在非自定义模式下设置尺寸
+            if (!slot.item.hasCustomWidth())
+                slot.item.setAutoWidth(itemW);
+            if (!slot.item.hasCustomHeight())
+                slot.item.setAutoHeight(itemH);
 
             // Render the item
             slot.item.renderWithGDI(hdc.Value);
@@ -145,13 +195,13 @@ class MenuBar : Control
     {
         // mx, my 已经是控件本地坐标（由 MainWindow clientToControl 转换）
         // slot.item.x()/y() 是绝对坐标，需要减去 MenuBar 的位置转为本地比较
-        int barX = x();
-        int barY = y();
+        int barX = position().x();
+        int barY = position().y();
         // 检查是否点击了某个 MenuItem
         foreach (ref slot; _slots)
         {
-            int itemLocalX = slot.item.x() - barX;
-            int itemLocalY = slot.item.y() - barY;
+            int itemLocalX = slot.item.position().x() - barX;
+            int itemLocalY = slot.item.position().y() - barY;
             if (mx >= itemLocalX && mx < itemLocalX + slot.width &&
                 my >= itemLocalY && my < itemLocalY + slot.item.height())
             {
@@ -181,31 +231,34 @@ class MenuBar : Control
     override void fireMouseMove(int mx, int my)
     {
         // mx, my 已经是控件本地坐标（由 MainWindow clientToControl 转换）
-        int barX = x();
-        int barY = y();
+        int barX = position().x();
+        int barY = position().y();
         // 如果有菜单展开，鼠标在菜单栏项上移动时切换展开的子菜单
         foreach (ref slot; _slots)
         {
-            int itemLocalX = slot.item.x() - barX;
-            int itemLocalY = slot.item.y() - barY;
+            int itemLocalX = slot.item.position().x() - barX;
+            int itemLocalY = slot.item.position().y() - barY;
             bool inSlot = mx >= itemLocalX && mx < itemLocalX + slot.width &&
                           my >= itemLocalY && my < itemLocalY + slot.item.height();
 
             if (inSlot && !slot.item._hovered)
             {
                 slot.item._hovered = true;
+                // 标记该MenuItem为脏（只更新该item的buffer）
+                slot.item.markDirty(DirtyBits.Visual);
                 // 如果有其他菜单展开，切换到这个
                 if (hasOpenMenu() && slot.item.hasSubMenu())
                 {
                     closeAll();
                     slot.item._menuOpen = true;
+                    markDirty(DirtyBits.Visual); // 子菜单展开需要重新布局
                 }
-                markDirty(DirtyBits.Visual);
             }
             else if (!inSlot && slot.item._hovered)
             {
                 slot.item._hovered = false;
-                markDirty(DirtyBits.Visual);
+                // 标记该MenuItem为脏（只更新该item的buffer）
+                slot.item.markDirty(DirtyBits.Visual);
             }
         }
     }
@@ -233,18 +286,71 @@ class MenuItem : Control
     package MenuItem[] _subItems;       /// 子菜单项列表
     package bool _menuOpen = false;     /// 子菜单是否展开
 
-    this(string text = "MenuItem")
-    {
-        _text = text;
-        width = 60;
-        height = 20;
-    }
+    // Layer buffer尺寸缓存（用于检测尺寸变化）
+    private int _bufferWidth = 0;
+    private int _bufferHeight = 0;
+
+    // 自定义尺寸标志
+    private bool _customWidth = false;
+    private bool _customHeight = false;
 
     this(Control parent, string text)
     {
-        this(text);
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        _text = text;
+        // 不设置默认宽高，由 MenuBar 自动计算或用户手动设置
+    }
+
+    /// 设置自定义宽度（禁用自动计算）
+    void setCustomWidth(int v)
+    {
+        _customWidth = true;
+        super.width(v);
+    }
+
+    /// 设置自定义高度（禁用自动计算）
+    void setCustomHeight(int v)
+    {
+        _customHeight = true;
+        super.height(v);
+    }
+
+    /// 设置自定义尺寸（禁用自动计算）
+    void setCustomSize(int w, int h)
+    {
+        setCustomWidth(w);
+        setCustomHeight(h);
+    }
+
+    /// 是否使用自定义宽度
+    bool hasCustomWidth() const @property { return _customWidth; }
+
+    /// 是否使用自定义高度
+    bool hasCustomHeight() const @property { return _customHeight; }
+
+    /// 重置为自动尺寸
+    void resetCustomSize()
+    {
+        _customWidth = false;
+        _customHeight = false;
+    }
+
+    /// 内部方法：设置自动计算的宽度（不触发自定义标志）
+    package void setAutoWidth(int v)
+    {
+        super.width(v);
+    }
+
+    /// 内部方法：设置自动计算的高度（不触发自定义标志）
+    package void setAutoHeight(int v)
+    {
+        super.height(v);
+    }
+    
+    ~this()
+    {
+        // 释放layer buffer资源
+        destroyLayerBuffer();
     }
 
     string text() const @property { return _text; }
@@ -253,7 +359,7 @@ class MenuItem : Control
     /// 添加子菜单项
     MenuItem addSubItem(string text)
     {
-        auto item = new MenuItem(text);
+        auto item = new MenuItem(this, text);
         _subItems ~= item;
         return item;
     }
@@ -304,8 +410,8 @@ class MenuItem : Control
         foreach (subItem; _subItems)
         {
             // 检查子项位置
-            if (px >= subItem.x() && px < subItem.x() + subItem.width() &&
-                py >= subItem.y() && py < subItem.y() + subItem.height())
+            if (px >= subItem.position().x() && px < subItem.position().x() + subItem.width() &&
+                py >= subItem.position().y() && py < subItem.position().y() + subItem.height())
             {
                 return subItem;
             }
@@ -356,46 +462,41 @@ class MenuItem : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("MenuItem.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        logTrace("MenuItem.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 
-        // ── Hover background ──
-        if (_hovered)
+        // ── Layer Buffer管理 ──
+        bool bufferNeedsRebuild = !_layerBufferValid || 
+                                   rw != _bufferWidth || 
+                                   rh != _bufferHeight;
+        
+        if (bufferNeedsRebuild)
         {
-            RECT hoverRect = {
-                cast(LONG)rx, cast(LONG)ry,
-                cast(LONG)(rx + rw), cast(LONG)(ry + rh)
-            };
-            HBRUSH hoverBrush = CreateSolidBrush(_hoverBg);
-            FillRect(hdc, &hoverRect, hoverBrush);
-            DeleteObject(cast(HGDIOBJ)hoverBrush);
+            // 重建buffer（尺寸变化）
+            initLayerBuffer(hdc);
+            _bufferWidth = rw;
+            _bufferHeight = rh;
         }
-
-        // ── Text ──
-        auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
-
-        SetTextColor(hdc, _textColor);
-        SetBkMode(hdc, TRANSPARENT);
-
-        wstring textW = toUTF16(_text);
-        int textX = rx + 6;   // extra horizontal padding
-        int textY = ry + (rh - cast(int)_fontSize) / 2;
-        TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
-
-        // 如果有子菜单，绘制右侧箭头 ▶
-        if (hasSubMenu())
+        
+        bool bufferNeedsUpdate = bufferNeedsRebuild || isDirty();
+        
+        if (bufferNeedsUpdate)
         {
-            wstring arrow = "▶"w;
-            int arrowX = rx + rw - 16;
-            int arrowY = ry + (rh - cast(int)_fontSize) / 2;
-            TextOutW(hdc, arrowX, arrowY, cast(const(PWSTR))arrow.ptr, cast(int)arrow.length);
+            // 更新buffer内容
+            updateItemBuffer();
+            clearDirty();
         }
-
-        FontCache.release(hdc, fontEntry);
+        
+        // ── 合成buffer到父DC ──
+        if (_layerBufferValid)
+        {
+            BitBlt(hdc, rx, ry, rw, rh, _layerDC, 0, 0, SRCCOPY);
+        }
 
         // 如果子菜单展开，渲染下拉面板
         if (_menuOpen && _subItems.length > 0)
@@ -403,12 +504,54 @@ class MenuItem : Control
             renderSubMenu(hdc);
         }
     }
+    
+    /// 更新MenuItem的layer buffer内容
+    private void updateItemBuffer()
+    {
+        if (!_layerBufferValid)
+            return;
+        
+        int rw = _bufferWidth;
+        int rh = _bufferHeight;
+        
+        // ── Background ──
+        RECT bgRect = {0, 0, rw, rh};
+        HBRUSH bgBrush;
+        if (_hovered)
+            bgBrush = CreateSolidBrush(_hoverBg);
+        else
+            bgBrush = CreateSolidBrush(cast(COLORREF)0x00E8E8E8); // MenuBar背景色
+        FillRect(_layerDC, &bgRect, bgBrush);
+        DeleteObject(cast(HGDIOBJ)bgBrush);
+
+        // ── Text ──
+        auto fontEntry = FontCache.get(_layerDC, "Segoe UI", cast(int)_fontSize);
+
+        SetTextColor(_layerDC, _textColor);
+        SetBkMode(_layerDC, TRANSPARENT);
+
+        wstring textW = toUTF16(_text);
+        int textX = 6;   // extra horizontal padding
+        int textY = (rh - cast(int)_fontSize) / 2;
+        TextOutW(_layerDC, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
+
+        // 如果有子菜单，绘制右侧箭头 ▶
+        if (hasSubMenu())
+        {
+            wstring arrow = "▶"w;
+            int arrowX = rw - 16;
+            int arrowY = (rh - cast(int)_fontSize) / 2;
+            TextOutW(_layerDC, arrowX, arrowY, cast(const(PWSTR))arrow.ptr, cast(int)arrow.length);
+        }
+
+        FontCache.release(_layerDC, fontEntry);
+    }
 
     /// 渲染子菜单下拉面板
     private void renderSubMenu(HDC hdc)
     {
-        int subX = x();                    // 子菜单左对齐父项
-        int subY = y() + height();         // 子菜单在父项下方
+        int subX = position().x();                    // 子菜单左对齐父项
+        int subY = position().y() + height();         // 子菜单在父项下方
         int subW = 160;                    // 子菜单宽度
         int subH = cast(int)_subItems.length * 24;  // 每项24px高
 
@@ -437,8 +580,7 @@ class MenuItem : Control
             int itemY = subY + cast(int)i * 24;
 
             // 设置子项位置（用于命中测试）
-            subItem.x(subX);
-            subItem.y(itemY);
+            subItem.setXY(subX, itemY);
             subItem.width(subW);
             subItem.height(24);
 

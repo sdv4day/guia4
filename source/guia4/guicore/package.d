@@ -1,7 +1,9 @@
 module guia4.guicore;
 
+public import guia4.guicore.color;
 public import guia4.guicore.dirtyflag;
 public import guia4.guicore.layer;
+public import guia4.guicore.position;
 public import guia4.guicore.control;
 public import guia4.guicore.layoutdata;
 public import guia4.guicore.layout;
@@ -34,3 +36,4 @@ public import guia4.guicore.filedialog;
 public import guia4.guicore.mainmenu;
 public import guia4.guicore.popupmenu;
 public import guia4.guicore.longlist;
+public import guia4.guicore.asynctask;

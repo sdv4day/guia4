@@ -88,20 +88,14 @@ class LongList : Control
 
     // ── 构造 ────────────────────────────────────────────────────
 
-    this()
+    this(Control parent)
     {
+        super(parent);
         width = 200;
         height = 300;
         focusable = true;
         onMouseWheel(&handleWheel);
         logTrace("LongList.ctor()");
-    }
-
-    this(Control parent)
-    {
-        this();
-        if (parent)
-            parent.addChild(this);
     }
 
     // ── 数据源设置 ──────────────────────────────────────────────
@@ -636,8 +630,11 @@ class LongList : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        int rx = x();
-        int ry = y();
+        logTrace("LongList.renderWithGDI() size=(", width(), ",", height(), ")");
+
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
         int listW = rw - _scrollbarWidth;
@@ -726,8 +723,8 @@ class LongList : Control
     /// 渲染滚动条
     private void renderScrollbar(HDC hdc)
     {
-        int rx = x() + width() - _scrollbarWidth;
-        int ry = y();
+        int rx = position().x() + width() - _scrollbarWidth;
+        int ry = position().y();
         int rh = height();
 
         // 轨道

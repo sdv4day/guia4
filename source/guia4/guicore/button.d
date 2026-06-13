@@ -28,32 +28,18 @@ class Button : Control
     private bool _pressed = false;
     private bool _hovered = false;
 
-    this(string text = "Button")
-    {
-        super();
-        logTrace("Button.ctor(text='", text, "')");
-        _text = text;
-        width = 100;
-        height = 30;
-        focusable = true;
-    }
-
     this(Control parent, string text)
     {
-        super();
+        super(parent);
         logTrace("Button.ctor(parent=", parent !is null, ", text='", text, "')");
         _text = text;
         width = 100;
         height = 30;
         focusable = true;
-        if (parent)
-        {
-            parent.addChild(this);
-        }
     }
 
     string text() const @property { return _text; }
-    void text(string v) { logTrace("Button.text = '", v, "'"); _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) @property { logTrace("Button.text = '", v, "'"); _text = v; markDirty(DirtyBits.Visual); }
 
     // ── Mouse event overrides ──────────────────────────────────────────
 
@@ -125,7 +111,8 @@ class Button : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("Button.renderWithGDI() - '", _text, "' at (", x(), ",", y(), ")");
+        // 关键修复：视口已经被 renderChildRecursive 偏移到控件位置，所以使用 (0, 0) 渲染
+        logTrace("Button.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
         // Select colors based on state
         COLORREF bgColor;
@@ -148,9 +135,10 @@ class Button : Control
             borderColor = cast(COLORREF)0x003333AA; // dark blue
         }
 
+        // 使用 (0, 0) 而不是 position()，因为视口已经偏移
         RECT rect = {
-            cast(LONG)x(), cast(LONG)y(),
-            cast(LONG)(x() + width()), cast(LONG)(y() + height())
+            0, 0,
+            cast(LONG)width(), cast(LONG)height()
         };
 
         HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)bgColor);
@@ -177,8 +165,8 @@ class Button : Control
         SIZE textSize;
         GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr, cast(int)textW.length, &textSize);
 
-        int textX = x() + (width() - textSize.cx) / 2;
-        int textY = y() + (height() - textSize.cy) / 2;
+        int textX = (width() - textSize.cx) / 2;
+        int textY = (height() - textSize.cy) / 2;
 
         TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
@@ -192,8 +180,8 @@ class Button : Control
             HBRUSH oldBrush2 = cast(HBRUSH)SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
 
             RECT focusRect = {
-                cast(LONG)(x() + 2), cast(LONG)(y() + 2),
-                cast(LONG)(x() + width() - 2), cast(LONG)(y() + height() - 2)
+                2, 2,
+                cast(LONG)(width() - 2), cast(LONG)(height() - 2)
             };
             Rectangle(hdc, focusRect.left, focusRect.top, focusRect.right, focusRect.bottom);
 

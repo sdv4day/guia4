@@ -25,23 +25,12 @@ class TabControl : Control
     private int _hoveredTab = -1;
     private uint _fontSize = 14;
 
-    this()
-    {
-        width = 300;
-        height = 28;
-    }
-
-    this(string[] labels)
-    {
-        this();
-        _tabLabels = labels;
-    }
-
     this(Control parent, string[] labels)
     {
-        this(labels);
-        if (parent)
-            parent.addChild(this);
+        super(parent);
+        width = 300;
+        height = 28;
+        _tabLabels = labels;
     }
 
     /// 添加标签，返回索引
@@ -105,10 +94,11 @@ class TabControl : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("TabControl.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("TabControl.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

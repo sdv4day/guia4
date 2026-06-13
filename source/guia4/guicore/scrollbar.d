@@ -45,32 +45,18 @@ class ScrollBar : Control
     private COLORREF _thumbHoverColor = cast(COLORREF)0x00A0A0A0; // 滑块悬停色
     private COLORREF _thumbDragColor  = cast(COLORREF)0x00808080; // 滑块拖拽色
 
-    this()
+    this(Control parent, ScrollBarOrientation orient = ScrollBarOrientation.Vertical)
     {
-        super();
+        super(parent);
         width = 14;
         height = 100;
-        onMouseWheel(&handleWheel);
-        logTrace("ScrollBar.ctor()");
-    }
-
-    this(ScrollBarOrientation orient)
-    {
-        this();
         _orientation = orient;
         if (orient == ScrollBarOrientation.Horizontal)
         {
             width = 100;
             height = 14;
         }
-        logTrace("ScrollBar.ctor(orient=", orient, ")");
-    }
-
-    this(Control parent, ScrollBarOrientation orient = ScrollBarOrientation.Vertical)
-    {
-        this(orient);
-        if (parent)
-            parent.addChild(this);
+        onMouseWheel(&handleWheel);
         logTrace("ScrollBar.ctor(parent=", parent !is null, ", orient=", orient, ")");
     }
 
@@ -272,10 +258,11 @@ class ScrollBar : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("ScrollBar.renderWithGDI() at (", x(), ",", y(), ")");
+        logTrace("ScrollBar.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

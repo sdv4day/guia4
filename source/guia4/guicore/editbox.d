@@ -53,25 +53,9 @@ class EditBox : Control
     private int _rightClickY = 0;
     private bool _contextMenuOpen = false;
 
-    this(string text = "")
-    {
-        super();
-        _text = text;
-        splitLines();
-        width = 200;
-        height = 100;
-        focusable = true;
-
-        onKeyDown(&handleKeyEvent);
-        onTextInput(&handleTextInput);
-        onMouseWheel(&handleMouseWheel);
-
-        logTrace("EditBox.ctor(text='", text, "')");
-    }
-
     this(Control parent, string text = "")
     {
-        super();
+        super(parent);
         _text = text;
         splitLines();
         width = 200;
@@ -82,8 +66,6 @@ class EditBox : Control
         onTextInput(&handleTextInput);
         onMouseWheel(&handleMouseWheel);
 
-        if (parent)
-            parent.addChild(this);
         logTrace("EditBox.ctor(parent=", parent !is null, ", text='", text, "')");
     }
 
@@ -738,10 +720,11 @@ class EditBox : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("EditBox.renderWithGDI() at (", x(), ",", y(), ")");
+        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+        logTrace("EditBox.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        int rx = x();
-        int ry = y();
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

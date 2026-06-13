@@ -11,15 +11,8 @@ import guia4.guicore.textinput;
  */
 class EditLine : TextInput
 {
-    this(string text = "", string placeholder = "")
-    {
-        super(text, placeholder);
-    }
-
     this(Control parent, string text = "")
     {
-        super(text);
-        if (parent)
-            parent.addChild(this);
+        super(parent, text);
     }
 }

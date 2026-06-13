@@ -23,25 +23,13 @@ class StringGrid : GridWidgetBase
     private string[][] _data;     /// _data[row][col]
     private string[] _headers;    /// 列标题
 
-    this()
+    this(Control parent, string[] headers, string[][] data)
     {
-        super();
-    }
-
-    this(string[] headers, string[][] data)
-    {
-        super();
+        super(parent);
         _headers = headers;
         _data = data;
         _colCount = cast(int)headers.length;
         _rowCount = cast(int)data.length;
-    }
-
-    this(Control parent, string[] headers, string[][] data)
-    {
-        this(headers, data);
-        if (parent)
-            parent.addChild(this);
     }
 
     /// 设置数据（表头 + 数据）

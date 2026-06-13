@@ -4,5 +4,22 @@
     "mainSourceFile": "all_controls_demo.d",
     "dependencies": {
         "guia4": {"path": ".."}
-    }
+    },
+    "configurations": [
+        {
+            "name": "default",
+            "mainSourceFile": "all_controls_demo.d",
+            "excludedSourceFiles": ["virtualcanvas_demo.d", "async_demo.d"]
+        },
+        {
+            "name": "virtualcanvas",
+            "mainSourceFile": "virtualcanvas_demo.d",
+            "excludedSourceFiles": ["all_controls_demo.d", "async_demo.d"]
+        },
+        {
+            "name": "async",
+            "mainSourceFile": "async_demo.d",
+            "excludedSourceFiles": ["all_controls_demo.d", "virtualcanvas_demo.d"]
+        }
+    ]
 }

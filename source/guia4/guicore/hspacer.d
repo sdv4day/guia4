@@ -14,39 +14,19 @@ import windows.win32.graphics.gdi;
  */
 class HSpacer : Control
 {
-    this()
-    {
-        super();
-        width = 1;
-        height = 1;
-        logTrace("HSpacer.ctor()");
-    }
-
-    this(int w)
-    {
-        super();
-        width = w;
-        height = 1;
-        logTrace("HSpacer.ctor(w=", w, ")");
-    }
-
     this(Control parent)
     {
-        super();
+        super(parent);
         width = 1;
         height = 1;
-        if (parent)
-            parent.addChild(this);
         logTrace("HSpacer.ctor(parent)");
     }
 
     this(Control parent, int w)
     {
-        super();
+        super(parent);
         width = w;
         height = 1;
-        if (parent)
-            parent.addChild(this);
         logTrace("HSpacer.ctor(parent, w=", w, ")");
     }
 

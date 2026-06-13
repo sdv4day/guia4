@@ -1,14 +1,3 @@
-/**
- * DGUI All Controls Demo
- *
- * Demonstrates every available widget/control in the guia4 framework:
- *   - Label (text, color, font size)
- *   - Button (click handler, mouse states, focus, keyboard activation)
- *   - MenuBar + MenuItem
- *   - Layouts (Vertical, Horizontal, Grid)
- *   - Event handling (mouse, keyboard, focus)
- *   - Timers and screenshots
- */
 module all_controls_demo;
 
 import guia4.app;
@@ -16,6 +5,38 @@ import guia4.guicore;
 import guia4.utils.logger;
 import core.sys.windows.windows;
 import std.string;
+
+// ══════════════════════════════════════════════════════════════
+// 布局常量
+// ══════════════════════════════════════════════════════════════
+enum {
+    WINDOW_X = 100,
+    WINDOW_Y = 50,
+    WINDOW_W = 960,
+    WINDOW_H = 800,
+    MENU_HEIGHT = 24,
+    SCROLL_WIDTH = 940,
+    SCROLL_HEIGHT = 740,
+    SECTION_SPACING = 10,
+    ITEM_SPACING = 4,
+    CONTENT_PADDING = 16,
+    HEADER_HEIGHT = 28,
+    BUTTON_HEIGHT = 32,
+    SMALL_BTN_HEIGHT = 26,
+    FONT_HEADER = 16,
+    FONT_SMALL = 12,
+    FONT_LARGE = 20,
+    COLOR_HEADER = 0x005A5A5A,
+    COLOR_INFO = 0x00444444,
+    COLOR_TIP = 0x00666666,
+    COLOR_SUMMARY = 0x00888888,
+    COLOR_RED = 0x000033CC,
+    COLOR_BLUE = 0x00CC3300,
+    COLOR_GREEN = 0x00209A00,
+    COLOR_PURPLE = 0x00663300,
+    COLOR_ORANGE = 0x00006BCC,
+    COLOR_DARKGREEN = 0x00006400,
+}
 
 shared static this()
 {
@@ -25,903 +46,529 @@ shared static this()
 
 void main()
 {
-    initLogger(LogLevel.info);
-    logInfo("=== DGUI All Controls Demo ===");
-
+    initLogger(LogLevel.trace);
     auto app = new Application();
-    auto window = app.createWindow(100, 50, 950, 840, "DGUI - All Controls Demo");
+    auto window = app.createWindow(WINDOW_X, WINDOW_Y, WINDOW_W, WINDOW_H, "guia4 - All Controls Demo");
 
-    // ── Plan: main scrollable content area (direct child of window, everything else goes inside) ──
-    auto plan = new ScrollableContainer();
-    plan.x(0);
-    plan.y(24);
-    plan.width(920);
-    plan.height(780);
-    window.addChild(plan);
+    // ── MenuBar ──
+    // MenuBar 使用 DockStyle.Top，自动停靠在顶部，宽度自适应
+    // 高度自动根据 item 高度 + 边框计算
+    auto menuBar = new MenuBar(window);
+    menuBar.itemHeight(MENU_HEIGHT - 1);  // 设置 item 高度，MenuBar 会自动计算总高度
 
-    // ════════════════════════════════════════════════
-    // Section 0: Global feedback label
-    // ════════════════════════════════════════════════
-    auto feedback = new Label("Ready \u2014 interact with the controls below");
-    feedback.x(20);
-    feedback.y(28);
-    feedback.width(700);
+    auto fileNew = menuBar.add("File");
+    auto fileNewSub = fileNew.addSubItem("New");
+    auto fileOpenSub = fileNew.addSubItem("Open");
+    auto helpItem = menuBar.add("Help");
+    auto aboutSub = helpItem.addSubItem("About");
+
+    // ── 主滚动容器 ──
+    // ScrollableContainer 默认使用 DockStyle.Fill，自动填充剩余空间
+    auto scroll = new ScrollableContainer(window);
+    scroll.layout(new VerticalLayout(SECTION_SPACING, CONTENT_PADDING));
+
+    // ── Feedback Label ──
+    auto feedback = new Label(scroll, "Ready — interact with controls below");
+    feedback.width(0);  // 让VerticalLayout分配宽度
     feedback.height(22);
-    feedback.textColor(0x00006400);
-    plan.addChild(feedback);
+    feedback.textColor(COLOR_DARKGREEN);
 
-    void setFeedback(string msg)
+    void setFeedback(string msg) { feedback.text("[Action] " ~ msg); }
+
+    // MenuBar事件
+    fileNewSub.onClick((ref ClickEvent e) { setFeedback("Menu: File > New"); });
+    fileOpenSub.onClick((ref ClickEvent e) { setFeedback("Menu: File > Open"); });
+    aboutSub.onClick((ref ClickEvent e) { setFeedback("Menu: Help > About"); });
+
+    // ══════════════════════════════════════════════════════════════
+    // Section 1: Buttons
+    // ══════════════════════════════════════════════════════════════
     {
-        feedback.text("[Action] " ~ msg);
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
+
+        auto hdr = new Label(sec, "—— Buttons ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
+
+        // 3x3按钮网格
+        auto grid = new Control(sec);
+        grid.layout(new GridLayout(3, 3, 8, 6, 6));
+        grid.height(120);
+
+        auto btn1 = new Button(grid, "Normal"); btn1.onClick((ref ClickEvent e) { setFeedback("Normal clicked"); });
+        auto btn2 = new Button(grid, "Click Me"); btn2.onClick((ref ClickEvent e) { setFeedback("Click Me clicked"); });
+        auto btn3 = new Button(grid, "Third"); btn3.onClick((ref ClickEvent e) { setFeedback("Third clicked"); });
+        auto btn4 = new Button(grid, "Tab Target 1"); btn4.onClick((ref ClickEvent e) { setFeedback("Tab Target 1 — use Tab+Enter"); });
+        auto btn5 = new Button(grid, "Tab Target 2"); btn5.onClick((ref ClickEvent e) { setFeedback("Tab Target 2 clicked"); });
+        auto btn6 = new Button(grid, "Reset Focus"); btn6.onClick((ref ClickEvent e) { window.setFocus(window); setFeedback("Focus reset"); });
+        auto btn7 = new Button(grid, "Say Hello"); btn7.onClick((ref ClickEvent e) { setFeedback("Hello from guia4!"); });
+        int clickCount = 0;
+        auto btn8 = new Button(grid, "Counter"); btn8.onClick((ref ClickEvent e) { clickCount++; setFeedback(format("Clicked %d time(s)", clickCount)); });
+        auto btn9 = new Button(grid, "Last One"); btn9.onClick((ref ClickEvent e) { setFeedback("Last button"); });
     }
 
-    // ── Top-of-window MenuBar (always at parent top) ──
-    auto menuBar = new MenuBar();
-    menuBar.x(0);
-    menuBar.y(0);
-    menuBar.width(920);
-    menuBar.height(24);
-    window.addChild(menuBar);
-
-    auto fileItem1 = menuBar.add("File > New");
-    fileItem1.onClick((ref ClickEvent e) { setFeedback("Menu: File > New"); });
-
-    auto fileItem2 = menuBar.add("File > Open");
-    fileItem2.onClick((ref ClickEvent e) { setFeedback("Menu: File > Open"); });
-
-    auto fileItem3 = menuBar.add("File > Save");
-    fileItem3.onClick((ref ClickEvent e) { setFeedback("Menu: File > Save"); });
-
-    auto helpItem = menuBar.add("Help > About");
-    helpItem.onClick((ref ClickEvent e) { setFeedback("Menu: Help > About  \u2014 DGUI v0.1"); });
-
-    // ── helper: section header ──
-    auto sectionY = 56;
-
-    Label makeHeader(string text)
+    /+
+    // ══════════════════════════════════════════════════════════════
+    // Section 1: Labels（暂时注释）
+    // ══════════════════════════════════════════════════════════════
     {
-        auto lbl = new Label(text);
-        lbl.x(16);
-        lbl.y(sectionY);
-        lbl.fontSize(17);
-        lbl.textColor(0x005A5A5A);
-        lbl.width(400);
-        lbl.height(26);
-        plan.addChild(lbl);
-        sectionY += 30;
-        return lbl;
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
+
+        auto hdr = new Label(sec, "—— Labels ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
+
+        auto lbl1 = new Label(sec, "Default label (14pt, black)");
+        lbl1.width(0);
+
+        auto lbl2 = new Label(sec, "Red label (14pt)");
+        lbl2.width(0); lbl2.textColor(COLOR_RED);
+
+        auto lbl3 = new Label(sec, "Blue label (14pt)");
+        lbl3.width(0); lbl3.textColor(COLOR_BLUE);
+
+        auto lbl4 = new Label(sec, "Large green label (20pt)");
+        lbl4.width(0); lbl4.height(28);
+        lbl4.fontSize(FONT_LARGE); lbl4.textColor(COLOR_GREEN);
+
+        auto row = new Control(sec);
+        row.layout(new HorizontalLayout(12, 0));
+        row.height(20);
+
+        auto side1 = new Label(row, "Left (purple)");
+        side1.width(200); side1.textColor(COLOR_PURPLE);
+
+        auto side2 = new Label(row, "Right (orange)");
+        side2.width(200); side2.textColor(COLOR_ORANGE);
     }
 
-    // ════════════════════════════════════════════════
-    // Section 1: Labels \u2014 text, color, font-size variants
-    // ════════════════════════════════════════════════
-    makeHeader("\u2014\u2014 Labels \u2014\u2014");
-
-    auto lblDef = new Label("Default label  (14pt, black)");
-    lblDef.x(28);
-    lblDef.y(sectionY);
-    plan.addChild(lblDef);
-    sectionY += 22;
-
-    auto lblRed = new Label("Red label  (14pt)");
-    lblRed.x(28);
-    lblRed.y(sectionY);
-    lblRed.textColor(0x000033CC);
-    plan.addChild(lblRed);
-    sectionY += 22;
-
-    auto lblBlue = new Label("Blue label  (14pt)");
-    lblBlue.x(28);
-    lblBlue.y(sectionY);
-    lblBlue.textColor(0x00CC3300);
-    plan.addChild(lblBlue);
-    sectionY += 22;
-
-    auto lblLarge = new Label("Large green label  (20pt)");
-    lblLarge.x(28);
-    lblLarge.y(sectionY);
-    lblLarge.fontSize(20);
-    lblLarge.textColor(0x00209A00);
-    plan.addChild(lblLarge);
-    sectionY += 30;
-
-    // Two labels side by side
-    auto lblSide1 = new Label("Left label (purple)");
-    lblSide1.x(28);
-    lblSide1.y(sectionY);
-    lblSide1.textColor(0x00663300);
-    plan.addChild(lblSide1);
-
-    auto lblSide2 = new Label("Right label (orange)");
-    lblSide2.x(220);
-    lblSide2.y(sectionY);
-    lblSide2.textColor(0x00006BCC);
-    plan.addChild(lblSide2);
-    sectionY += 26;
-
-    // ════════════════════════════════════════════════
-    // Section 2: Buttons \u2014 click, hover, press, focus, keyboard
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("\u2014\u2014 Buttons \u2014\u2014");
-
-    // Row 1: basic buttons
-    int btnX = 28;
-
-    auto btn1 = new Button("Normal Button");
-    btn1.x(btnX);
-    btn1.y(sectionY);
-    btn1.onClick((ref ClickEvent e) { setFeedback("'Normal Button' clicked"); });
-    plan.addChild(btn1);
-
-    auto btn2 = new Button("Click Me");
-    btn2.x(btnX + 120);
-    btn2.y(sectionY);
-    btn2.onClick((ref ClickEvent e) { setFeedback("'Click Me' clicked"); });
-    plan.addChild(btn2);
-
-    auto btn3 = new Button("Third");
-    btn3.x(btnX + 220);
-    btn3.y(sectionY);
-    btn3.onClick((ref ClickEvent e) { setFeedback("'Third' clicked"); });
-    plan.addChild(btn3);
-    sectionY += 38;
-
-    // Row 2: focusable buttons (Tab navigation demo)
-    auto btn4 = new Button("Tab Target 1");
-    btn4.x(btnX);
-    btn4.y(sectionY);
-    btn4.onClick((ref ClickEvent e) { setFeedback("'Tab Target 1' \u2014 Tab to focus, Enter/Space to click"); });
-    plan.addChild(btn4);
-
-    auto btn5 = new Button("Tab Target 2");
-    btn5.x(btnX + 120);
-    btn5.y(sectionY);
-    btn5.onClick((ref ClickEvent e) { setFeedback("'Tab Target 2' clicked  (focus + Enter/Space works)"); });
-    plan.addChild(btn5);
-
-    auto btn6 = new Button("Reset Focus");
-    btn6.x(btnX + 220);
-    btn6.y(sectionY);
-    btn6.onClick((ref ClickEvent e) {
-        setFeedback("Focus reset \u2014 press Tab or click any button");
-        window.setFocus(window);
-    });
-    plan.addChild(btn6);
-    sectionY += 38;
-
-    // Row 3: interactive buttons
-    auto btn7 = new Button("Say Hello");
-    btn7.x(btnX);
-    btn7.y(sectionY);
-    btn7.onClick((ref ClickEvent e) { setFeedback("Hello from DGUI!"); });
-    plan.addChild(btn7);
-
-    auto btn8 = new Button("Counter");
-    btn8.x(btnX + 120);
-    btn8.y(sectionY);
-    int clickCount = 0;
-    btn8.onClick((ref ClickEvent e) {
-        clickCount++;
-        setFeedback(format("Button clicked %d time(s)", clickCount));
-    });
-    plan.addChild(btn8);
-
-    auto btn9 = new Button("Last One");
-    btn9.x(btnX + 220);
-    btn9.y(sectionY);
-    btn9.onClick((ref ClickEvent e) { setFeedback("'Last One' \u2014 end of buttons section"); });
-    plan.addChild(btn9);
-    sectionY += 42;
-
-    // ════════════════════════════════════════════════
-    // Section 3: Layout Demos
-    // ════════════════════════════════════════════════
-    makeHeader("\u2014\u2014 Layout Demo  (VerticalLayout, HorizontalLayout, GridLayout) \u2014\u2014");
-
-    // --- VerticalLayout ---
-    auto vLabel = new Label("VerticalLayout  (spacing=4, padding=6):");
-    vLabel.x(28);
-    vLabel.y(sectionY);
-    vLabel.fontSize(13);
-    vLabel.textColor(0x00444444);
-    plan.addChild(vLabel);
-    sectionY += 20;
-
-    auto vContainer = new Control();
-    vContainer.x(36);
-    vContainer.y(sectionY);
-    vContainer.width(260);
-    vContainer.height(100);
-    vContainer.layout(new VerticalLayout(4, 6));
-    plan.addChild(vContainer);
-
-    foreach (i; 0 .. 3)
+    // ══════════════════════════════════════════════════════════════
+    // Section 3: Layout Demos（暂时注释）
+    // ══════════════════════════════════════════════════════════════
     {
-        auto b = new Button("VBtn " ~ cast(string)[cast(char)('A' + i)]);
-        b.width(vContainer.width() - 12);
-        b.height(26);
-        vContainer.addChild(b);
-    }
-    vContainer.applyLayout();
-    sectionY += 108;
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // --- HorizontalLayout ---
-    auto hLabel = new Label("HorizontalLayout  (spacing=6, padding=6):");
-    hLabel.x(28);
-    hLabel.y(sectionY);
-    hLabel.fontSize(13);
-    hLabel.textColor(0x00444444);
-    plan.addChild(hLabel);
-    sectionY += 20;
+        auto hdr = new Label(sec, "—— Layout Demos ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    auto hContainer = new Control();
-    hContainer.x(36);
-    hContainer.y(sectionY);
-    hContainer.width(400);
-    hContainer.height(40);
-    hContainer.layout(new HorizontalLayout(6, 6));
-    plan.addChild(hContainer);
+        auto vl = new Label(sec, "VerticalLayout (spacing=4, padding=6):");
+        vl.width(0); vl.fontSize(FONT_SMALL); vl.textColor(COLOR_INFO);
 
-    foreach (i; 0 .. 4)
-    {
-        auto b = new Button("HBtn " ~ cast(string)[cast(char)('0' + i)]);
-        b.width(80);
-        b.height(hContainer.height() - 12);
-        hContainer.addChild(b);
-    }
-    hContainer.applyLayout();
-    sectionY += 50;
+        auto vBox = new Control(sec);
+        vBox.width(260); vBox.height(110);
+        vBox.layout(new VerticalLayout(4, 6));
 
-    // --- GridLayout ---
-    auto gLabel = new Label("GridLayout  (2 rows \u00d7 3 cols, spacing=6, padding=6):");
-    gLabel.x(28);
-    gLabel.y(sectionY);
-    gLabel.fontSize(13);
-    gLabel.textColor(0x00444444);
-    plan.addChild(gLabel);
-    sectionY += 20;
+        foreach (i; 0 .. 3)
+        {
+            auto b = new Button(vBox, "VBtn " ~ cast(string)[cast(char)('A' + i)]);
+            b.width(0); b.height(SMALL_BTN_HEIGHT);
+        }
 
-    auto gContainer = new Control();
-    gContainer.x(36);
-    gContainer.y(sectionY);
-    gContainer.width(400);
-    gContainer.height(82);
-    gContainer.layout(new GridLayout(2, 3, 6, 6, 6));
-    plan.addChild(gContainer);
+        auto hl = new Label(sec, "HorizontalLayout (spacing=6, padding=6):");
+        hl.width(0); hl.fontSize(FONT_SMALL); hl.textColor(COLOR_INFO);
 
-    foreach (i; 0 .. 6)
-    {
-        auto b = new Button("G" ~ cast(string)[cast(char)('1' + i)]);
-        gContainer.addChild(b);
-    }
-    gContainer.applyLayout();
-    sectionY += 92;
+        auto hBox = new Control(sec);
+        hBox.width(400); hBox.height(40);
+        hBox.layout(new HorizontalLayout(6, 6));
 
-    // ════════════════════════════════════════════════
-    // Section 4: MenuBar  (now at top of window)
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("\u2014\u2014 MenuBar  (positioned at window top) \u2014\u2014");
+        foreach (i; 0 .. 4)
+        {
+            auto b = new Button(hBox, "HBtn " ~ cast(string)[cast(char)('0' + i)]);
+            b.width(80); b.height(0);
+        }
 
-    auto menuInfo = new Label("The MenuBar is displayed at y=0 above the feedback label. Hover over items to see highlight, click for action.");
-    menuInfo.x(28);
-    menuInfo.y(sectionY);
-    menuInfo.width(800);
-    menuInfo.height(20);
-    menuInfo.fontSize(12);
-    menuInfo.textColor(0x00444444);
-    plan.addChild(menuInfo);
+        auto gl = new Label(sec, "GridLayout (2×3, spacing=6, padding=6):");
+        gl.width(0); gl.fontSize(FONT_SMALL); gl.textColor(COLOR_INFO);
 
-    sectionY += 28;
+        auto gBox = new Control(sec);
+        gBox.width(400); gBox.height(82);
+        gBox.layout(new GridLayout(2, 3, 6, 6, 6));
 
-    // ════════════════════════════════════════════════
-    // Section 5: Events & Focus info
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("\u2014\u2014 Events & Focus \u2014\u2014");
-
-    auto infoFocus = new Label("Tab to cycle through buttons  |  Enter/Space to click focused button  |  Click any button to focus it");
-    infoFocus.x(28);
-    infoFocus.y(sectionY);
-    infoFocus.width(800);
-    infoFocus.height(20);
-    infoFocus.fontSize(12);
-    infoFocus.textColor(0x00666666);
-    plan.addChild(infoFocus);
-    sectionY += 22;
-
-    // Live mouse coordinate display
-    auto infoMouse = new Label("Mouse events: \u2014");
-    infoMouse.x(28);
-    infoMouse.y(sectionY);
-    infoMouse.width(800);
-    infoMouse.height(20);
-    infoMouse.fontSize(12);
-    infoMouse.textColor(0x00666666);
-    plan.addChild(infoMouse);
-    sectionY += 24;
-
-    window.onMouseMove((ref MouseEvent e) {
-        infoMouse.text(format("Mouse at (%d, %d)", e.x, e.y));
-    });
-
-    // ════════════════════════════════════════════════
-    // Section 6: TextInput Demo
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("\u2014\u2014 TextInput \u2014\u2014");
-
-    auto inputInfo = new Label("Editable text fields  \u2014  tab to focus, start typing:");
-    inputInfo.x(28);
-    inputInfo.y(sectionY);
-    inputInfo.fontSize(12);
-    inputInfo.textColor(0x00444444);
-    plan.addChild(inputInfo);
-    sectionY += 22;
-
-    auto ti1 = new TextInput("Hello, world!");
-    ti1.x(28);
-    ti1.y(sectionY);
-    ti1.width(300);
-    plan.addChild(ti1);
-
-    auto ti2 = new TextInput("", "Type something here...");
-    ti2.x(350);
-    ti2.y(sectionY);
-    ti2.width(300);
-    plan.addChild(ti2);
-
-    auto tiInfoLabel = new Label("(last action)");
-    tiInfoLabel.x(28);
-    tiInfoLabel.y(sectionY + 32);
-    tiInfoLabel.fontSize(11);
-    tiInfoLabel.textColor(0x00666666);
-    plan.addChild(tiInfoLabel);
-
-    // Track edits
-    ti1.onKeyDown((ref KeyEvent e) {
-        tiInfoLabel.text(format("ti1: key=0x%X, text='%s'", e.keyCode, ti1.text()));
-    });
-    ti2.onTextInput((dchar ch) {
-        if (ti2.text().length > 0)
-            tiInfoLabel.text(format("ti2: typed '%c', text='%s'", ch, ti2.text()));
-        else
-            tiInfoLabel.text(format("ti2: typed '%c' (empty)", ch));
-    });
-
-    sectionY += 60;
-
-    // ════════════════════════════════════════════════
-    // Section 7: ScrollableContainer Demo
-    // ════════════════════════════════════════════════
-    makeHeader("\u2014\u2014 ScrollableContainer \u2014\u2014");
-
-    auto scrollInfo = new Label("Scrollable container  \u2014  mouse wheel to scroll, buttons overflow below:");
-    scrollInfo.x(28);
-    scrollInfo.y(sectionY);
-    scrollInfo.fontSize(12);
-    scrollInfo.textColor(0x00444444);
-    plan.addChild(scrollInfo);
-    sectionY += 22;
-
-    // Create a scrollable container with many buttons
-    auto scrollContainer = new ScrollableContainer(400, 320, 180);
-    scrollContainer.x(28);
-    scrollContainer.y(sectionY);
-    plan.addChild(scrollContainer);
-
-    // Add many buttons that overflow the container vertically
-    foreach (i; 0 .. 12)
-    {
-        auto btn = new Button(format("Scroll Btn %d", i + 1));
-        btn.x(scrollContainer.x() + 10);
-        btn.y(scrollContainer.y() + i * 32 + 6);
-        btn.width(scrollContainer.width() - 40);
-        btn.height(26);
-        btn.onClick((ref ClickEvent e) {
-            setFeedback(format("'Scroll Btn %d' clicked inside ScrollableContainer", i + 1));
-        });
-        scrollContainer.addChild(btn);
-    }
-    sectionY += scrollContainer.height() + 12;
-
-    // A second scrollable container for comparison
-    makeHeader("\u2014\u2014 ScrollableContainer (Auto-content) \u2014\u2014");
-
-    auto scrollInfo2 = new Label("Second container with labels + buttons, taller content:");
-    scrollInfo2.x(28);
-    scrollInfo2.y(sectionY);
-    scrollInfo2.fontSize(12);
-    scrollInfo2.textColor(0x00444444);
-    plan.addChild(scrollInfo2);
-    sectionY += 22;
-
-    auto scrollContainer2 = new ScrollableContainer(600, 280, 200);
-    scrollContainer2.x(28);
-    scrollContainer2.y(sectionY);
-    plan.addChild(scrollContainer2);
-
-    foreach (i; 0 .. 8)
-    {
-        auto lbl = new Label(format("Scrollable item %d  (mixed content)", i + 1));
-        lbl.x(scrollContainer2.x() + 8);
-        lbl.y(scrollContainer2.y() + i * 32 + 6);
-        lbl.width(scrollContainer2.width() - 24);
-        lbl.fontSize(13);
-        scrollContainer2.addChild(lbl);
+        foreach (i; 0 .. 6)
+        {
+            auto b = new Button(gBox, "G" ~ cast(string)[cast(char)('1' + i)]);
+        }
     }
 
-    sectionY += scrollContainer2.height() + 12;
+    // ══════════════════════════════════════════════════════════════
+    // Section 4: TextInput & EditLine & EditBox（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // ════════════════════════════════════════════════
-    // Section 7a: CheckBox & RadioButton
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— CheckBox & RadioButton ——");
+        auto hdr = new Label(sec, "—— TextInput & EditLine & EditBox ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    auto cb1 = new CheckBox("Option A");
-    cb1.x(28); cb1.y(sectionY);
-    plan.addChild(cb1);
+        auto info = new Label(sec, "Tab to focus, start typing:");
+        info.width(0); info.fontSize(FONT_SMALL); info.textColor(COLOR_INFO);
 
-    auto cb2 = new CheckBox("Option B");
-    cb2.x(160); cb2.y(sectionY);
-    cb2.checked(true);
-    plan.addChild(cb2);
+        auto tiRow = new Control(sec);
+        tiRow.layout(new HorizontalLayout(12, 0));
+        tiRow.height(28);
 
-    auto cb3 = new CheckBox("Option C");
-    cb3.x(290); cb3.y(sectionY);
-    plan.addChild(cb3);
-    sectionY += 30;
+        auto ti1 = new TextInput(tiRow, "Hello, world!");
+        ti1.width(300);
 
-    auto rb1 = new RadioButton("Choice 1");
-    rb1.x(28); rb1.y(sectionY); rb1.groupId(1); rb1.checked(true);
-    plan.addChild(rb1);
+        auto ti2 = new TextInput(tiRow, "", "Type here...");
+        ti2.width(300);
 
-    auto rb2 = new RadioButton("Choice 2");
-    rb2.x(160); rb2.y(sectionY); rb2.groupId(1);
-    plan.addChild(rb2);
+        auto tiInfo = new Label(sec, "(last action)");
+        tiInfo.width(0); tiInfo.fontSize(11); tiInfo.textColor(COLOR_TIP);
 
-    auto rb3 = new RadioButton("Choice 3");
-    rb3.x(290); rb3.y(sectionY); rb3.groupId(1);
-    plan.addChild(rb3);
-    sectionY += 36;
+        ti1.onKeyDown((ref KeyEvent e) { tiInfo.text(format("ti1: key=0x%X, text='%s'", e.keyCode, ti1.text())); });
+        ti2.onTextInput((dchar ch) { tiInfo.text(format("ti2: typed '%c', text='%s'", ch, ti2.text())); });
 
-    // ════════════════════════════════════════════════
-    // Section 7b: EditLine & EditBox
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— EditLine & EditBox ——");
+        auto elLabel = new Label(sec, "EditLine (single-line edit):");
+        elLabel.width(0); elLabel.fontSize(FONT_SMALL); elLabel.textColor(COLOR_INFO);
 
-    auto editLine1 = new EditLine("Single line edit");
-    editLine1.x(28); editLine1.y(sectionY); editLine1.width(300);
-    plan.addChild(editLine1);
-    sectionY += 34;
+        auto editLine1 = new EditLine(sec, "Single line edit");
+        editLine1.width(300);
 
-    auto editBox1 = new EditBox("Line 1\nLine 2\nLine 3");
-    editBox1.x(28); editBox1.y(sectionY); editBox1.width(400); editBox1.height(80);
-    plan.addChild(editBox1);
-    sectionY += 90;
+        auto ebLabel = new Label(sec, "EditBox (multi-line edit):");
+        ebLabel.width(0); ebLabel.fontSize(FONT_SMALL); ebLabel.textColor(COLOR_INFO);
 
-    // ════════════════════════════════════════════════
-    // Section 7b2: UTF-8 多语言支持
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— UTF-8 多语言支持 ——");
+        auto editBox1 = new EditBox(sec, "Line 1\nLine 2\nLine 3");
+        editBox1.width(400); editBox1.height(80);
+    }
 
-    auto utf8Info = new Label("框架支持 UTF-8 编码，可正确显示和编辑多语言文本：");
-    utf8Info.x(28); utf8Info.y(sectionY); utf8Info.width(600);
-    utf8Info.fontSize(12); utf8Info.textColor(0x00444444);
-    plan.addChild(utf8Info);
-    sectionY += 22;
+    // ══════════════════════════════════════════════════════════════
+    // Section 5: CheckBox & RadioButton（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // 中文
-    auto lblCN = new Label("中文：你好世界！简体繁體都能正確顯示");
-    lblCN.x(28); lblCN.y(sectionY); lblCN.width(500);
-    plan.addChild(lblCN);
-    sectionY += 22;
+        auto hdr = new Label(sec, "—— CheckBox & RadioButton ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // 日文
-    auto lblJP = new Label("日本語：こんにちは世界！ひらがなカタカナ漢字混じり");
-    lblJP.x(28); lblJP.y(sectionY); lblJP.width(500);
-    plan.addChild(lblJP);
-    sectionY += 22;
+        auto cbRow = new Control(sec);
+        cbRow.layout(new HorizontalLayout(16, 0));
+        cbRow.height(24);
 
-    // 韩文
-    auto lblKR = new Label("한국어：안녕하세요！한글 표시가 정상적으로 됩니다");
-    lblKR.x(28); lblKR.y(sectionY); lblKR.width(500);
-    plan.addChild(lblKR);
-    sectionY += 22;
+        auto cb1 = new CheckBox(cbRow, "Option A");
+        auto cb2 = new CheckBox(cbRow, "Option B"); cb2.checked(true);
+        auto cb3 = new CheckBox(cbRow, "Option C");
 
-    // 俄文
-    auto lblRU = new Label("Русский：Привет мир! Кириллица работает");
-    lblRU.x(28); lblRU.y(sectionY); lblRU.width(500);
-    plan.addChild(lblRU);
-    sectionY += 22;
+        auto rbRow = new Control(sec);
+        rbRow.layout(new HorizontalLayout(16, 0));
+        rbRow.height(24);
 
-    // 阿拉伯文
-    auto lblAR = new Label("العربية：مرحبا بالعالم! النص من اليمين لليسار");
-    lblAR.x(28); lblAR.y(sectionY); lblAR.width(500);
-    plan.addChild(lblAR);
-    sectionY += 22;
+        auto rb1 = new RadioButton(rbRow, "Choice 1"); rb1.groupId(1); rb1.checked(true);
+        auto rb2 = new RadioButton(rbRow, "Choice 2"); rb2.groupId(1);
+        auto rb3 = new RadioButton(rbRow, "Choice 3"); rb3.groupId(1);
+    }
 
-    // 泰文
-    auto lblTH = new Label("ไทย：สวัสดีชาวโลก! ภาษาไทยแสดงผลได้");
-    lblTH.x(28); lblTH.y(sectionY); lblTH.width(500);
-    plan.addChild(lblTH);
-    sectionY += 22;
+    // ══════════════════════════════════════════════════════════════
+    // Section 6: ComboBox（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // 希腊文
-    auto lblGR = new Label("Ελληνικά：Γεια σου κόσμε! Ελληνικά γράμματα");
-    lblGR.x(28); lblGR.y(sectionY); lblGR.width(500);
-    plan.addChild(lblGR);
-    sectionY += 22;
+        auto hdr = new Label(sec, "—— ComboBox ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // Emoji
-    auto lblEmoji = new Label("Emoji：😀🎉🚀❤️🌟👍🎵🎨🔥💡✅🌈");
-    lblEmoji.x(28); lblEmoji.y(sectionY); lblEmoji.width(500);
-    plan.addChild(lblEmoji);
-    sectionY += 22;
+        auto cb = new ComboBox(sec);
+        cb.width(200);
+        cb.addItem("Item 1"); cb.addItem("Item 2"); cb.addItem("Item 3");
+        cb.addItem("Item 4"); cb.addItem("Item 5");
+    }
 
-    // 数学符号
-    auto lblMath = new Label("Math：∑∏∫√∞≈≠≤≥±×÷∂∇");
-    lblMath.x(28); lblMath.y(sectionY); lblMath.width(500);
-    plan.addChild(lblMath);
-    sectionY += 22;
+    // ══════════════════════════════════════════════════════════════
+    // Section 7: TabWidget（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // 特殊符号
-    auto lblSymbols = new Label("Symbols：©®™€£¥§¶†‡★☆♠♣♥♦");
-    lblSymbols.x(28); lblSymbols.y(sectionY); lblSymbols.width(500);
-    plan.addChild(lblSymbols);
-    sectionY += 30;
+        auto hdr = new Label(sec, "—— TabWidget ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // 多语言 TextInput 展示
-    auto utf8InputInfo = new Label("多语言 TextInput 输入测试：");
-    utf8InputInfo.x(28); utf8InputInfo.y(sectionY); utf8InputInfo.width(400);
-    utf8InputInfo.fontSize(12); utf8InputInfo.textColor(0x00444444);
-    plan.addChild(utf8InputInfo);
-    sectionY += 20;
+        auto tabs = new TabWidget(sec);
+        tabs.width(500); tabs.height(160);
 
-    auto tiCN = new TextInput("输入中文测试");
-    tiCN.x(28); tiCN.y(sectionY); tiCN.width(300);
-    plan.addChild(tiCN);
+        auto page1 = new Control();
+        page1.layout(new VerticalLayout(4, 10));
+        auto p1Label = new Label(page1, "Tab 1 content"); p1Label.width(200);
+        auto p1Btn = new Button(page1, "Tab1 Button");
+        tabs.addTab("Tab 1", page1);
 
-    auto tiJP = new TextInput("日本語入力");
-    tiJP.x(340); tiJP.y(sectionY); tiJP.width(300);
-    plan.addChild(tiJP);
-    sectionY += 34;
+        auto page2 = new Control();
+        auto p2Label = new Label(page2, "Tab 2 content"); p2Label.setXY(10, 10); p2Label.width(200);
+        tabs.addTab("Tab 2", page2);
 
-    auto tiMix = new TextInput("Hello 你世界 123");
-    tiMix.x(28); tiMix.y(sectionY); tiMix.width(300);
-    plan.addChild(tiMix);
-    sectionY += 40;
+        auto page3 = new Control();
+        auto p3Label = new Label(page3, "Tab 3"); p3Label.setXY(10, 10); p3Label.width(200);
+        tabs.addTab("Tab 3", page3);
+    }
 
-    // 多语言 EditBox 展示
-    auto utf8EditInfo = new Label("多语言 EditBox 多行编辑测试：");
-    utf8EditInfo.x(28); utf8EditInfo.y(sectionY); utf8EditInfo.width(400);
-    utf8EditInfo.fontSize(12); utf8EditInfo.textColor(0x00444444);
-    plan.addChild(utf8EditInfo);
-    sectionY += 20;
+    // ══════════════════════════════════════════════════════════════
+    // Section 8: ScrollableContainer（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    auto editBoxUTF8 = new EditBox("多语言多行编辑测试：\nChinese: 你好世界\nJapanese: こんにちは\nKorean: 안녕하세요\nRussian: Привет\nEmoji: 😀🎉🚀");
-    editBoxUTF8.x(28); editBoxUTF8.y(sectionY); editBoxUTF8.width(400); editBoxUTF8.height(100);
-    plan.addChild(editBoxUTF8);
-    sectionY += 110;
+        auto hdr = new Label(sec, "—— ScrollableContainer ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // ════════════════════════════════════════════════
-    // Section 7c: TabWidget
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— TabWidget ——");
+        auto scInfo = new Label(sec, "Mouse wheel to scroll:");
+        scInfo.width(0); scInfo.fontSize(FONT_SMALL); scInfo.textColor(COLOR_INFO);
 
-    auto tabWidget = new TabWidget();
-    tabWidget.x(28); tabWidget.y(sectionY); tabWidget.width(500); tabWidget.height(160);
+        auto sc = new ScrollableContainer(sec);
+        sc.contentHeight(400); sc.width(320); sc.height(180);
+        sc.layout(new VerticalLayout(6, 10));
 
-    // 标签页 1
-    auto tab1Container = new Control();
-    auto tab1Label = new Label("这是标签页 1 的内容");
-    tab1Label.x(10); tab1Label.y(10); tab1Label.width(200);
-    tab1Container.addChild(tab1Label);
-    auto tab1Btn = new Button("Tab1 Button");
-    tab1Btn.x(10); tab1Btn.y(40);
-    tab1Container.addChild(tab1Btn);
-    tabWidget.addTab("Tab 1", tab1Container);
+        foreach (i; 0 .. 12)
+        {
+            auto btn = new Button(sc, format("Scroll Btn %d", i + 1));
+            btn.width(0); btn.height(SMALL_BTN_HEIGHT);
+            btn.onClick((ref ClickEvent e) { setFeedback(format("Scroll Btn %d clicked", i + 1)); });
+        }
+    }
 
-    // 标签页 2
-    auto tab2Container = new Control();
-    auto tab2Label = new Label("这是标签页 2 的内容");
-    tab2Label.x(10); tab2Label.y(10); tab2Label.width(200);
-    tab2Container.addChild(tab2Label);
-    tabWidget.addTab("Tab 2", tab2Container);
+    // ══════════════════════════════════════════════════════════════
+    // Section 9: StringGrid（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // 标签页 3
-    auto tab3Container = new Control();
-    auto tab3Label = new Label("这是标签页 3");
-    tab3Label.x(10); tab3Label.y(10); tab3Label.width(200);
-    tab3Container.addChild(tab3Label);
-    tabWidget.addTab("Tab 3", tab3Container);
+        auto hdr = new Label(sec, "—— StringGrid ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    plan.addChild(tabWidget);
-    sectionY += 170;
+        auto grid = new StringGrid(sec,
+            ["Name", "Value", "Status"],
+            [
+                ["Alpha", "100", "OK"],
+                ["Beta", "200", "Warn"],
+                ["Gamma", "300", "OK"],
+                ["Delta", "400", "Error"],
+                ["Alpha", "100", "OK"],
+                ["Beta", "200", "Warn"],
+                ["Gamma", "300", "OK"],
+                ["Delta", "400", "Error"],
+            ]
+        );
+        grid.width(400); grid.height(120);
+        grid.setColWidths([120, 100, 80]);
+    }
 
-    // ════════════════════════════════════════════════
-    // Section 7d: ComboBox
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— ComboBox ——");
+    // ══════════════════════════════════════════════════════════════
+    // Section 10: TreeWidget（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    auto comboBox1 = new ComboBox();
-    comboBox1.x(28); comboBox1.y(sectionY); comboBox1.width(200);
-    comboBox1.addItem("Item 1");
-    comboBox1.addItem("Item 2");
-    comboBox1.addItem("Item 3");
-    comboBox1.addItem("Item 4");
-    comboBox1.addItem("Item 5");
-    plan.addChild(comboBox1);
-    sectionY += 36;
+        auto hdr = new Label(sec, "—— TreeWidget ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // ════════════════════════════════════════════════
-    // Section 7e: StringGrid
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— StringGrid ——");
+        auto root = new TreeItem("Root");
+        auto c1 = root.addChild("Child 1");
+        c1.addChild("Leaf 1.1");
+        c1.addChild("Leaf 1.2");
+        auto c2 = root.addChild("Child 2");
+        c2.addChild("Leaf 2.1");
+        root.addChild("Child 3");
+        root.expanded = true;
+        c1.expanded = true;
 
-    auto stringGrid = new StringGrid(
-        ["Name", "Value", "Status"],  // 表头
-        [                             // 数据
-            ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-                        ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-                        ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-                        ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-                        ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-                        ["Alpha", "100", "OK"],
-            ["Beta", "200", "Warn"],
-            ["Gamma", "300", "OK"],
-            ["Delta", "400", "Error"],
-        ]
-    );
-    stringGrid.x(28); stringGrid.y(sectionY); stringGrid.width(400); stringGrid.height(120);
-    stringGrid.setColWidths([120, 100, 80]);
-    plan.addChild(stringGrid);
-    sectionY += 130;
+        auto tree = new TreeWidget(sec);
+        tree.width(300); tree.height(140);
+        tree.root(root);
+    }
 
-    // ════════════════════════════════════════════════
-    // Section 7f: TreeWidget
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— TreeWidget ——");
+    // ══════════════════════════════════════════════════════════════
+    // Section 11: ScrollBar & Panel（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    auto treeRoot = new TreeItem("Root");
-    auto child1 = treeRoot.addChild("Child 1");
-    child1.addChild("Leaf 1.1");
-    child1.addChild("Leaf 1.2");
-    auto child2 = treeRoot.addChild("Child 2");
-    child2.addChild("Leaf 2.1");
-    treeRoot.addChild("Child 3");
-    treeRoot.expanded = true;
-    child1.expanded = true;
+        auto hdr = new Label(sec, "—— ScrollBar & Panel ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    auto treeWidget = new TreeWidget();
-    treeWidget.x(28); treeWidget.y(sectionY); treeWidget.width(300); treeWidget.height(140);
-    treeWidget.root(treeRoot);
-    plan.addChild(treeWidget);
-    sectionY += 150;
+        auto sbBox = new Control(sec);
+        sbBox.width(250); sbBox.height(104);
 
-    // ════════════════════════════════════════════════
-    // Section 7g: ScrollBar & Spacers
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— ScrollBar & Spacers ——");
+        auto vsb = new ScrollBar(sbBox);
+        vsb.setXY(0, 0); vsb.width(14); vsb.height(100);
+        vsb.max(100); vsb.pageSize(20);
 
-    auto vScrollBar = new ScrollBar();
-    vScrollBar.x(28); vScrollBar.y(sectionY); vScrollBar.width(14); vScrollBar.height(100);
-    vScrollBar.max(100); vScrollBar.pageSize(20);
-    plan.addChild(vScrollBar);
+        auto hsb = new ScrollBar(sbBox, ScrollBarOrientation.Horizontal);
+        hsb.setXY(22, 80); hsb.width(200); hsb.height(14);
+        hsb.max(100); hsb.pageSize(20);
 
-    auto hScrollBar = new ScrollBar(ScrollBarOrientation.Horizontal);
-    hScrollBar.x(50); hScrollBar.y(sectionY + 80); hScrollBar.width(200); hScrollBar.height(14);
-    hScrollBar.max(100); hScrollBar.pageSize(20);
-    plan.addChild(hScrollBar);
+        auto panel1 = new Panel(sec, "Panel with title");
+        panel1.width(300); panel1.height(120);
+        panel1.vScroll(true);
 
-    auto spacerLabel = new Label("VSpacer/HSpacer are invisible layout helpers");
-    spacerLabel.x(50); spacerLabel.y(sectionY); spacerLabel.width(300);
-    spacerLabel.fontSize(12); spacerLabel.textColor(0x00666666);
-    plan.addChild(spacerLabel);
-    sectionY += 104;
+        auto panelLabel = new Label(panel1, "Panel content area");
+        panelLabel.setXY(10, 30); panelLabel.width(200);
 
-    // ════════════════════════════════════════════════
-    // Section 7h: Panel
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— Panel ——");
+        auto panelBtn = new Button(panel1, "Panel Button");
+        panelBtn.setXY(10, 60);
+    }
 
-    auto panel1 = new Panel("Panel with title");
-    panel1.x(28); panel1.y(sectionY); panel1.width(300); panel1.height(120);
-    panel1.vScroll(true);
-    plan.addChild(panel1);
-
-    auto panelLabel = new Label("Panel content area");
-    panelLabel.x(10); panelLabel.y(30); panelLabel.width(200);
-    panel1.addChild(panelLabel);
-
-    auto panelBtn = new Button("Panel Button");
-    panelBtn.x(10); panelBtn.y(60);
-    panel1.addChild(panelBtn);
-
-    sectionY += 130;
-
-    // ════════════════════════════════════════════════
-    // Section 7i: Popup & PopupMenu
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— Popup & PopupMenu ——");
-
-    auto popupInfo = new Label("Popup and PopupMenu are programmatic overlays");
-    popupInfo.x(28); popupInfo.y(sectionY); popupInfo.width(400);
-    popupInfo.fontSize(12); popupInfo.textColor(0x00444444);
-    plan.addChild(popupInfo);
-
-    auto btnShowPopup = new Button("Show Popup");
-    btnShowPopup.x(28); btnShowPopup.y(sectionY + 24); btnShowPopup.width(120);
-    plan.addChild(btnShowPopup);
-
-    auto popup1 = new Popup();
-    popup1.x(100); popup1.y(200); popup1.width(200); popup1.height(100);
-    auto popupLabel = new Label("Popup content!");
-    popupLabel.x(10); popupLabel.y(10); popupLabel.width(180);
+    // Popup（添加到window，不在scroll内）
+    auto popup1 = new Popup(window);
+    popup1.setXY(100, 200);
+    popup1.width(200); popup1.height(100);
+    auto popupLabel = new Label(popup1, "Popup content!");
+    popupLabel.setXY(10, 10); popupLabel.width(180);
     popup1.content(popupLabel);
-    window.addChild(popup1);
 
-    btnShowPopup.onClick((ref ClickEvent e) {
-        popup1.open(200, 300);
-        setFeedback("Popup opened");
-    });
+    // ══════════════════════════════════════════════════════════════
+    // Section 12: Popup & ImageWidgets（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    sectionY += 60;
+        auto hdr = new Label(sec, "—— Popup & Image Controls ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // ════════════════════════════════════════════════
-    // Section 7j: ImageWidget & ImageButton & TextImageButton
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— ImageWidget & ImageButton & TextImageButton ——");
+        auto popInfo = new Label(sec, "Popup is a programmatic overlay. Image controls require BMP files (showing placeholders).");
+        popInfo.width(0); popInfo.fontSize(FONT_SMALL); popInfo.textColor(COLOR_INFO);
 
-    auto imgInfo = new Label("Image controls require BMP files. Showing placeholders:");
-    imgInfo.x(28); imgInfo.y(sectionY); imgInfo.width(400);
-    imgInfo.fontSize(12); imgInfo.textColor(0x00444444);
-    plan.addChild(imgInfo);
-    sectionY += 22;
+        auto btnPopup = new Button(sec, "Show Popup");
+        btnPopup.onClick((ref ClickEvent e) { popup1.open(200, 300); setFeedback("Popup opened"); });
 
-    auto imgWidget = new ImageWidget();
-    imgWidget.x(28); imgWidget.y(sectionY); imgWidget.width(80); imgWidget.height(60);
-    plan.addChild(imgWidget);
+        auto imgRow = new Control(sec);
+        imgRow.layout(new HorizontalLayout(12, 0));
+        imgRow.height(60);
 
-    auto imgBtn = new ImageButton();
-    imgBtn.x(120); imgBtn.y(sectionY); imgBtn.width(80); imgBtn.height(60);
-    plan.addChild(imgBtn);
+        auto imgW = new ImageWidget(imgRow); imgW.width(80); imgW.height(60);
+        auto imgB = new ImageButton(imgRow); imgB.width(80); imgB.height(60);
+        auto tib = new TextImageButton(imgRow, "IconBtn"); tib.width(120); tib.height(40);
+    }
 
-    auto textImgBtn = new TextImageButton("IconBtn");
-    textImgBtn.x(210); textImgBtn.y(sectionY); textImgBtn.width(120); textImgBtn.height(40);
-    plan.addChild(textImgBtn);
+    // ══════════════════════════════════════════════════════════════
+    // Section 13: MainMenu & Events（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    sectionY += 70;
+        auto hdr = new Label(sec, "—— MainMenu & Events ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    // ════════════════════════════════════════════════
-    // Section 7k: MainMenu & PopupMenu
-    // ════════════════════════════════════════════════
-    sectionY += 4;
-    makeHeader("—— MainMenu & PopupMenu ——");
+        auto mmInfo = new Label(sec, "MainMenu extends MenuBar. Use Tab to cycle focus, Enter/Space to click.");
+        mmInfo.width(0); mmInfo.fontSize(FONT_SMALL); mmInfo.textColor(COLOR_INFO);
 
-    auto menuInfo2 = new Label("MainMenu extends MenuBar. PopupMenu is a right-click context menu.");
-    menuInfo2.x(28); menuInfo2.y(sectionY); menuInfo2.width(500);
-    menuInfo2.fontSize(12); menuInfo2.textColor(0x00444444);
-    plan.addChild(menuInfo2);
+        auto mm = new MainMenu(sec);
+        mm.width(400); mm.height(MENU_HEIGHT);
+        auto mi1 = mm.add("Menu1");
+        auto ms1 = mi1.addSubItem("SubItem 1");
+        auto ms2 = mi1.addSubItem("SubItem 2");
+        auto mi2 = mm.add("Menu2");
+        auto ms3 = mi2.addSubItem("Action A");
+        ms3.onClick((ref ClickEvent e) { setFeedback("MainMenu: Action A"); });
 
-    auto mainMenu1 = new MainMenu();
-    mainMenu1.x(28); mainMenu1.y(sectionY + 24); mainMenu1.width(400); mainMenu1.height(24);
-    auto mmItem1 = mainMenu1.add("Menu1");
-    auto mmSub1 = mmItem1.addSubItem("SubItem 1");
-    auto mmSub2 = mmItem1.addSubItem("SubItem 2");
-    auto mmItem2 = mainMenu1.add("Menu2");
-    auto mmSub3 = mmItem2.addSubItem("Action A");
-    mmSub3.onClick((ref ClickEvent e) { setFeedback("MainMenu: Action A"); });
-    plan.addChild(mainMenu1);
+        auto mouseLabel = new Label(sec, "Mouse: —");
+        mouseLabel.width(0); mouseLabel.fontSize(FONT_SMALL); mouseLabel.textColor(COLOR_TIP);
 
-    sectionY += 60;
+        window.onMouseMove((ref MouseEvent e) {
+            mouseLabel.text(format("Mouse at (%d, %d)", e.x, e.y));
+        });
+    }
 
-    // ════════════════════════════════════════════════
-    // Section 8: Utilities  (screenshot, close)
-    // ════════════════════════════════════════════════
-    sectionY += 6;
-    makeHeader("\u2014\u2014 Utilities \u2014\u2014");
+    // ══════════════════════════════════════════════════════════════
+    // Section 14: UTF-8 多语言（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    auto btnScreenshot = new Button("Take Screenshot Now");
-    btnScreenshot.x(28);
-    btnScreenshot.y(sectionY);
-    btnScreenshot.width(200);
-    btnScreenshot.onClick((ref ClickEvent e) {
-        setFeedback("Taking immediate screenshot...");
-        window.captureImmediate("all_controls_demo.bmp");
-        setFeedback("Screenshot saved to all_controls_demo.bmp");
-    });
-    plan.addChild(btnScreenshot);
+        auto hdr = new Label(sec, "—— UTF-8 多语言支持 ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
-    auto btnScreenshotDelay = new Button("Screenshot in 3s");
-    btnScreenshotDelay.x(240);
-    btnScreenshotDelay.y(sectionY);
-    btnScreenshotDelay.width(180);
-    btnScreenshotDelay.onClick((ref ClickEvent e) {
-        setFeedback("Screenshot scheduled in 3 seconds...");
-        window.scheduleScreenshot(3000, "all_controls_demo_delayed.bmp");
-    });
-    plan.addChild(btnScreenshotDelay);
+        auto utf8Info = new Label(sec, "框架支持 UTF-8 编码，可正确显示和编辑多语言文本：");
+        utf8Info.width(0); utf8Info.fontSize(FONT_SMALL); utf8Info.textColor(COLOR_INFO);
 
-    auto btnClose = new Button("Close Window");
-    btnClose.x(440);
-    btnClose.y(sectionY);
-    btnClose.width(160);
-    btnClose.onClick((ref ClickEvent e) {
-        setFeedback("Closing window...");
-        window.close();
-    });
-    plan.addChild(btnClose);
-    sectionY += 42;
+        foreach (text; [
+            "中文：你好世界！简体繁體都能正確顯示",
+            "日本語：こんにちは世界！",
+            "한국어：안녕하세요！",
+            "Русский：Привет мир!",
+            "Emoji：😀🎉🚀❤️🌟👍",
+            "Math：∑∏∫√∞≈≠≤≥±×÷",
+        ])
+        {
+            auto lbl = new Label(sec, text);
+            lbl.width(0);
+        }
 
-    // ════════════════════════════════════════════════
-    // Section 9: Summary
-    // ════════════════════════════════════════════════
-    makeHeader("\u2014\u2014 Summary \u2014\u2014");
+        auto tiRowCN = new Control(sec);
+        tiRowCN.layout(new HorizontalLayout(12, 0));
+        tiRowCN.height(28);
 
-    auto summary = new Label(format(
-        "Controls: Label + Button + CheckBox + RadioButton + EditLine + EditBox + TextInput + TabWidget + ComboBox + StringGrid + TreeWidget + ScrollBar + Panel + Popup + ImageWidget + ImageButton + TextImageButton + ScrollableContainer + MenuBar + MainMenu + PopupMenu + VSpacer + HSpacer + Layouts(V/H/Grid)"
-    ));
-    summary.x(28);
-    summary.y(sectionY);
-    summary.width(850);
-    summary.height(20);
-    summary.fontSize(12);
-    summary.textColor(0x00888888);
-    plan.addChild(summary);
-    sectionY += 24;
+        auto tiCN = new TextInput(tiRowCN, "输入中文测试"); tiCN.width(300);
+        auto tiJP = new TextInput(tiRowCN, "日本語入力"); tiJP.width(300);
 
-    auto tip = new Label("Tip: Press Tab to cycle focus through buttons.  Enter/Space activates the focused button.");
-    tip.x(28);
-    tip.y(sectionY);
-    tip.width(850);
-    tip.height(20);
-    tip.fontSize(12);
-    tip.textColor(0x00666666);
-    plan.addChild(tip);
+        auto ebUTF8 = new EditBox(sec, "多语言编辑：\nChinese: 你好世界\nJapanese: こんにちは\nEmoji: 😀🎉🚀");
+        ebUTF8.width(400); ebUTF8.height(100);
+    }
 
-    // ════════════════════════════════════════════════
-    // Finalize scrollable content bounds
-    // ════════════════════════════════════════════════
-    plan.recalcContent();
-    logInfo("Plan content height: ", plan.contentHeight());
+    // ══════════════════════════════════════════════════════════════
+    // Section 15: Utilities（暂时注释）
+    // ══════════════════════════════════════════════════════════════
+    {
+        auto sec = new Control(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-    // ════════════════════════════════════════════════
-    // Go!
-    // ════════════════════════════════════════════════
-    logInfo("All controls added \u2014 showing window");
+        auto hdr = new Label(sec, "—— Utilities ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
 
+        auto utilRow = new Control(sec);
+        utilRow.layout(new HorizontalLayout(12, 0));
+        utilRow.height(BUTTON_HEIGHT);
+
+        auto btnShot = new Button(utilRow, "Screenshot Now");
+        btnShot.width(200); btnShot.height(BUTTON_HEIGHT);
+        btnShot.onClick((ref ClickEvent e) {
+            setFeedback("Taking screenshot...");
+            window.captureImmediate("all_controls_demo.bmp");
+            setFeedback("Screenshot saved");
+        });
+
+        auto btnDelay = new Button(utilRow, "Screenshot in 3s");
+        btnDelay.width(180); btnDelay.height(BUTTON_HEIGHT);
+        btnDelay.onClick((ref ClickEvent e) {
+            setFeedback("Screenshot in 3s...");
+            window.scheduleScreenshot(3000, "all_controls_demo_delayed.bmp");
+        });
+
+        auto btnClose = new Button(utilRow, "Close Window");
+        btnClose.width(160); btnClose.height(BUTTON_HEIGHT);
+        btnClose.onClick((ref ClickEvent e) { window.close(); });
+    }
+    +/
+
+    // ══════════════════════════════════════════════════════════════
+    // Finalize
+    // ══════════════════════════════════════════════════════════════
+    scroll.recalcContent();
+    logInfo("Content height: ", scroll.contentHeight());
     window.show();
-    // 窗口显示后延迟截图，确保控件已渲染
-    window.scheduleScreenshot(500, "all_controls_demo_screenshot.bmp");
     app.run();
-
-    logInfo("=== DGUI All Controls Demo Exited ===");
+    logInfo("=== Demo Exited ===");
 }
