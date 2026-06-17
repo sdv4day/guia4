@@ -64,13 +64,16 @@ class TabControl : Control
         int tabW = width() / cast(int)_tabLabels.length;
         int idx = mx / tabW;
         if (idx >= 0 && idx < cast(int)_tabLabels.length)
-        {
-            if (_selectedIndex != idx)
             {
-                _selectedIndex = idx;
-                markDirty(DirtyBits.Visual);
+                if (_selectedIndex != idx)
+                {
+                    _selectedIndex = idx;
+                    markDirty(DirtyBits.Visual);
+                    // 通知父控件（TabWidget）子控件状态变化，需要重新渲染
+                    if (parent() !is null)
+                        parent().markDirty(DirtyBits.Children);
+                }
             }
-        }
     }
 
     override void fireMouseMove(int mx, int my)

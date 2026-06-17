@@ -3,6 +3,8 @@ module guia4.guicore.panel;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.scrollbar;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.utils.math : clamp;
@@ -28,12 +30,12 @@ import windows.win32.ui.windowsandmessaging;
 class Panel : Control
 {
     private string _title;
-    private COLORREF _bgColor = cast(COLORREF)0x00F0F0F0;       // 浅灰背景
-    private COLORREF _borderColor = cast(COLORREF)0x00CCCCCC;   // 灰色边框
+    private COLORREF _bgColor = Theme.crPanelBg();
+    private COLORREF _borderColor = Theme.crBorder();
     private int _borderWidth = 1;
     private int _borderRadius = 6;                               // 圆角半径
-    private COLORREF _titleBgColor = cast(COLORREF)0x00E0E0E0;  // 标题栏背景
-    private COLORREF _titleTextColor = cast(COLORREF)0x00333333; // 标题文字颜色
+    private COLORREF _titleBgColor = Theme.crTitleBarBg();
+    private COLORREF _titleTextColor = Theme.crText();
     private uint _fontSize = 13;
     private int _titleHeight = 0;  // 0 = 无标题栏, >0 = 标题栏高度
 
@@ -47,20 +49,9 @@ class Panel : Control
     private int _contentHeight = 0;   /// 内容总高度
     private int _scrollbarWidth = 14; /// 滚动条宽度
 
-    // ── 滚动条拖拽状态 ──
-    private bool _vThumbDragging = false;
-    private bool _hThumbDragging = false;
-    private int _vDragStartY = 0;
-    private int _hDragStartX = 0;
-    private int _vDragStartScroll = 0;
-    private int _hDragStartScroll = 0;
-    private bool _vThumbHovered = false;
-    private bool _hThumbHovered = false;
-
-    // ── 滚动条颜色 ──
-    private COLORREF _trackColor = cast(COLORREF)0x00F0F0F0;
-    private COLORREF _thumbColor = cast(COLORREF)0x00C0C0C0;
-    private COLORREF _thumbHoverColor = cast(COLORREF)0x00A0A0A0;
+    // ── 内部 ScrollBar 实例（非子控件）──
+    private ScrollBar _vScrollBar;
+    private ScrollBar _hScrollBar;
 
     // ── 自动内容尺寸 ──
     private bool _autoSizeContent = false;  /// 自动计算内容尺寸
@@ -72,6 +63,13 @@ class Panel : Control
         height = 150;
         padding(8);  // 默认内边距
         onMouseWheel(&handleMouseWheel);
+
+        // 创建内部滚动条（null parent = 不加入控件树）
+        _vScrollBar = new ScrollBar(null, ScrollBarOrientation.Vertical);
+        _vScrollBar.width = _scrollbarWidth;
+        _hScrollBar = new ScrollBar(null, ScrollBarOrientation.Horizontal);
+        _hScrollBar.height = _scrollbarWidth;
+
         logTrace("Panel.ctor()");
     }
 
@@ -84,6 +82,13 @@ class Panel : Control
         height = 150;
         padding(8);  // 默认内边距
         onMouseWheel(&handleMouseWheel);
+
+        // 创建内部滚动条
+        _vScrollBar = new ScrollBar(null, ScrollBarOrientation.Vertical);
+        _vScrollBar.width = _scrollbarWidth;
+        _hScrollBar = new ScrollBar(null, ScrollBarOrientation.Horizontal);
+        _hScrollBar.height = _scrollbarWidth;
+
         logTrace("Panel.ctor(title='", title, "')");
     }
 
@@ -118,11 +123,75 @@ class Panel : Control
     int scrollX() const @property { return _scrollX; }
     int scrollY() const @property { return _scrollY; }
 
+    /// override Control.scrollOffsetY
+    override int scrollOffsetY() const @property { return _scrollY; }
+
+    /// override Control.scrollOffsetX
+    override int scrollOffsetX() const @property { return _scrollX; }
+
 
     // ── 自动内容尺寸属性 ──
 
     bool autoSizeContent() const @property { return _autoSizeContent; }
     void autoSizeContent(bool v) @property { _autoSizeContent = v; markDirty(DirtyBits.Visual); }
+
+    // ── ScrollBar 同步辅助 ──
+
+    /// 同步内部 ScrollBar 状态（渲染和事件转发前调用）
+    private void syncScrollBars()
+    {
+        int viewH = height() - _titleHeight - paddingTop() - paddingBottom() - (_hScroll ? _scrollbarWidth : 0);
+        int viewW = width() - paddingLeft() - paddingRight() - (_vScroll ? _scrollbarWidth : 0);
+
+        // 纵向
+        _vScrollBar.width = _scrollbarWidth;
+        _vScrollBar.height = viewH;
+        _vScrollBar.min(0);
+        _vScrollBar.max(_contentHeight);
+        _vScrollBar.pageSize(viewH);
+        _vScrollBar.value(_scrollY);
+
+        // 横向
+        _hScrollBar.height = _scrollbarWidth;
+        _hScrollBar.width = viewW;
+        _hScrollBar.min(0);
+        _hScrollBar.max(_contentWidth);
+        _hScrollBar.pageSize(viewW);
+        _hScrollBar.value(_scrollX);
+    }
+
+    /// 从内部 ScrollBar 同步滚动值回 Panel
+    private void syncScrollFromBars()
+    {
+        int newSY = _vScrollBar.value();
+        int newSX = _hScrollBar.value();
+        if (newSY != _scrollY || newSX != _scrollX)
+        {
+            _scrollY = newSY;
+            _scrollX = newSX;
+            markDirty(DirtyBits.Visual);
+        }
+    }
+
+    /// 判断容器局部坐标是否在纵向滚动条区域内
+    private bool isInVScrollbar(int lx, int ly) const
+    {
+        if (!_vScroll || _contentHeight <= height() - _titleHeight - paddingTop() - paddingBottom() - (_hScroll ? _scrollbarWidth : 0))
+            return false;
+        int viewH = height() - _titleHeight - (_hScroll ? _scrollbarWidth : 0);
+        return lx >= width() - _scrollbarWidth && lx < width()
+            && ly >= _titleHeight && ly < _titleHeight + viewH;
+    }
+
+    /// 判断容器局部坐标是否在横向滚动条区域内
+    private bool isInHScrollbar(int lx, int ly) const
+    {
+        if (!_hScroll || _contentWidth <= width() - paddingLeft() - paddingRight() - (_vScroll ? _scrollbarWidth : 0))
+            return false;
+        int viewW = width() - (_vScroll ? _scrollbarWidth : 0);
+        return ly >= height() - _scrollbarWidth && ly < height()
+            && lx >= 0 && lx < viewW;
+    }
 
     // ── 内容区域计算辅助 ──
 
@@ -322,11 +391,22 @@ class Panel : Control
 
             RestoreDC(hdc, savedDC);
 
-            // ── 绘制滚动条 ──
+            // ── 绘制滚动条（通过内部 ScrollBar）──
+            syncScrollBars();
             if (_vScroll && _contentHeight > contentH)
-                drawVScrollbar(hdc, rx, ry + _titleHeight, rw, rh - _titleHeight);
+            {
+                POINT sbOrigin;
+                OffsetViewportOrgEx(hdc, rx + rw - _scrollbarWidth, ry + _titleHeight, &sbOrigin);
+                _vScrollBar.renderWithGDI(hdc.Value);
+                SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
+            }
             if (_hScroll && _contentWidth > contentW)
-                drawHScrollbar(hdc, rx, ry + _titleHeight, rw, rh - _titleHeight);
+            {
+                POINT sbOrigin;
+                OffsetViewportOrgEx(hdc, rx, ry + rh - _scrollbarWidth, &sbOrigin);
+                _hScrollBar.renderWithGDI(hdc.Value);
+                SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
+            }
         }
         else
         {
@@ -345,68 +425,79 @@ class Panel : Control
         }
     }
 
-    // ── 滚动条绘制 ──
+    // ── 鼠标事件转发给内部 ScrollBar ──
 
-    /// 绘制纵向滚动条
-    private void drawVScrollbar(HDC hdc, int rx, int ry, int rw, int rh)
+    override void fireMouseDown(int x, int y, int button)
     {
-        int trackH = rh - (_hScroll ? _scrollbarWidth : 0);
-        int thumbH = cast(int)(cast(float)trackH * rh / _contentHeight);
-        if (thumbH < 10) thumbH = 10;
-
-        int maxScroll = _contentHeight - (rh - (_hScroll ? _scrollbarWidth : 0));
-        if (maxScroll <= 0) return;
-
-        int sbLeft = rx + rw - _scrollbarWidth;
-        int sbTop = ry;
-
-        // ── 轨道 ──
-        RECT trackRect = { cast(LONG)sbLeft, cast(LONG)sbTop, cast(LONG)(sbLeft + _scrollbarWidth), cast(LONG)(sbTop + trackH) };
-        HBRUSH trackBrush = CreateSolidBrush(_trackColor);
-        FillRect(hdc, &trackRect, trackBrush);
-        DeleteObject(cast(HGDIOBJ)trackBrush);
-
-        // ── 滑块 ──
-        float ratio = cast(float)_scrollY / maxScroll;
-        int availableTrack = trackH - thumbH;
-        int thumbTop = sbTop + cast(int)(availableTrack * ratio);
-
-        COLORREF thumbCol = _vThumbHovered ? _thumbHoverColor : _thumbColor;
-        HBRUSH thumbBrush = CreateSolidBrush(thumbCol);
-        RECT thumbRect = { cast(LONG)(sbLeft + 2), cast(LONG)thumbTop, cast(LONG)(sbLeft + _scrollbarWidth - 2), cast(LONG)(thumbTop + thumbH) };
-        FillRect(hdc, &thumbRect, thumbBrush);
-        DeleteObject(cast(HGDIOBJ)thumbBrush);
+        if (isInVScrollbar(x, y))
+        {
+            syncScrollBars();
+            int sbLocalX = x - (width() - _scrollbarWidth);
+            int sbLocalY = y - _titleHeight;
+            _vScrollBar.fireMouseDown(sbLocalX, sbLocalY, button);
+            syncScrollFromBars();
+            return;
+        }
+        if (isInHScrollbar(x, y))
+        {
+            syncScrollBars();
+            int sbLocalX = x;
+            int sbLocalY = y - (height() - _scrollbarWidth);
+            _hScrollBar.fireMouseDown(sbLocalX, sbLocalY, button);
+            syncScrollFromBars();
+            return;
+        }
+        super.fireMouseDown(x, y, button);
     }
 
-    /// 绘制横向滚动条
-    private void drawHScrollbar(HDC hdc, int rx, int ry, int rw, int rh)
+    override void fireMouseUp(int x, int y, int button)
     {
-        int trackW = rw - (_vScroll ? _scrollbarWidth : 0);
-        int thumbW = cast(int)(cast(float)trackW * rw / _contentWidth);
-        if (thumbW < 10) thumbW = 10;
+        bool vDrag = _vScrollBar.isDragging;
+        bool hDrag = _hScrollBar.isDragging;
+        if (vDrag || hDrag)
+        {
+            syncScrollBars();
+            if (vDrag)
+            {
+                int sbLocalX = x - (width() - _scrollbarWidth);
+                int sbLocalY = y - _titleHeight;
+                _vScrollBar.fireMouseUp(sbLocalX, sbLocalY, button);
+            }
+            if (hDrag)
+            {
+                int sbLocalX = x;
+                int sbLocalY = y - (height() - _scrollbarWidth);
+                _hScrollBar.fireMouseUp(sbLocalX, sbLocalY, button);
+            }
+            syncScrollFromBars();
+            return;
+        }
+        super.fireMouseUp(x, y, button);
+    }
 
-        int maxScroll = _contentWidth - (rw - (_vScroll ? _scrollbarWidth : 0));
-        if (maxScroll <= 0) return;
-
-        int sbLeft = rx;
-        int sbTop = ry + rh - _scrollbarWidth;
-
-        // ── 轨道 ──
-        RECT trackRect = { cast(LONG)sbLeft, cast(LONG)sbTop, cast(LONG)(sbLeft + trackW), cast(LONG)(sbTop + _scrollbarWidth) };
-        HBRUSH trackBrush = CreateSolidBrush(_trackColor);
-        FillRect(hdc, &trackRect, trackBrush);
-        DeleteObject(cast(HGDIOBJ)trackBrush);
-
-        // ── 滑块 ──
-        float ratio = cast(float)_scrollX / maxScroll;
-        int availableTrack = trackW - thumbW;
-        int thumbLeft = sbLeft + cast(int)(availableTrack * ratio);
-
-        COLORREF thumbCol = _hThumbHovered ? _thumbHoverColor : _thumbColor;
-        HBRUSH thumbBrush = CreateSolidBrush(thumbCol);
-        RECT thumbRect = { cast(LONG)thumbLeft, cast(LONG)(sbTop + 2), cast(LONG)(thumbLeft + thumbW), cast(LONG)(sbTop + _scrollbarWidth - 2) };
-        FillRect(hdc, &thumbRect, thumbBrush);
-        DeleteObject(cast(HGDIOBJ)thumbBrush);
+    override void fireMouseMove(int x, int y)
+    {
+        bool vDrag = _vScrollBar.isDragging;
+        bool hDrag = _hScrollBar.isDragging;
+        if (vDrag || hDrag || isInVScrollbar(x, y) || isInHScrollbar(x, y))
+        {
+            syncScrollBars();
+            if (vDrag || isInVScrollbar(x, y))
+            {
+                int sbLocalX = x - (width() - _scrollbarWidth);
+                int sbLocalY = y - _titleHeight;
+                _vScrollBar.fireMouseMove(sbLocalX, sbLocalY);
+            }
+            if (hDrag || isInHScrollbar(x, y))
+            {
+                int sbLocalX = x;
+                int sbLocalY = y - (height() - _scrollbarWidth);
+                _hScrollBar.fireMouseMove(sbLocalX, sbLocalY);
+            }
+            syncScrollFromBars();
+            return;
+        }
+        super.fireMouseMove(x, y);
     }
 
     override void render()

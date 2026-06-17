@@ -30,6 +30,7 @@ struct WheelEventData
     int x;          // 客户区 x 坐标
     int y;          // 客户区 y 坐标
     int delta;      // 正值 = 向上滚动, 负值 = 向下滚动
+    int hDelta;     // 正值 = 向右滚动, 负值 = 向左滚动（横向滚轮）
 }
 
 /// 字符输入事件数据

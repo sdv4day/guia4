@@ -7,6 +7,7 @@ import guia4.guicore;
 import guia4.guicore.menubar;
 import guia4.guicore.combobox;
 import guia4.guicore.popup;
+import guia4.guicore.focusmanager;
 import guia4.utils.logger;
 import std.datetime;
 import std.utf;
@@ -23,15 +24,13 @@ import guia4.platform.types : MouseEventData, KeyEventData, WheelEventData, Char
 import guia4.platform.iwindow : IPlatformWindow;
 import guia4.platform_win32.win32defs : VK_TAB;
 
-alias LONG = int;
-
 // Static paint callback — called from WNDPROC via instance-level function pointer.
 // Casts user data (MainWindow*) back to MainWindow and calls render().
 // This is the only mechanism proven to work from WNDPROC context
 // (field function pointers → crash, delegates → body not executed).
 private static void mainWindowPaintCallback(HDC hdc, int w, int h, void* data)
 {
-    logInfo("mainWindowPaintCallback: w=", w, " h=", h);
+    logTrace("mainWindowPaintCallback: w=", w, " h=", h);
     auto mw = cast(MainWindow)data;
     if (mw !is null)
     {
@@ -48,15 +47,15 @@ private static void mainWindowTimerCallback(uint id, void* data)
     if (id == MainWindow.BLINK_TIMER_ID)
     {
         // Recurring blink timer — toggle cursor on focused TextInput / EditBox
-        if (mw._focusedControl !is null)
+        if (mw.focusedControl !is null)
         {
-            auto ti = cast(TextInput)mw._focusedControl;
+            auto ti = cast(TextInput)mw.focusedControl;
             if (ti !is null)
             {
                 ti.cursorTick();
                 mw.requestRedraw();
             }
-            auto eb = cast(EditBox)mw._focusedControl;
+            auto eb = cast(EditBox)mw.focusedControl;
             if (eb !is null)
             {
                 eb.cursorTick();
@@ -197,10 +196,10 @@ class MainWindow : Control
     // Mouse dispatch state
     private Control _capturedControl;  // control that received mouse-down (for click detection)
     private Control _hoveredControl;   // control currently under cursor
-    
+
     // Focus state
-    private Control _focusedControl;   // control currently holding keyboard focus
-    
+    private FocusManager _focusManager;  // 焦点管理器
+
     // ── Layer-based渲染系统 ────────────────────────────────────────
     import guia4.guicore.layercompositor;
     private LayerCompositor _compositor;   // Layer合并引擎
@@ -215,16 +214,44 @@ class MainWindow : Control
         _platformWindow = new Win32Window(x, y, width, height, title);
         (cast(Win32Window)_platformWindow).setPaintFunction(&mainWindowPaintCallback, cast(Object)this);
         _platformWindow.setCloseCallback({ this.close(); this.fireClose(); });
+        _platformWindow.setResizeCallback({ this.onResize(); });
         _platformWindow.setMouseCallback(&mouseEventHandler);
         _platformWindow.setKeyCallback(&keyEventHandler);
         _platformWindow.setWheelCallback(&wheelEventHandler);
         _platformWindow.setCharCallback(&charEventHandler);
+        _focusManager = new FocusManager();
         _renderDevice = null;
     }
     
     this(int x = 100, int y = 100, uint width = 800, uint height = 600, string title = "DGUI Window")
     {
         this(null, x, y, width, height, title);
+    }
+    
+    /**
+     * 析构函数 — RAII资源清理
+     * 
+     * 注意：不在析构函数中调用 Win32 API（如 DestroyWindow），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * Win32 API 可能导致访问冲突。
+     * 
+     * 正确的做法是在程序退出前显式调用 close() 方法。
+     */
+    ~this()
+    {
+        logTrace("MainWindow.~this() - marking resources as destroyed");
+        
+        // 仅标记资源为 null，不调用 Win32 API
+        // 实际的资源清理应该在 close() 中完成
+        _compositor = null;
+        _renderDevice = null;
+        _platformWindow = null;
+        _focusManager = null;
+        _capturedControl = null;
+        _hoveredControl = null;
+        _app = null;
+        
+        logTrace("MainWindow.~this() - cleanup complete");
     }
     
     void show()
@@ -266,6 +293,51 @@ class MainWindow : Control
         logInfo("MainWindow.show() - size set to ", w, "x", h);
     }
     
+    /**
+     * 处理窗口大小变化
+     * 
+     * 当窗口大小改变时（WM_SIZE），更新 MainWindow 的大小，
+     * 更新 LayerCompositor 的大小，并触发子控件的重新布局。
+     */
+    void onResize()
+    {
+        // 获取新的窗口客户区大小
+        HWND hwnd = cast(HWND)nativeHandle();
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int w = rect.right - rect.left;
+        int h = rect.bottom - rect.top;
+        
+        logTrace("MainWindow.onResize() - new size: ", w, "x", h);
+        
+        // 更新 MainWindow 自身的大小
+        super.width(w);
+        super.height(h);
+        
+        // 更新 LayerCompositor 的大小
+        if (_compositor !is null && _layerSystemInitialized)
+        {
+            HDC hdc = GetDC(hwnd);
+            _compositor.init(w, h, hdc);
+            ReleaseDC(hwnd, hdc);
+        }
+        
+        // 触发子控件的重新布局
+        // 对于 DockStyle.Fill 的子控件，会自动调整大小
+        foreach (child; children())
+        {
+            if (child.visible())
+            {
+                // 标记子控件为脏，触发重新布局
+                child.markDirty(DirtyBits.Size);
+                child.markDirty(DirtyBits.Layout);
+            }
+        }
+        
+        // 强制重绘
+        InvalidateRect(hwnd, null, cast(BOOL)0);
+    }
+    
     void hide()
     {
         logTrace("MainWindow.hide()");
@@ -275,15 +347,28 @@ class MainWindow : Control
     void close()
     {
         logTrace("MainWindow.close()");
+        
+        // 清理 LayerCompositor（GDI资源）
+        if (_compositor !is null)
+        {
+            _compositor.destroy();
+        }
+        
+        // 清理 RenderDevice（D3D12资源）
+        // 注意：D3D12RenderDevice 的析构函数会自动清理资源
+        
         if (_app !is null)
         {
             _app.removeWindow(this);
         }
         hide();
+        
         // Destroy the native HWND after app lifecycle logic (removeWindow, hide).
         // This triggers WM_DESTROY, but PostQuitMessage is no longer called there —
         // the Application layer (removeWindow → quit) handles process exit.
         _platformWindow.destroy();
+        
+        logTrace("MainWindow.close() - all resources cleaned up");
     }
     
     void title(string title)
@@ -435,87 +520,22 @@ class MainWindow : Control
         captureScreenshot(filename);
     }
     
-    /// 计算控件在窗口客户区中的绝对坐标
-    /// 控件的 x()/y() 是相对父控件的坐标，需要累加所有祖先的偏移来得到绝对位置
+    /// 计算控件在窗口客户区中的绝对坐标（委托到 Control.controlToClient）
     private void controlToClient(Control ctrl, out int absX, out int absY)
     {
-        import guia4.guicore.panel;
-        import guia4.guicore.tabhost;
-
-        absX = ctrl.position().x();
-        absY = ctrl.position().y();
-        int scrollY = 0;
-
-        Control cur = ctrl.parent();
-        while (cur !is null)
-        {
-            // 累加所有父容器的位置偏移
-            // 子控件的 position 是相对于直接父容器的坐标
-            // 窗口绝对坐标 = 子控件 position + 所有祖先 position 之和
-            absX += cur.position().x();
-            absY += cur.position().y();
-
-            // Panel 和 ScrollableContainer 使用 GDI 视口偏移渲染
-            // 滚动时子控件的视觉位置上移了 scrollY
-            // 所以窗口绝对 y 需要减去滚动偏移
-            auto sc = cast(ScrollableContainer)cur;
-            auto pn = cast(Panel)cur;
-            if (sc !is null)
-            {
-                scrollY += sc.scrollY;
-            }
-            else if (pn !is null)
-            {
-                scrollY += pn.scrollY();
-            }
-
-            cur = cur.parent();
-        }
-
-        // 应用 Panel/ScrollableContainer 的滚动补偿
-        absY -= scrollY;
+        ctrl.controlToClient(absX, absY);
     }
 
-    /// Translate client-space coordinates to content-space coordinates relative to a control.
-    ///
-    /// NOTE: `_x` / `_y` are absolute window-client coordinates. However, when a
-    /// control lives inside a scrolled ScrollableContainer, the GDI viewport offset
-    /// shifts its visual position upward by `scrollY`.  To convert the client click
-    /// to the control's local content-space we must add back every ancestor's scrollY.
+    /// 将窗口客户区坐标转换为控件局部坐标（委托到 Control.clientToControl）
     private void clientToControl(Control ctrl, int clientX, int clientY, out int localX, out int localY)
     {
-        int absX, absY;
-        controlToClient(ctrl, absX, absY);
-
-        localX = clientX - absX;
-        localY = clientY - absY;
+        ctrl.clientToControl(clientX, clientY, localX, localY);
     }
 
-    /// Sum _scrollY from every ScrollableContainer ancestor of [ctrl].
-    /// Needed because children use absolute coordinates while GDI rendering
-    /// offsets by scrollY — event dispatch must reverse this shift.
+    /// 累加所有祖先的纵向滚动偏移（委托到 Control.ancestorScrollY）
     private static int ancestorScrollY(Control ctrl)
     {
-        int total = 0;
-        Control cur = ctrl.parent();
-        while (cur !is null)
-        {
-            // ScrollableContainer 和 Panel 都会向下偏移内容用于滚动。
-            // Panel 在 GDI 渲染时使用 OffsetViewportOrgEx(-_scrollX, -_scrollY)，
-            // 而子节点用绝对坐标存储，所以事件分发必须将滚动量加回去。
-            auto sc = cast(ScrollableContainer)cur;
-            if (sc !is null)
-                total += sc.scrollY;
-            else
-            {
-                import guia4.guicore.panel;
-                auto pn = cast(Panel)cur;
-                if (pn !is null)
-                    total += pn.scrollY();
-            }
-            cur = cur.parent();
-        }
-        return total;
+        return Control.ancestorScrollY(ctrl);
     }
 
     /// Mouse event dispatch from Win32Window.
@@ -544,36 +564,32 @@ class MainWindow : Control
         if (ev.down)
         {
             // 检查是否点击了 TextInput 的右键菜单
-            if (_focusedControl !is null)
+            if (focusedControl !is null)
             {
-                auto ti = cast(TextInput)_focusedControl;
+                auto ti = cast(TextInput)focusedControl;
                 if (ti !is null && ti.contextMenuOpen)
                 {
+                    auto menu = ti.contextMenu;
                     int localX, localY;
-                    clientToControl(ti, ev.x, ev.y, localX, localY);
-                    if (ti.handleContextMenuClick(localX, localY))
-                    {
-                        // 点击了菜单项，已处理
-                        requestRedraw();
-                        return;
-                    }
-                    // 点击菜单外，菜单已关闭，继续正常处理
+                    clientToControl(menu, ev.x, ev.y, localX, localY);
+                    menu.fireMouseDown(localX, localY, 0);
+                    requestRedraw();
+                    return;
                 }
             }
 
             // 检查是否点击了 EditBox 的右键菜单
-            if (_focusedControl !is null)
+            if (focusedControl !is null)
             {
-                auto eb = cast(EditBox)_focusedControl;
+                auto eb = cast(EditBox)focusedControl;
                 if (eb !is null && eb.contextMenuOpen)
                 {
+                    auto menu = eb.contextMenu;
                     int localX, localY;
-                    clientToControl(eb, ev.x, ev.y, localX, localY);
-                    if (eb.handleContextMenuClick(localX, localY))
-                    {
-                        requestRedraw();
-                        return;
-                    }
+                    clientToControl(menu, ev.x, ev.y, localX, localY);
+                    menu.fireMouseDown(localX, localY, 0);
+                    requestRedraw();
+                    return;
                 }
             }
 
@@ -712,17 +728,9 @@ class MainWindow : Control
                 }
             }
 
-            // 更新 ComboBox 下拉列表悬停
-            foreach (child; children())
-            {
-                auto cb = cast(ComboBox)child;
-                if (cb !is null && cb.isDropDown())
-                {
-                    updateComboBoxDropDownHover(ev.x, ev.y);
-                    needRedraw = true;  // ComboBox下拉悬停需要重绘
-                    break;
-                }
-            }
+            // 更新 ComboBox 下拉列表悬停（递归查找所有嵌套的 ComboBox）
+            updateComboBoxDropDownHover(ev.x, ev.y);
+            needRedraw = true;
             
             if (needRedraw)
                 requestRedraw();
@@ -859,11 +867,11 @@ class MainWindow : Control
     /// Wheel event handler — dispatch to hovered control (bubbling propagates to ScrollableContainer).
     private void wheelEventHandler(ref WheelEventData ev)
     {
-        logTrace("MainWindow.wheelEventHandler(x=", ev.x, ", y=", ev.y, ", delta=", ev.delta, ")");
+        logTrace("MainWindow.wheelEventHandler(x=", ev.x, ", y=", ev.y, ", delta=", ev.delta, ", hDelta=", ev.hDelta, ")");
         
         // Dispatch to hovered control — bubbling carries it to parent ScrollableContainer
         if (_hoveredControl !is null && _hoveredControl !is this)
-            _hoveredControl.fireMouseWheel(ev.delta, ev.x, ev.y);
+            _hoveredControl.fireMouseWheel(ev.delta, ev.hDelta, ev.x, ev.y);
 
         requestRedraw();
     }
@@ -878,9 +886,9 @@ class MainWindow : Control
         if (ev.ch < 0x20 && ev.ch != 0x09 && ev.ch != 0x0A && ev.ch != 0x0D)
             return;
         
-        if (_focusedControl !is null)
+        if (focusedControl !is null)
         {
-            _focusedControl.fireTextInput(ev.ch);
+            focusedControl.fireTextInput(ev.ch);
         }
 
         requestRedraw();
@@ -889,63 +897,65 @@ class MainWindow : Control
     /// Set keyboard focus to a specific control.
     void setFocus(Control ctrl)
     {
-        if (_focusedControl is ctrl) return;
-        // Remove focus from previous
-        if (_focusedControl !is null && _focusedControl !is this)
+        Control prevFocused = _focusManager.focusedControl;
+        if (prevFocused is ctrl) return;
+
+        // 停止旧控件的光标闪烁定时器
+        if (prevFocused !is null && prevFocused !is this)
         {
-            // Stop blink timer if losing focus on a TextInput / EditBox
-            auto prevTi = cast(TextInput)_focusedControl;
-            auto prevEb = cast(EditBox)_focusedControl;
+            auto prevTi = cast(TextInput)prevFocused;
+            auto prevEb = cast(EditBox)prevFocused;
             if (prevTi !is null || prevEb !is null)
                 _platformWindow.stopTimer(BLINK_TIMER_ID);
-            _focusedControl.hasFocus(false);
         }
-        // Grant focus to new
-        _focusedControl = ctrl;
-        if (_focusedControl !is null && _focusedControl !is this)
+
+        // 使用 FocusManager 更新焦点状态
+        _focusManager.setFocus(ctrl);
+
+        // 启动新控件的光标闪烁定时器
+        Control newFocused = _focusManager.focusedControl;
+        if (newFocused !is null && newFocused !is this)
         {
-            _focusedControl.hasFocus(true);
-            // Start blink timer for TextInput / EditBox
-            auto newTi = cast(TextInput)_focusedControl;
-            auto newEb = cast(EditBox)_focusedControl;
+            auto newTi = cast(TextInput)newFocused;
+            auto newEb = cast(EditBox)newFocused;
             if (newTi !is null || newEb !is null)
                 _platformWindow.startTimer(BLINK_TIMER_ID, 530);
         }
-        logTrace("MainWindow.setFocus() -> ", _focusedControl !is null ? _focusedControl.toString() : "null");
+        logTrace("MainWindow.setFocus() -> ", newFocused !is null ? newFocused.toString() : "null");
         requestRedraw();
     }
-    
-    /// Collect all focusable controls in tab order via depth-first traversal.
-    private void collectFocusable(Control parent, ref Control[] list)
-    {
-        foreach (child; parent.children())
-        {
-            if (!child.visible()) continue;
-            if (child.focusable())
-                list ~= child;
-            collectFocusable(child, list);
-        }
-    }
+
+    /// 获取当前焦点控件
+    Control focusedControl() @property { return _focusManager.focusedControl; }
     
     /// Move focus to next focusable control (Tab), or previous (Shift+Tab).
     private void cycleFocus(bool reverse = false)
     {
-        Control[] focusable;
-        collectFocusable(this, focusable);
-        if (focusable.length == 0) return;
-        
-        int idx = -1;
-        foreach (i, c; focusable)
+        Control prevFocused = _focusManager.focusedControl;
+        _focusManager.cycleFocus(this, reverse);
+        Control newFocused = _focusManager.focusedControl;
+
+        // 如果焦点变化，处理定时器
+        if (newFocused !is prevFocused)
         {
-            if (c is _focusedControl) { idx = cast(int)i; break; }
+            // 停止旧控件的光标闪烁定时器
+            if (prevFocused !is null && prevFocused !is this)
+            {
+                auto prevTi = cast(TextInput)prevFocused;
+                auto prevEb = cast(EditBox)prevFocused;
+                if (prevTi !is null || prevEb !is null)
+                    _platformWindow.stopTimer(BLINK_TIMER_ID);
+            }
+            // 启动新控件的光标闪烁定时器
+            if (newFocused !is null && newFocused !is this)
+            {
+                auto newTi = cast(TextInput)newFocused;
+                auto newEb = cast(EditBox)newFocused;
+                if (newTi !is null || newEb !is null)
+                    _platformWindow.startTimer(BLINK_TIMER_ID, 530);
+            }
+            requestRedraw();
         }
-        
-        if (reverse)
-            idx = (idx <= 0) ? cast(int)(focusable.length - 1) : idx - 1;
-        else
-            idx = (idx < 0 || idx >= cast(int)(focusable.length - 1)) ? 0 : idx + 1;
-        
-        setFocus(focusable[idx]);
     }
     
     /// Keyboard event handler — dispatch key events to focused control.
@@ -959,11 +969,11 @@ class MainWindow : Control
         // 但如果 focused control 正在编辑（如 GridWidgetBase），让控件自己处理 Tab
         if (ev.keyCode == VK_TAB)
         {
-            auto grid = cast(GridWidgetBase)_focusedControl;
+            auto grid = cast(GridWidgetBase)focusedControl;
             if (grid !is null && grid.isEditing())
             {
                 // 传给控件处理（GridWidgetBase 会在编辑模式下确认并移到下一格）
-                _focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
+                focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
                 requestRedraw();
                 return;
             }
@@ -971,12 +981,12 @@ class MainWindow : Control
             requestRedraw();
             return;
         }
-        
+
         // Ctrl+A 全选由 TextInput 内部处理，需要传递修饰键
         // Forward to focused control (with shift/control modifiers)
-        if (_focusedControl !is null)
+        if (focusedControl !is null)
         {
-            _focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
+            focusedControl.fireKeyDown(ev.keyCode, ev.shift, ev.control, ev.alt);
         }
 
         requestRedraw();
@@ -1097,14 +1107,14 @@ class MainWindow : Control
 
     void render(HDC hdc, int width, int height)
     {
-        logInfo("MainWindow.render: width=", width, " height=", height, " _layerSystemInitialized=", _layerSystemInitialized);
-        
+        logTrace("MainWindow.render: width=", width, " height=", height, " _layerSystemInitialized=", _layerSystemInitialized);
+
         // 更新 MainWindow 自身的大小（处理窗口大小变化）
         if (this.width() != width || this.height() != height)
         {
             super.width(width);
             super.height(height);
-            logInfo("MainWindow.render: size updated to ", width, "x", height);
+            logTrace("MainWindow.render: size updated to ", width, "x", height);
         }
         
         // 执行 MainWindow 自身的布局（停靠布局）
@@ -1152,8 +1162,11 @@ class MainWindow : Control
         
         // 2. 使用compositor合成所有layer（传入脏标记状态）
         _compositor.render(hdc, allControls, hasDirty);
-        
-        // 3. 清除所有脏标记
+
+        // 3. 在所有控件渲染完毕后，渲染 ComboBox 下拉列表（确保在下拉列表不被其他控件遮挡）
+        renderComboBoxDropDowns(hdc);
+
+        // 4. 清除所有脏标记
         clearDirty();
         foreach (child; children())
         {
@@ -1195,7 +1208,7 @@ class MainWindow : Control
 
         // Fill background
         RECT rect = {0, 0, width, height};
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH brush = CreateSolidBrush(Theme.crBackground());
         FillRect(memDC, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
 
@@ -1232,7 +1245,7 @@ class MainWindow : Control
     /// 递归渲染控件（检查rendersChildren标志）
     private void renderControlRecursive(Control ctrl, HDC hdc)
     {
-        logInfo("renderControlRecursive: ctrl=", typeid(ctrl).name, " position=(", ctrl.position().x(), ",", ctrl.position().y(), ") size=(", ctrl.width(), ",", ctrl.height(), ")");
+        logTrace("renderControlRecursive: ctrl=", typeid(ctrl).name, " position=(", ctrl.position().x(), ",", ctrl.position().y(), ") size=(", ctrl.width(), ",", ctrl.height(), ")");
         
         if (!ctrl.visible())
             return;
@@ -1304,16 +1317,26 @@ class MainWindow : Control
             auto ti = cast(TextInput)ctrl;
             if (ti !is null && ti.contextMenuOpen)
             {
+                auto menu = ti.contextMenu;
                 int absX, absY;
-                controlToClient(ti, absX, absY);
-                ti.renderContextMenuOnly(hdc, absX, absY);
+                ti.controlToClient(absX, absY);
+                // PopupMenu 的位置是相对于 TextInput 的本地坐标
+                // 需要转换为窗口客户区坐标
+                int menuAbsX = absX + menu.position().x();
+                int menuAbsY = absY + menu.position().y();
+                menu.setXY(menuAbsX, menuAbsY);
+                menu.renderWithGDI(hdc.Value);
             }
             auto eb = cast(EditBox)ctrl;
             if (eb !is null && eb.contextMenuOpen)
             {
+                auto menu = eb.contextMenu;
                 int absX, absY;
-                controlToClient(eb, absX, absY);
-                eb.renderContextMenuOnly(hdc, absX, absY);
+                eb.controlToClient(absX, absY);
+                int menuAbsX = absX + menu.position().x();
+                int menuAbsY = absY + menu.position().y();
+                menu.setXY(menuAbsX, menuAbsY);
+                menu.renderWithGDI(hdc.Value);
             }
             foreach (child; ctrl.children())
             {

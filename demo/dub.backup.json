@@ -1,8 +1,0 @@
-{
-    "name": "test01",
-    "targetType": "executable",
-    "mainSourceFile": "test01.d",
-    "dependencies": {
-        "guia4": {"path": ".."}
-    }
-}

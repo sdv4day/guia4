@@ -3,6 +3,8 @@ module guia4.guicore.editbox;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.popupmenu;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
@@ -32,11 +34,11 @@ class EditBox : Control
     private bool _cursorVisible = true;
     private string[] _lines; /// 按行分割的文本
 
-    private COLORREF _bgColor          = cast(COLORREF)0x00FFFFFF;
-    private COLORREF _textColor        = cast(COLORREF)0x00000000;
-    private COLORREF _borderColor      = cast(COLORREF)0x00CCCCCC;
+    private COLORREF _bgColor          = Theme.crBackground();
+    private COLORREF _textColor        = Theme.crText();
+    private COLORREF _borderColor      = Theme.crBorder();
     private COLORREF _focusBorderColor = cast(COLORREF)0x003366FF;
-    private COLORREF _selectionBgColor = cast(COLORREF)0x00B0D0FF; /// 选区背景色（浅蓝色）
+    private COLORREF _selectionBgColor = cast(COLORREF)0x00B0D0FF;
     private uint _fontSize = 14;
     private int _padding = 4;
     private int _lineHeight = 18; /// 每行像素高度
@@ -49,9 +51,7 @@ class EditBox : Control
     private bool _isSelecting = false;     /// 正在拖选
 
     // 右键菜单
-    private int _rightClickX = 0;
-    private int _rightClickY = 0;
-    private bool _contextMenuOpen = false;
+    private PopupMenu _contextMenu;
 
     this(Control parent, string text = "")
     {
@@ -65,6 +65,15 @@ class EditBox : Control
         onKeyDown(&handleKeyEvent);
         onTextInput(&handleTextInput);
         onMouseWheel(&handleMouseWheel);
+
+        // 初始化右键上下文菜单
+        _contextMenu = new PopupMenu(null);
+        _contextMenu.width = 120;
+        _contextMenu.addItem("剪切");
+        _contextMenu.addItem("复制");
+        _contextMenu.addItem("粘贴");
+        _contextMenu.addItem("全选");
+        _contextMenu.onItemClick = &handleContextMenuItem;
 
         logTrace("EditBox.ctor(parent=", parent !is null, ", text='", text, "')");
     }
@@ -194,7 +203,24 @@ class EditBox : Control
     }
 
     /// 检查右键菜单是否打开
-    bool contextMenuOpen() const @property { return _contextMenuOpen; }
+    bool contextMenuOpen() const @property { return _contextMenu !is null && _contextMenu.isOpen; }
+
+    /// 获取内部 PopupMenu 实例（供 MainWindow 事件转发）
+    PopupMenu contextMenu() @property { return _contextMenu; }
+
+    /// 右键菜单项点击处理
+    private void handleContextMenuItem(int index, string text)
+    {
+        switch (index)
+        {
+            case 0: cut(); break;
+            case 1: copy(); break;
+            case 2: paste(); break;
+            case 3: selectAll(); break;
+            default: break;
+        }
+        markDirty(DirtyBits.Visual);
+    }
 
     // ── 剪贴板操作 ──────────────────────────────────────
 
@@ -656,16 +682,14 @@ class EditBox : Control
         {
             // 先定位光标
             positionCursorFromClick(x, y);
-            // 显示右键菜单
-            _rightClickX = x;
-            _rightClickY = y;
-            _contextMenuOpen = true;
+            // 弹出右键菜单
+            _contextMenu.popup(x, y);
             markDirty(DirtyBits.Visual);
             return;
         }
 
         // 左键
-        _contextMenuOpen = false;
+        _contextMenu.close();
 
         // 定位光标
         positionCursorFromClick(x, y);
@@ -863,72 +887,6 @@ class EditBox : Control
                 SelectObject(hdc, oldPen2);
                 DeleteObject(cast(HGDIOBJ)cursorPen);
             }
-        }
-
-        FontCache.release(hdc, fontEntry);
-    }
-
-    // ── 右键菜单 ──────────────────────────────────────────
-
-    /// 处理右键菜单项点击（由 MainWindow 调用）
-    bool handleContextMenuClick(int mx, int my)
-    {
-        if (!_contextMenuOpen) return false;
-
-        int menuX = _rightClickX;
-        int menuY = _rightClickY;
-        int menuW = 120;
-        int menuH = 4 * 24;
-
-        if (mx >= menuX && mx < menuX + menuW && my >= menuY && my < menuY + menuH)
-        {
-            int itemIndex = (my - menuY) / 24;
-            switch (itemIndex)
-            {
-                case 0: cut(); break;
-                case 1: copy(); break;
-                case 2: paste(); break;
-                case 3: selectAll(); break;
-                default: break;
-            }
-            _contextMenuOpen = false;
-            markDirty(DirtyBits.Visual);
-            return true;
-        }
-
-        _contextMenuOpen = false;
-        markDirty(DirtyBits.Visual);
-        return false;
-    }
-
-    /// 渲染右键上下文菜单（由 MainWindow 在所有内容之上调用）
-    public void renderContextMenuOnly(HDC hdc, int absX, int absY)
-    {
-        int menuX = absX + _rightClickX;
-        int menuY = absY + _rightClickY;
-        int menuW = 120;
-        int menuH = 4 * 24;
-
-        RECT menuRect = { cast(LONG)menuX, cast(LONG)menuY, cast(LONG)(menuX + menuW), cast(LONG)(menuY + menuH) };
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
-        FillRect(hdc, &menuRect, bgBrush);
-        DeleteObject(cast(HGDIOBJ)bgBrush);
-
-        HBRUSH borderBrush = CreateSolidBrush(cast(COLORREF)0x00CCCCCC);
-        FrameRect(hdc, &menuRect, borderBrush);
-        DeleteObject(cast(HGDIOBJ)borderBrush);
-
-        auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
-        SetTextColor(hdc, cast(COLORREF)0x00333333);
-        SetBkMode(hdc, TRANSPARENT);
-
-        string[4] labels = ["剪切", "复制", "粘贴", "全选"];
-        foreach (i, label; labels)
-        {
-            int itemY = menuY + cast(int)i * 24;
-            wstring textW = toUTF16(label);
-            TextOutW(hdc, menuX + 8, itemY + (24 - cast(int)_fontSize) / 2,
-                     cast(const(PWSTR))textW.ptr, cast(int)textW.length);
         }
 
         FontCache.release(hdc, fontEntry);

@@ -52,6 +52,7 @@ interface IPlatformWindow
     void setWheelCallback(WheelEventCallback callback);
     void setCharCallback(CharEventCallback callback);
     void setCloseCallback(CloseEventCallback callback);
+    void setResizeCallback(void delegate() callback);
     void setRedrawCallback(RedrawEventCallback callback);
 
     // 定时器

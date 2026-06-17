@@ -50,10 +50,19 @@ class VirtualCanvas : Control
         logTrace("VirtualCanvas.ctor()");
     }
     
-    /// 析构函数 - 释放GDI资源
+    /**
+     * 析构函数 — 仅标记资源为已销毁
+     * 
+     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * GDI API 可能导致访问冲突。
+     * 
+     * 正确的做法是在控件被移除时显式调用 destroyBuffer() 方法。
+     */
     ~this()
     {
-        destroyBuffer();
+        // 仅标记资源为已销毁，不调用 GDI API
+        // 实际的 GDI 资源清理应该在 destroyBuffer() 中完成
     }
     
     // ── 属性 ────────────────────────────────────────────────────

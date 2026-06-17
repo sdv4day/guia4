@@ -4,6 +4,7 @@ import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
 import guia4.guicore.layer;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
@@ -13,17 +14,28 @@ import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
 
 /**
- * PopupMenu — 弹出菜单
+ * PopupMenu — 弹出菜单 / 右键上下文菜单
  *
- * 右键弹出菜单，类似 MenuItem 的子菜单面板。
- * 在指定位置弹出。
+ * 通用弹出菜单组件，支持：
+ * - 添加菜单项和分隔线
+ * - 菜单项点击回调（onItemClick）
+ * - 悬停高亮
+ * - 点击外部自动关闭
+ *
+ * 使用方式：
+ *   auto menu = new PopupMenu(null);
+ *   menu.width = 120;
+ *   menu.addItem("剪切");
+ *   menu.addItem("复制");
+ *   menu.onItemClick = (index, text) { ... };
+ *   menu.popup(x, y);
  */
 class PopupMenu : Control
 {
     private struct PopupItem
     {
         string text;
-        bool separator = false;  /// 分隔线
+        bool separator = false;
     }
 
     private PopupItem[] _items;
@@ -31,6 +43,9 @@ class PopupMenu : Control
     private int _hoveredIndex = -1;
     private uint _fontSize = 14;
     private int _itemHeight = 24;
+
+    /// 菜单项点击回调：参数为 (itemIndex, itemText)
+    void delegate(int index, string text) onItemClick;
 
     this(Control parent)
     {
@@ -41,17 +56,26 @@ class PopupMenu : Control
         layer = Layer.Popup;
     }
 
-    /// 添加菜单项
-    void addItem(string text)
+    /// 添加菜单项，返回该项索引
+    int addItem(string text)
     {
+        int idx = cast(int)_items.length;
         _items ~= PopupItem(text);
         recalcHeight();
+        return idx;
     }
 
     /// 添加分隔线
     void addSeparator()
     {
         _items ~= PopupItem("", true);
+        recalcHeight();
+    }
+
+    /// 清空所有菜单项
+    void clearItems()
+    {
+        _items.length = 0;
         recalcHeight();
     }
 
@@ -67,6 +91,7 @@ class PopupMenu : Control
         setXY(px, py);
         _isOpen = true;
         visible = true;
+        _hoveredIndex = -1;
         markDirty(DirtyBits.Visual);
     }
 
@@ -91,7 +116,6 @@ class PopupMenu : Control
         if (!_isOpen || button != 0)
             return;
 
-        // mx, my 已经是控件本地坐标（由 MainWindow clientToControl 转换）
         // 点击菜单外部 → 关闭
         if (mx < 0 || mx >= width() || my < 0 || my >= height())
         {
@@ -102,8 +126,9 @@ class PopupMenu : Control
         int idx = my / _itemHeight;
         if (idx >= 0 && idx < cast(int)_items.length && !_items[idx].separator)
         {
-            // 触发该项的 onClick
-            fireClick(mx, my);
+            // 触发回调
+            if (onItemClick !is null)
+                onItemClick(idx, _items[idx].text);
             close();
         }
     }
@@ -113,7 +138,6 @@ class PopupMenu : Control
         if (!_isOpen)
             return;
 
-        // mx, my 已经是控件本地坐标（由 MainWindow clientToControl 转换）
         if (mx < 0 || mx >= width() || my < 0 || my >= height())
         {
             if (_hoveredIndex != -1)
@@ -140,23 +164,22 @@ class PopupMenu : Control
 
         logTrace("PopupMenu.renderWithGDI() size=(", width(), ",", height(), ")");
 
-        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         int rx = 0;
         int ry = 0;
         int rw = width();
         int rh = height();
 
-        // ── 白色背景 ──
+        // ── 背景 ──
         RECT bgRect = {
             cast(LONG)rx, cast(LONG)ry,
             cast(LONG)(rx + rw), cast(LONG)(ry + rh)
         };
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH bgBrush = CreateSolidBrush(Theme.crMenuBg());
         FillRect(hdc, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
         // ── 边框 ──
-        HPEN borderPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00888888);
+        HPEN borderPen = CreatePen(PS_SOLID, 1, Theme.crBorderDark());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
         Rectangle(hdc, rx, ry, rx + rw, ry + rh);
@@ -175,8 +198,7 @@ class PopupMenu : Control
 
             if (item.separator)
             {
-                // 分隔线
-                HPEN sepPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00CCCCCC);
+                HPEN sepPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
                 HGDIOBJ oldPen2 = SelectObject(hdc, cast(HGDIOBJ)sepPen);
                 MoveToEx(hdc, rx + 4, itemY + _itemHeight / 2, null);
                 LineTo(hdc, rx + rw - 4, itemY + _itemHeight / 2);
@@ -185,20 +207,20 @@ class PopupMenu : Control
             }
             else
             {
-                // 悬停项高亮
+                // 悬停高亮
                 if (i == _hoveredIndex)
                 {
                     RECT hovRect = {
                         cast(LONG)rx, cast(LONG)itemY,
                         cast(LONG)(rx + rw), cast(LONG)(itemY + _itemHeight)
                     };
-                    HBRUSH hovBrush = CreateSolidBrush(cast(COLORREF)0x00D0D0D0);
+                    HBRUSH hovBrush = CreateSolidBrush(Theme.crMenuHoverBg());
                     FillRect(hdc, &hovRect, hovBrush);
                     DeleteObject(cast(HGDIOBJ)hovBrush);
                 }
 
                 // 文字
-                SetTextColor(hdc, cast(COLORREF)0x00333333);
+                SetTextColor(hdc, Theme.crText());
                 wstring textW = toUTF16(item.text);
                 int textX = rx + 8;
                 int textY = itemY + (_itemHeight - cast(int)_fontSize) / 2;

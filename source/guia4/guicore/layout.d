@@ -3,39 +3,155 @@ module guia4.guicore.layout;
 import guia4.guicore.control;
 import guia4.guicore.position;
 
-
+/**
+ * ILayout — 布局管理器接口
+ */
 interface ILayout
 {
     void layout(Control parent);
 }
 
-class AbsoluteLayout : ILayout
+/**
+ * LayoutDefaults — 布局默认值常量
+ * 
+ * 消除魔数,统一管理布局默认参数
+ */
+enum LayoutDefaults
 {
-    void layout(Control parent) {}
+    defaultSpacing = 4,
+    defaultPadding = 4,
+    defaultCellWidth = 100,
+    defaultCellHeight = 30,
 }
 
-class VerticalLayout : ILayout
+/**
+ * BaseLayout — 布局管理器基类
+ *
+ * 提取公共逻辑,消除VerticalLayout、HorizontalLayout、GridLayout的重复代码
+ */
+abstract class BaseLayout : ILayout
 {
-    private int _spacing = 4;
-    private int _padding = 4;
+    protected int _spacing = LayoutDefaults.defaultSpacing;
+    protected int _padding = LayoutDefaults.defaultPadding;
     
-    this(int spacing = 4, int padding = 4)
+    this(int spacing = LayoutDefaults.defaultSpacing, int padding = LayoutDefaults.defaultPadding)
     {
         _spacing = spacing;
         _padding = padding;
     }
     
-    /// 从祖先容器推断可用宽度
-    private int inferAvailableWidth(Control parent)
+    // ── 公共辅助方法 ─────────────────────────────────────
+    
+    /**
+     * 检查控件是否应该跳过布局
+     * 
+     * Params:
+     *   child = 要检查的控件
+     * 
+     * Returns: true表示应该跳过该控件
+     */
+    protected final bool shouldSkipChild(Control child) nothrow @nogc
+    {
+        return !child.visible() || 
+               child.isAbsolutePosition() || 
+               child.isFixedPosition();
+    }
+    
+    /**
+     * 应用位置到控件
+     * 
+     * 根据定位模式(Static/Relative)设置控件位置
+     * 
+     * Params:
+     *   child = 目标控件
+     *   normalX = 正常X坐标
+     *   normalY = 正常Y坐标
+     */
+    protected final void applyPosition(Control child, int normalX, int normalY) nothrow @nogc
+    {
+        if (child.isRelativePosition())
+        {
+            // Relative定位：应用x/y偏移
+            child.setXY(normalX + child.position().x(), normalY + child.position().y());
+        }
+        else
+        {
+            // Static定位：直接设置位置
+            child.setXY(normalX, normalY);
+        }
+    }
+    
+    /**
+     * 从祖先容器推断可用尺寸
+     * 
+     * 当父容器没有设置尺寸时,向上查找祖先容器获取可用尺寸
+     * 
+     * Params:
+     *   parent = 起始控件
+     *   getDimension = 获取尺寸的函数指针
+     * 
+     * Returns: 可用尺寸,如果没有找到则返回0
+     */
+    protected final int inferAvailableDimension(Control parent, 
+                                                int function(Control) nothrow @nogc getDimension) 
+                                                nothrow @nogc
     {
         Control cur = parent.parent();
         while (cur !is null)
         {
-            if (cur.width() > 0)
-                return cur.width();
+            int dim = getDimension(cur);
+            if (dim > 0)
+                return dim;
             cur = cur.parent();
         }
         return 0;
+    }
+    
+    /**
+     * 自动设置父容器尺寸
+     * 
+     * 如果父容器没有设置尺寸,根据内容自动设置
+     * 
+     * Params:
+     *   parent = 父容器
+     *   contentWidth = 内容宽度
+     *   contentHeight = 内容高度
+     */
+    protected final void autoSetParentSize(Control parent, int contentWidth, int contentHeight) nothrow @nogc
+    {
+        if (parent.width() == 0 && contentWidth > 0)
+            parent.width(contentWidth + _padding * 2);
+        
+        if (parent.height() == 0 && contentHeight > 0)
+            parent.height(contentHeight + _padding * 2);
+    }
+    
+    // ── 属性访问器 ─────────────────────────────────────
+    
+    int spacing() const nothrow @nogc @property { return _spacing; }
+    int padding() const nothrow @nogc @property { return _padding; }
+}
+
+/**
+ * AbsoluteLayout — 绝对布局
+ * 
+ * 不进行任何布局,控件使用绝对定位
+ */
+class AbsoluteLayout : ILayout
+{
+    void layout(Control parent) {}
+}
+
+/**
+ * VerticalLayout — 垂直布局
+ * 
+ * 子控件从上到下垂直排列
+ */
+class VerticalLayout : BaseLayout
+{
+    this(int spacing = LayoutDefaults.defaultSpacing, int padding = LayoutDefaults.defaultPadding)
+    {
+        super(spacing, padding);
     }
     
     void layout(Control parent)
@@ -43,38 +159,26 @@ class VerticalLayout : ILayout
         int y = _padding;
         int maxWidth = 0;
         
-        // 确定可用宽度：优先使用父容器宽度，否则从祖先推断
-        int availableWidth = parent.width() > 0 ? parent.width() : inferAvailableWidth(parent);
+        // 确定可用宽度：优先使用父容器宽度,否则从祖先推断
+        int availableWidth = parent.width() > 0 ? parent.width() : 
+                             inferAvailableDimension(parent, function int(Control c) nothrow @nogc => c.width());
         
         foreach (child; parent.children())
         {
-            if (!child.visible()) continue;
+            if (shouldSkipChild(child)) continue;
             
-            // 检查定位模式：Absolute/Fixed不参与布局
-            if (child.isAbsolutePosition() || child.isFixedPosition())
-                continue;
-            
-            // 计算正常位置（Static/Relative都参与布局）
+            // 计算正常位置
             int normalX = _padding;
             int normalY = y;
             
-            // Relative定位：应用x/y偏移
-            if (child.isRelativePosition())
-            {
-                child.setXY(normalX + child.position().x(), normalY + child.position().y());  // x/y是偏移量
-            }
-            else
-            {
-                // Static定位：直接设置位置
-                child.setXY(normalX, normalY);
-            }
+            applyPosition(child, normalX, normalY);
             
-            // 子控件宽度处理：
-            // - 如果子控件宽度为0（未显式设置）且没有自己的布局管理器，继承可用宽度
-            // - 如果子控件已有宽度，保持不变
-            // - 如果子控件有自己的布局管理器，由其自行计算尺寸
-            if (child.width() == 0 && availableWidth > 0 && child.layout() is null)
-                child.width(availableWidth - _padding * 2);
+            // 子控件宽度处理
+            if ((child.autoWidth || child.hAlign == HAlign.Stretch) && 
+                availableWidth > 0 && child.layout() is null)
+            {
+                child.setLayoutWidth(availableWidth - _padding * 2);
+            }
             
             y += child.height() + _spacing;
             
@@ -83,40 +187,21 @@ class VerticalLayout : ILayout
                 maxWidth = child.width();
         }
         
-        // 自动设置父容器尺寸（如果父容器没有设置尺寸）
-        if (parent.width() == 0 && maxWidth > 0)
-            parent.width(maxWidth + _padding * 2);
-        
-        if (parent.height() == 0 && y > _padding)
-            parent.height(y - _spacing + _padding);
+        // 自动设置父容器尺寸
+        autoSetParentSize(parent, maxWidth, y - _spacing);
     }
-    
-    int spacing() const @property { return _spacing; }
-    int padding() const @property { return _padding; }
 }
 
-class HorizontalLayout : ILayout
+/**
+ * HorizontalLayout — 水平布局
+ * 
+ * 子控件从左到右水平排列
+ */
+class HorizontalLayout : BaseLayout
 {
-    private int _spacing = 4;
-    private int _padding = 4;
-    
-    this(int spacing = 4, int padding = 4)
+    this(int spacing = LayoutDefaults.defaultSpacing, int padding = LayoutDefaults.defaultPadding)
     {
-        _spacing = spacing;
-        _padding = padding;
-    }
-    
-    /// 从祖先容器推断可用高度
-    private int inferAvailableHeight(Control parent)
-    {
-        Control cur = parent.parent();
-        while (cur !is null)
-        {
-            if (cur.height() > 0)
-                return cur.height();
-            cur = cur.parent();
-        }
-        return 0;
+        super(spacing, padding);
     }
     
     void layout(Control parent)
@@ -124,38 +209,26 @@ class HorizontalLayout : ILayout
         int x = _padding;
         int maxHeight = 0;
         
-        // 确定可用高度：优先使用父容器高度，否则从祖先推断
-        int availableHeight = parent.height() > 0 ? parent.height() : inferAvailableHeight(parent);
+        // 确定可用高度：优先使用父容器高度,否则从祖先推断
+        int availableHeight = parent.height() > 0 ? parent.height() : 
+                              inferAvailableDimension(parent, function int(Control c) nothrow @nogc => c.height());
         
         foreach (child; parent.children())
         {
-            if (!child.visible()) continue;
+            if (shouldSkipChild(child)) continue;
             
-            // 检查定位模式：Absolute/Fixed不参与布局
-            if (child.isAbsolutePosition() || child.isFixedPosition())
-                continue;
-            
-            // 计算正常位置（Static/Relative都参与布局）
+            // 计算正常位置
             int normalX = x;
             int normalY = _padding;
             
-            // Relative定位：应用x/y偏移
-            if (child.isRelativePosition())
-            {
-                child.setXY(normalX + child.position().x(), normalY + child.position().y());  // x/y是偏移量
-            }
-            else
-            {
-                // Static定位：直接设置位置
-                child.setXY(normalX, normalY);
-            }
+            applyPosition(child, normalX, normalY);
             
-            // 子控件高度处理：
-            // - 如果子控件高度为0（未显式设置）且没有自己的布局管理器，继承可用高度
-            // - 如果子控件已有高度，保持不变
-            // - 如果子控件有自己的布局管理器，由其自行计算尺寸
-            if (child.height() == 0 && availableHeight > 0 && child.layout() is null)
-                child.height(availableHeight - _padding * 2);
+            // 子控件高度处理
+            if ((child.autoHeight || child.vAlign == VAlign.Stretch) && 
+                availableHeight > 0 && child.layout() is null)
+            {
+                child.setLayoutHeight(availableHeight - _padding * 2);
+            }
             
             x += child.width() + _spacing;
             
@@ -164,33 +237,33 @@ class HorizontalLayout : ILayout
                 maxHeight = child.height();
         }
         
-        // 自动设置父容器尺寸（如果父容器没有设置尺寸）
-        if (parent.width() == 0 && x > _padding)
-            parent.width(x - _spacing + _padding);
-        
-        if (parent.height() == 0 && maxHeight > 0)
-            parent.height(maxHeight + _padding * 2);
+        // 自动设置父容器尺寸
+        autoSetParentSize(parent, x - _spacing, maxHeight);
     }
-    
-    int spacing() const @property { return _spacing; }
-    int padding() const @property { return _padding; }
 }
 
-class GridLayout : ILayout
+/**
+ * GridLayout — 网格布局
+ * 
+ * 子控件按行列网格排列
+ */
+class GridLayout : BaseLayout
 {
     private int _rows;
     private int _cols;
-    private int _hSpacing = 4;
-    private int _vSpacing = 4;
-    private int _padding = 4;
+    private int _hSpacing;
+    private int _vSpacing;
     
-    this(int rows, int cols, int hSpacing = 4, int vSpacing = 4, int padding = 4)
+    this(int rows, int cols, 
+         int hSpacing = LayoutDefaults.defaultSpacing, 
+         int vSpacing = LayoutDefaults.defaultSpacing, 
+         int padding = LayoutDefaults.defaultPadding)
     {
+        super(LayoutDefaults.defaultSpacing, padding);
         _rows = rows;
         _cols = cols;
         _hSpacing = hSpacing;
         _vSpacing = vSpacing;
-        _padding = padding;
     }
     
     void layout(Control parent)
@@ -203,15 +276,15 @@ class GridLayout : ILayout
         
         if (parent.width() > 0 && parent.height() > 0)
         {
-            // 父容器有尺寸，按比例分配
+            // 父容器有尺寸,按比例分配
             cellWidth = (parent.width() - _padding * 2 - (_cols - 1) * _hSpacing) / _cols;
             cellHeight = (parent.height() - _padding * 2 - (_rows - 1) * _vSpacing) / _rows;
         }
         else
         {
-            // 父容器无尺寸，使用子控件的默认尺寸
-            cellWidth = 100;  // 默认单元格宽度
-            cellHeight = 30;  // 默认单元格高度
+            // 父容器无尺寸,使用默认尺寸
+            cellWidth = LayoutDefaults.defaultCellWidth;
+            cellHeight = LayoutDefaults.defaultCellHeight;
         }
         
         // 用于跳过Absolute/Fixed定位的控件
@@ -219,11 +292,7 @@ class GridLayout : ILayout
         
         foreach (i, child; children)
         {
-            if (!child.visible()) continue;
-            
-            // 检查定位模式：Absolute/Fixed不参与布局
-            if (child.isAbsolutePosition() || child.isFixedPosition())
-                continue;
+            if (shouldSkipChild(child)) continue;
             
             int row = cast(int)(layoutIndex / _cols);
             int col = cast(int)(layoutIndex % _cols);
@@ -232,24 +301,15 @@ class GridLayout : ILayout
             int normalX = _padding + col * (cellWidth + _hSpacing);
             int normalY = _padding + row * (cellHeight + _vSpacing);
             
-            // Relative定位：应用x/y偏移
-            if (child.isRelativePosition())
-            {
-                child.setXY(normalX + child.position().x(), normalY + child.position().y());  // x/y是偏移量
-            }
-            else
-            {
-                // Static定位：直接设置位置
-                child.setXY(normalX, normalY);
-            }
+            applyPosition(child, normalX, normalY);
             
-            child.width(cellWidth);
-            child.height(cellHeight);
+            child.setLayoutWidth(cellWidth);
+            child.setLayoutHeight(cellHeight);
             
             layoutIndex++;
         }
         
-        // 自动设置父容器尺寸（如果父容器没有设置尺寸）
+        // 自动设置父容器尺寸
         if (parent.width() == 0)
             parent.width(_padding * 2 + _cols * cellWidth + (_cols - 1) * _hSpacing);
         
@@ -257,6 +317,6 @@ class GridLayout : ILayout
             parent.height(_padding * 2 + _rows * cellHeight + (_rows - 1) * _vSpacing);
     }
     
-    int rows() const @property { return _rows; }
-    int cols() const @property { return _cols; }
+    int rows() const nothrow @nogc @property { return _rows; }
+    int cols() const nothrow @nogc @property { return _cols; }
 }

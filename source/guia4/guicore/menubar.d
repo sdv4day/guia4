@@ -3,6 +3,8 @@ module guia4.guicore.menubar;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.layer;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
@@ -31,6 +33,7 @@ class MenuBar : Control
         super(parent);
         rendersChildren(true);  // MenuBar自己渲染MenuItem
         dock(DockStyle.Top);    // 默认停靠在顶部，宽度自适应父容器
+        layer(Layer.Popup);     // 使用Popup层，确保在所有Content控件之后渲染（子菜单不被覆盖）
         updateHeight();         // 根据item高度计算MenuBar高度
         logTrace("MenuBar.ctor()");
     }
@@ -120,7 +123,7 @@ class MenuBar : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("MenuBar.renderWithGDI() size=(", width(), ",", height(), ") slots=", _slots.length);
+        logTrace("MenuBar.renderWithGDI() size=(", width(), ",", height(), ")");
 
         // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         int rx = 0;
@@ -133,12 +136,12 @@ class MenuBar : Control
             cast(LONG)rx, cast(LONG)ry,
             cast(LONG)(rx + rw), cast(LONG)(ry + rh)
         };
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00E8E8E8);
+        HBRUSH bgBrush = CreateSolidBrush(Theme.crMenuBarBg());
         FillRect(hdc, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
         // Bottom border
-        HPEN borderPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00CCCCCC);
+        HPEN borderPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         MoveToEx(hdc, rx, ry + rh - 1, null);
         LineTo(hdc, rx + rw, ry + rh - 1);
@@ -274,8 +277,8 @@ class MenuItem : Control
     private uint _fontSize = 14;
 
     // Colors
-    private COLORREF _textColor  = cast(COLORREF)0x00333333;
-    private COLORREF _hoverBg    = cast(COLORREF)0x00D0D0D0;
+    private COLORREF _textColor  = Theme.crText();
+    private COLORREF _hoverBg    = Theme.crMenuHoverBg();
     package bool _hovered = false;
 
     /// 获取/设置悬停状态（用于外部更新）
@@ -347,10 +350,19 @@ class MenuItem : Control
         super.height(v);
     }
     
+    /**
+     * 析构函数 — 仅标记资源为已销毁
+     * 
+     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * GDI API 可能导致访问冲突。
+     * 
+     * 正确的做法是在控件被移除时显式调用 destroyLayerBuffer() 方法。
+     */
     ~this()
     {
-        // 释放layer buffer资源
-        destroyLayerBuffer();
+        // 仅标记资源为已销毁，不调用 GDI API
+        // 实际的 GDI 资源清理应该在 destroyLayerBuffer() 中完成
     }
 
     string text() const @property { return _text; }
@@ -464,9 +476,10 @@ class MenuItem : Control
         auto hdc = cast(HDC)hdc_;
         logTrace("MenuItem.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
-        int rx = 0;
-        int ry = 0;
+        // MenuBar 直接调用 renderWithGDI 时没有再次偏移视口到子项位置，
+        // 因此 MenuItem 需要使用自身在父容器中的相对坐标
+        int rx = position().x();
+        int ry = position().y();
         int rw = width();
         int rh = height();
 
@@ -501,7 +514,11 @@ class MenuItem : Control
         // 如果子菜单展开，渲染下拉面板
         if (_menuOpen && _subItems.length > 0)
         {
+            // 移除父容器设置的clip限制，允许子菜单绘制到MenuBar bounds之外
+            int savedDC = SaveDC(hdc);
+            SelectClipRgn(hdc, cast(HRGN)null);
             renderSubMenu(hdc);
+            RestoreDC(hdc, savedDC);
         }
     }
     
@@ -520,7 +537,7 @@ class MenuItem : Control
         if (_hovered)
             bgBrush = CreateSolidBrush(_hoverBg);
         else
-            bgBrush = CreateSolidBrush(cast(COLORREF)0x00E8E8E8); // MenuBar背景色
+            bgBrush = CreateSolidBrush(Theme.crMenuBarBg());
         FillRect(_layerDC, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
@@ -557,12 +574,12 @@ class MenuItem : Control
 
         // 绘制子菜单背景
         RECT subRect = { cast(LONG)subX, cast(LONG)subY, cast(LONG)(subX + subW), cast(LONG)(subY + subH) };
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH bgBrush = CreateSolidBrush(Theme.crMenuBg());
         FillRect(hdc, &subRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
         // 绘制子菜单边框
-        HPEN borderPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00CCCCCC);
+        HPEN borderPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
         Rectangle(hdc, subRect.left, subRect.top, subRect.right, subRect.bottom);
@@ -572,7 +589,7 @@ class MenuItem : Control
 
         // 绘制每个子菜单项
         auto fontEntry = FontCache.get(hdc, "Segoe UI", cast(int)_fontSize);
-        SetTextColor(hdc, cast(COLORREF)0x00333333);
+        SetTextColor(hdc, Theme.crText());
         SetBkMode(hdc, TRANSPARENT);
 
         foreach (i, subItem; _subItems)
@@ -588,7 +605,7 @@ class MenuItem : Control
             if (subItem._hovered)
             {
                 RECT hoverRect = { cast(LONG)subX, cast(LONG)itemY, cast(LONG)(subX + subW), cast(LONG)(itemY + 24) };
-                HBRUSH hoverBrush = CreateSolidBrush(cast(COLORREF)0x00D0D0D0);
+                HBRUSH hoverBrush = CreateSolidBrush(Theme.crMenuHoverBg());
                 FillRect(hdc, &hoverRect, hoverBrush);
                 DeleteObject(cast(HGDIOBJ)hoverBrush);
             }

@@ -3,6 +3,8 @@ module guia4.guicore.scrollcontainer;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.scrollbar;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.math : clamp;
 import guia4.platform_win32.win32defs;
@@ -14,41 +16,36 @@ import windows.win32.ui.windowsandmessaging;
 
 /**
  * ScrollableContainer — a control that clips and scrolls its children
- * using GDI viewport offset, with a vertical scrollbar.
+ * using GDI viewport offset, with vertical and horizontal scrollbars.
  *
  * Rendering approach:
  *   1. SaveDC to preserve original clip region + viewport origin
  *   2. IntersectClipRect to clip drawing to this container's bounds
- *   3. OffsetViewportOrgEx to shift children upward by _scrollY
+ *   3. OffsetViewportOrgEx to shift children by (-_scrollX, -_scrollY)
  *   4. Render each visible child via renderWithGDI
  *   5. RestoreDC to undo clip and offset
- *   6. Draw the scrollbar on top (unclipped)
+ *   6. Draw the scrollbars on top (unclipped)
  *
  * Mouse wheel scrolls content. Scrollbar thumb supports click-and-drag.
  * Hover effect on thumb is tracked.
  *
  * Children are positioned as usual (absolute coords = container.x + rel.x).
  * The viewport offset shifts everything so child at (cx+5, cy+5)
- * appears at (cx+5, cy+5 - _scrollY) on screen.
+ * appears at (cx+5 - _scrollX, cy+5 - _scrollY) on screen.
  */
 class ScrollableContainer : Control
 {
+    private int _scrollX = 0;
     private int _scrollY = 0;
+    private int _contentWidth = 0;   // total virtual width of content
     private int _contentHeight = 0;   // total virtual height of content
-    private int _thumbHeight = 0;     // height of the scrollbar thumb in pixels
     private int _scrollbarWidth = 14; // width of the vertical scrollbar
+    private int _scrollbarHeight = 14; // height of the horizontal scrollbar
 
-    // Scrollbar colors
-    private COLORREF _trackColor   = cast(COLORREF)0x00F0F0F0; // light grey
-    private COLORREF _thumbColor   = cast(COLORREF)0x00C0C0C0; // grey
-    private COLORREF _thumbHover   = cast(COLORREF)0x00A0A0A0; // darker grey
-    private bool _thumbHovered = false;
+    // ── 内部 ScrollBar 实例（非子控件，避免被布局和滚动影响）──
+    private ScrollBar _vScrollBar;
+    private ScrollBar _hScrollBar;
 
-    // ── Thumb drag state ──
-    private bool _isDragging = false;
-    private int _dragStartY = 0;       // mouse Y at drag start (container-local)
-    private int _dragStartScrollY = 0; // scrollY at drag start
-    
     // ── Layer buffer state ──
     private bool _layerBufferInitialized = false;
 
@@ -57,20 +54,74 @@ class ScrollableContainer : Control
         super(parent);
         rendersChildren(true);  // ScrollableContainer自己渲染children
         dock(DockStyle.Fill);   // 默认填充父容器剩余空间
+
+        // 创建内部滚动条（null parent = 不加入控件树）
+        _vScrollBar = new ScrollBar(null, ScrollBarOrientation.Vertical);
+        _vScrollBar.width = _scrollbarWidth;
+        
+        _hScrollBar = new ScrollBar(null, ScrollBarOrientation.Horizontal);
+        _hScrollBar.height = _scrollbarHeight;
+        
+        // 设置鼠标滚轮事件处理器
+        onMouseWheel((ref MouseWheelEvent ev) {
+            // 垂直滚轮：向下滚动（delta < 0）增加 scrollY，向上滚动（delta > 0）减少 scrollY
+            if (ev.delta != 0)
+            {
+                int newScrollY = _scrollY - ev.delta;
+                scrollY(newScrollY);
+            }
+            
+            // 横向滚轮：向右滚动（hDelta < 0）增加 scrollX，向左滚动（hDelta > 0）减少 scrollX
+            if (ev.hDelta != 0)
+            {
+                int newScrollX = _scrollX - ev.hDelta;
+                scrollX(newScrollX);
+            }
+        });
     }
-    
+
+    /**
+     * 析构函数 — 仅标记资源为已销毁
+     * 
+     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * GDI API 可能导致访问冲突。
+     * 
+     * 正确的做法是在控件被移除时显式调用 destroyLayerBuffer() 方法。
+     */
     ~this()
     {
-        // 释放layer buffer资源
-        destroyLayerBuffer();
+        // 仅标记资源为已销毁，不调用 GDI API
+        // 实际的 GDI 资源清理应该在 destroyLayerBuffer() 中完成
     }
 
     // ── Properties ────────────────────────────────────────────────
 
+    int scrollX() const @property { return _scrollX; }
+    void scrollX(int v) @property
+    {
+        _scrollX = v.clamp(0, maxScrollX());
+        markDirty(DirtyBits.Visual);
+    }
+
     int scrollY() const @property { return _scrollY; }
     void scrollY(int v) @property
     {
-        _scrollY = v.clamp(0, maxScroll());
+        _scrollY = v.clamp(0, maxScrollY());
+        markDirty(DirtyBits.Visual);
+    }
+
+    /// override Control.scrollOffsetX
+    override int scrollOffsetX() const @property { return _scrollX; }
+    
+    /// override Control.scrollOffsetY
+    override int scrollOffsetY() const @property { return _scrollY; }
+
+    int contentWidth() const @property { return _contentWidth; }
+    void contentWidth(int v) @property
+    {
+        _contentWidth = v;
+        updateScrollbars();
         markDirty(DirtyBits.Visual);
     }
 
@@ -78,42 +129,155 @@ class ScrollableContainer : Control
     void contentHeight(int v) @property
     {
         _contentHeight = v;
-        updateScrollbar();
+        updateScrollbars();
         markDirty(DirtyBits.Visual);
     }
 
     int scrollbarWidth() const @property { return _scrollbarWidth; }
-    void scrollbarWidth(int v) @property { _scrollbarWidth = v; markDirty(DirtyBits.Visual); }
+    void scrollbarWidth(int v) @property
+    {
+        _scrollbarWidth = v;
+        _vScrollBar.width = v;
+        markDirty(DirtyBits.Visual);
+    }
+
+    int scrollbarHeight() const @property { return _scrollbarHeight; }
+    void scrollbarHeight(int v) @property
+    {
+        _scrollbarHeight = v;
+        _hScrollBar.height = v;
+        markDirty(DirtyBits.Visual);
+    }
+    
+    /// 重写 height() getter 方法
+    override int height() const nothrow @nogc @property { return super.height(); }
+    
+    /// 重写 height() setter 方法，在大小改变时重新计算内容高度
+    override void height(int v) nothrow @nogc @property
+    {
+        int oldHeight = super.height();
+        super.height(v);
+        if (oldHeight != v)
+        {
+            // 标记需要重新计算内容高度（在下次渲染时执行）
+            markDirty(DirtyBits.Layout);
+        }
+    }
+    
+    /// 重写 width() getter 方法
+    override int width() const nothrow @nogc @property { return super.width(); }
+    
+    /// 重写 width() setter 方法，在大小改变时重新计算内容高度
+    override void width(int v) nothrow @nogc @property
+    {
+        int oldWidth = super.width();
+        super.width(v);
+        if (oldWidth != v)
+        {
+            // 标记需要重新计算内容高度（在下次渲染时执行）
+            markDirty(DirtyBits.Layout);
+        }
+    }
 
     /// Maximum scroll value (can't scroll past the bottom)
-    private int maxScroll() const
+    private int maxScrollY() const nothrow @nogc
     {
         return std.algorithm.max(0, _contentHeight - height());
     }
+    
+    /// Maximum horizontal scroll value
+    private int maxScrollX() const nothrow @nogc
+    {
+        return std.algorithm.max(0, _contentWidth - width());
+    }
 
     /// Whether the content exceeds the container height
-    private bool needsScrollbar() const
+    private bool needsVerticalScrollbar() const nothrow @nogc
     {
         return _contentHeight > height();
     }
-
-    /// Update scrollbar thumb size and clamp scroll position
-    private void updateScrollbar()
+    
+    /// Whether the content exceeds the container width
+    private bool needsHorizontalScrollbar() const nothrow @nogc
     {
-        if (!needsScrollbar())
+        return _contentWidth > width();
+    }
+    
+    /// 兼容旧方法名
+    private bool needsScrollbar() const nothrow @nogc
+    {
+        return needsVerticalScrollbar();
+    }
+    
+    /// 兼容旧方法名
+    private int maxScroll() const nothrow @nogc
+    {
+        return maxScrollY();
+    }
+
+    /// 同步内部 ScrollBar 状态（渲染和事件转发前调用）
+    private void syncScrollbars()
+    {
+        // 同步垂直滚动条
+        _vScrollBar.width = _scrollbarWidth;
+        _vScrollBar.height = height();
+        _vScrollBar.min(0);
+        _vScrollBar.max(_contentHeight);
+        _vScrollBar.pageSize(height());
+        _vScrollBar.value(_scrollY);
+        
+        // 同步水平滚动条
+        _hScrollBar.height = _scrollbarHeight;
+        _hScrollBar.width = width();
+        _hScrollBar.min(0);
+        _hScrollBar.max(_contentWidth);
+        _hScrollBar.pageSize(width());
+        _hScrollBar.value(_scrollX);
+    }
+    
+    /// 兼容旧方法名
+    private void syncScrollBar()
+    {
+        syncScrollbars();
+    }
+
+    /// 从内部 ScrollBar 同步滚动值回 _scrollY
+    private void syncScrollFromBar()
+    {
+        int newVal = _vScrollBar.value();
+        if (newVal != _scrollY)
         {
-            _thumbHeight = 0;
-            _scrollY = 0;
-            return;
+            _scrollY = newVal;
+            markDirty(DirtyBits.Visual);
         }
+    }
 
-        // Thumb height proportional to visible area vs content area
-        float visibleRatio = cast(float)height() / _contentHeight;
-        _thumbHeight = cast(int)(height() * visibleRatio);
-        _thumbHeight = std.algorithm.max(_thumbHeight, 10); // minimum 10px thumb
-
-        // Clamp scroll position
-        _scrollY = _scrollY.clamp(0, maxScroll());
+    /// Update scrollbar state and clamp scroll position
+    private void updateScrollbars() nothrow @nogc
+    {
+        if (!needsVerticalScrollbar())
+        {
+            _scrollY = 0;
+        }
+        else
+        {
+            _scrollY = _scrollY.clamp(0, maxScrollY());
+        }
+        
+        if (!needsHorizontalScrollbar())
+        {
+            _scrollX = 0;
+        }
+        else
+        {
+            _scrollX = _scrollX.clamp(0, maxScrollX());
+        }
+    }
+    
+    /// 兼容旧方法名
+    private void updateScrollbar() nothrow @nogc
+    {
+        updateScrollbars();
     }
 
     /// How many pixels of scroll per mouse wheel notch
@@ -130,6 +294,9 @@ class ScrollableContainer : Control
         int delta = ev.delta;
         logTrace("ScrollableContainer.handleMouseWheel(delta=", delta, ")");
 
+        if (maxScroll() <= 0)
+            return; // no scrolling needed
+
         if (delta > 0)
         {
             // Scroll up (negative delta moves content down to reveal more above)
@@ -145,79 +312,12 @@ class ScrollableContainer : Control
         logTrace("ScrollableContainer: scrollY now ", _scrollY);
     }
 
-    // ── Thumb drag handlers ──────────────────────────────────────
+    // ── Scrollbar area detection ─────────────────────────────────
 
     /// Returns true if container-local x is inside the scrollbar track.
     private bool isInScrollbar(int lx) const
     {
-        return lx >= width() - _scrollbarWidth && lx < width();
-    }
-
-    /// Returns the thumb top edge in container-local coordinates.
-    private int computeThumbTop() const
-    {
-        if (_thumbHeight <= 0 || maxScroll() <= 0)
-            return 0;
-        float ratio = cast(float)_scrollY / maxScroll();
-        int available = height() - _thumbHeight;
-        return cast(int)(available * ratio);
-    }
-
-    /// Handle mouse-down: start drag if on the scrollbar thumb.
-    private void handleMouseDown(ref MouseEvent event)
-    {
-        if (!needsScrollbar() || _thumbHeight <= 0)
-            return;
-
-        if (!isInScrollbar(event.x))
-            return;
-
-        int tTop = computeThumbTop();
-        if (event.y >= tTop && event.y < tTop + _thumbHeight)
-        {
-            _isDragging = true;
-            _dragStartY = event.y;
-            _dragStartScrollY = _scrollY;
-            logTrace("ScrollableContainer: thumb drag started at y=", event.y);
-        }
-    }
-
-    /// Handle mouse-up: stop drag.
-    private void handleMouseUp(ref MouseEvent event)
-    {
-        if (_isDragging)
-        {
-            _isDragging = false;
-            _thumbHovered = false;
-            logTrace("ScrollableContainer: thumb drag ended");
-        }
-    }
-
-    /// Handle mouse-move: during drag → update scroll; otherwise → hover tracking.
-    private void handleMouseMove(ref MouseEvent event)
-    {
-        if (_isDragging)
-        {
-            int deltaY = event.y - _dragStartY;
-            float scrollPerPixel = cast(float)maxScroll() / (height() - _thumbHeight);
-            _scrollY = cast(int)(_dragStartScrollY + deltaY * scrollPerPixel);
-            _scrollY = _scrollY.clamp(0, maxScroll());
-            markDirty(DirtyBits.Visual);
-            logTrace("ScrollableContainer: drag scrollY=", _scrollY);
-        }
-        else
-        {
-            // Hover tracking for thumb color
-            if (isInScrollbar(event.x))
-            {
-                int tTop = computeThumbTop();
-                _thumbHovered = (event.y >= tTop && event.y < tTop + _thumbHeight);
-            }
-            else
-            {
-                _thumbHovered = false;
-            }
-        }
+        return needsScrollbar() && lx >= width() - _scrollbarWidth && lx < width();
     }
 
     // ── Child management ─────────────────────────────────────────
@@ -229,20 +329,38 @@ class ScrollableContainer : Control
         int maxBottom = 0;
         foreach (child; children())
         {
-            int childBottom = child.position().y() + child.height() - position().y();
+            // child.position().y() 已相对于本容器，无需再减去 position().y()
+            int childBottom = child.position().y() + child.height();
             if (childBottom > maxBottom)
                 maxBottom = childBottom;
         }
-        return std.algorithm.max(maxBottom, height());
+        return maxBottom;
+    }
+    
+    private int computeContentWidth()
+    {
+        int maxRight = 0;
+        foreach (child; children())
+        {
+            // child.position().x() 已相对于本容器，无需再减去 position().x()
+            int childRight = child.position().x() + child.width();
+            if (childRight > maxRight)
+                maxRight = childRight;
+        }
+        return maxRight;
     }
 
-    /// Recalculate content height from current children and update scrollbar.
+    /// Recalculate content height and width from current children and update scrollbars.
     /// Call this after repositioning children, adding/removing via raw _children, or
     /// after container resize. The `addChild` override calls this automatically.
     void recalcContent()
     {
+        // 确保布局已执行，这样才能正确计算内容高度和宽度
+        ensureLayout();
+        
         _contentHeight = computeContentHeight();
-        updateScrollbar();
+        _contentWidth = computeContentWidth();
+        updateScrollbars();
         markDirty(DirtyBits.Visual);
     }
 
@@ -360,14 +478,14 @@ class ScrollableContainer : Control
     /// 渲染内容到layer buffer（坐标原点为(0,0)）
     private void renderContentToBuffer(HDC hdc)
     {
-        logTrace("ScrollableContainer.renderContentToBuffer() size=", width(), "x", height(), " scrollY=", _scrollY, " position=(", position().x(), ",", position().y(), ")");
+        logTrace("ScrollableContainer.renderContentToBuffer() size=", width(), "x", height(), " scrollX=", _scrollX, " scrollY=", _scrollY, " position=(", position().x(), ",", position().y(), ")");
 
         int rw = width();
         int rh = height();
 
         // ── Draw container background ──
         RECT bgRect = {0, 0, rw, rh};
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00F8F8F8);
+        HBRUSH bgBrush = CreateSolidBrush(Theme.crContainerBg());
         FillRect(hdc, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
@@ -380,7 +498,7 @@ class ScrollableContainer : Control
         // ── Apply scroll offset for children ──
         POINT oldOrigin;
         // 偏移原点：减去滚动偏移（相对于buffer的(0,0)）
-        OffsetViewportOrgEx(hdc, 0, -_scrollY, &oldOrigin);
+        OffsetViewportOrgEx(hdc, -_scrollX, -_scrollY, &oldOrigin);
 
         // ── Render each visible child (递归渲染) ──
         // 传递 ScrollableContainer 的绝对位置作为初始偏移
@@ -399,7 +517,7 @@ class ScrollableContainer : Control
         RestoreDC(hdc, savedDC);
 
         // ── Draw border ──
-        HPEN borderPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00CCCCCC);
+        HPEN borderPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
 
@@ -409,10 +527,33 @@ class ScrollableContainer : Control
         SelectObject(hdc, oldBrush);
         DeleteObject(cast(HGDIOBJ)borderPen);
 
-        // ── Draw scrollbar (on top, unclipped) ──
-        if (needsScrollbar())
+        // ── Draw scrollbars via internal ScrollBar ──
+        // 注意：滚动条渲染在容器右侧和底部，不受裁剪影响
+        
+        // 渲染垂直滚动条
+        if (needsVerticalScrollbar())
         {
-            drawScrollbarOnBuffer(hdc, rw, rh);
+            syncScrollbars();
+            POINT sbOrigin;
+            // 如果同时有水平滚动条，垂直滚动条的高度要减去水平滚动条的高度
+            int vScrollbarHeight = needsHorizontalScrollbar() ? rh - _scrollbarHeight : rh;
+            _vScrollBar.height = vScrollbarHeight;
+            OffsetViewportOrgEx(hdc, rw - _scrollbarWidth, 0, &sbOrigin);
+            _vScrollBar.renderWithGDI(hdc.Value);
+            SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
+        }
+        
+        // 渲染水平滚动条
+        if (needsHorizontalScrollbar())
+        {
+            syncScrollbars();
+            POINT sbOrigin;
+            // 如果同时有垂直滚动条，水平滚动条的宽度要减去垂直滚动条的宽度
+            int hScrollbarWidth = needsVerticalScrollbar() ? rw - _scrollbarWidth : rw;
+            _hScrollBar.width = hScrollbarWidth;
+            OffsetViewportOrgEx(hdc, 0, rh - _scrollbarHeight, &sbOrigin);
+            _hScrollBar.renderWithGDI(hdc.Value);
+            SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
         }
     }
     
@@ -429,16 +570,18 @@ class ScrollableContainer : Control
         int ctrlAbsX = absX + ctrl.position().x();
         int ctrlAbsY = absY + ctrl.position().y();
         
-        logTrace("  renderChildRecursive: ", typeid(ctrl).name, " absPos=(", ctrlAbsX, ",", ctrlAbsY, ") relPos=(", ctrl.position().x(), ",", ctrl.position().y(), ")");
+        // 保存DC状态（包括裁剪区域）
+        int savedDC = SaveDC(hdc);
+        
+        // 设置裁剪区域为控件边界，防止内容绘制到控件外部
+        IntersectClipRect(hdc, ctrl.position().x(), ctrl.position().y(),
+                          ctrl.position().x() + ctrl.width(), ctrl.position().y() + ctrl.height());
         
         // 关键修复：在渲染控件之前，先偏移视口到控件位置
         POINT oldOrigin;
         OffsetViewportOrgEx(hdc, ctrl.position().x(), ctrl.position().y(), &oldOrigin);
         
         // 渲染控件本身
-        // 由于视口已经偏移，控件应该使用 (0, 0) 而不是 position() 来渲染
-        // 但为了兼容现有代码，我们让控件继续使用 position() 渲染
-        // 这需要在控件的 renderWithGDI 中调整
         ctrl.renderWithGDI(hdc.Value);
         
         // 如果控件不自己渲染子控件，递归渲染其子控件
@@ -456,57 +599,68 @@ class ScrollableContainer : Control
         
         // 恢复GDI视口
         SetViewportOrgEx(hdc, oldOrigin.x, oldOrigin.y, null);
+        
+        // 恢复DC状态（包括裁剪区域）
+        RestoreDC(hdc, savedDC);
     }
 
-    
-    /// 在buffer上绘制滚动条（坐标原点为(0,0)）
-    private void drawScrollbarOnBuffer(HDC hdc, int rw, int rh)
+
+    // ── Event overrides — 委托滚动条交互给内部 ScrollBar ──
+
+    override void fireMouseDown(int x, int y, int button)
     {
-
-        int sbLeft = rw - _scrollbarWidth;
-        int sbTop = 0;
-        int sbWidth = _scrollbarWidth;
-        int sbHeight = rh;
-
-        // ── Track background ──
-        RECT trackRect = {
-            cast(LONG)sbLeft, cast(LONG)sbTop,
-            cast(LONG)(sbLeft + sbWidth), cast(LONG)(sbTop + sbHeight)
-        };
-        HBRUSH trackBrush = CreateSolidBrush(_trackColor);
-        FillRect(hdc, &trackRect, trackBrush);
-        DeleteObject(cast(HGDIOBJ)trackBrush);
-
-        // ── Thumb ──
-        if (_thumbHeight > 0 && maxScroll() > 0)
+        if (isInScrollbar(x))
         {
-            // Thumb position proportional to scroll progress
-            float scrollRatio = cast(float)_scrollY / maxScroll();
-            int availableTrack = sbHeight - _thumbHeight;
-            int thumbTop = sbTop + cast(int)(availableTrack * scrollRatio);
-
-            COLORREF thumb = _thumbHovered ? _thumbHover : _thumbColor;
-            HBRUSH thumbBrush = CreateSolidBrush(thumb);
-            RECT thumbRect = {
-                cast(LONG)(sbLeft + 2), cast(LONG)thumbTop,
-                cast(LONG)(sbLeft + sbWidth - 2), cast(LONG)(thumbTop + _thumbHeight)
-            };
-            FillRect(hdc, &thumbRect, thumbBrush);
-            DeleteObject(cast(HGDIOBJ)thumbBrush);
-
-            // ── Thumb border ──
-            HPEN thumbPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00B0B0B0);
-            HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)thumbPen);
-            HGDIOBJ oldBrush2 = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-
-            Rectangle(hdc, thumbRect.left, thumbRect.top, thumbRect.right, thumbRect.bottom);
-
-            SelectObject(hdc, oldPen);
-            SelectObject(hdc, oldBrush2);
-            DeleteObject(cast(HGDIOBJ)thumbPen);
+            syncScrollBar();
+            int sbLocalX = x - (width() - _scrollbarWidth);
+            _vScrollBar.fireMouseDown(sbLocalX, y, button);
+            syncScrollFromBar();
+            return;
         }
+        super.fireMouseDown(x, y, button);
     }
 
+    override void fireMouseUp(int x, int y, int button)
+    {
+        // 拖拽中时始终转发 mouseUp 给 ScrollBar
+        if (_vScrollBar.isDragging)
+        {
+            syncScrollBar();
+            int sbLocalX = x - (width() - _scrollbarWidth);
+            _vScrollBar.fireMouseUp(sbLocalX, y, button);
+            syncScrollFromBar();
+            return;
+        }
+        super.fireMouseUp(x, y, button);
+    }
+
+    override void fireMouseMove(int x, int y)
+    {
+        // 拖拽中或在滚动条区域内时转发给 ScrollBar
+        if (_vScrollBar.isDragging || isInScrollbar(x))
+        {
+            syncScrollBar();
+            int sbLocalX = x - (width() - _scrollbarWidth);
+            _vScrollBar.fireMouseMove(sbLocalX, y);
+            syncScrollFromBar();
+            return;
+        }
+        super.fireMouseMove(x, y);
+    }
+
+    override void fireMouseWheel(int delta, int hDelta = 0, int x = 0, int y = 0)
+    {
+        MouseWheelEvent event;
+        event.id = EventId.MouseWheel;
+        event.target = this;
+        event.delta = delta;
+        event.hDelta = hDelta;
+        event.x = x;
+        event.y = y;
+        handleMouseWheel(event);
+        // Continue bubbling so nested containers / parents can scroll too
+        super.fireMouseWheel(delta, hDelta, x, y);
+    }
 
     override void render()
     {

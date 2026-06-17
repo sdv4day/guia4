@@ -30,6 +30,7 @@ class TabWidget : Control
         super(parent);
         width = 300;
         height = 250;
+        rendersChildren = true;  // 自己渲染子控件，防止递归重复渲染
         _tabControl = new TabControl(this, []);
         _tabHost = new TabHost(this);
     }
@@ -37,11 +38,18 @@ class TabWidget : Control
     /// 添加标签页（标签 + 页面内容），返回索引
     int addTab(string label, Control page)
     {
+        // 如果 page 已经有父控件，先移除，避免在旧父控件的 children 中残留引用
+        // 否则命中测试可能错误地找到这些残留子控件
+        if (page.parent() !is null)
+        {
+            page.parent().removeChild(page);
+        }
+
         int idx = _tabControl.addTab(label);
         _tabHost.addPage(page);
 
         // 立即同步 _tabHost 的大小与位置（首次渲染前 hitTest 才能正确）
-        _tabHost.setXY(position().x(), position().y() + _tabBarHeight);
+        _tabHost.setXY(0, _tabBarHeight);
         _tabHost.width(width());
         _tabHost.height(height() - _tabBarHeight);
 

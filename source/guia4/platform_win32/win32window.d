@@ -9,6 +9,10 @@ import windows.win32.ui.windowsandmessaging;
 import windows.win32.graphics.gdi;
 import std.utf;
 
+// 注意：不导入 windows.win32.ui.input.keyboardandmouse，避免 VK_* 常量冲突
+// 只导入需要的函数和类型
+import windows.win32.ui.input.keyboardandmouse : TrackMouseEvent, GetKeyState, TRACKMOUSEEVENT, TME_LEAVE;
+
 enum WM_PAINT = 0x000F;
 enum WM_CLOSE = 0x0010;
 enum WM_DESTROY = 0x0002;
@@ -25,34 +29,27 @@ enum WM_KEYUP = 0x0101;
 enum WM_CHAR = 0x0102;
 
 enum WM_MOUSEWHEEL = 0x020A;
+enum WM_MOUSEHWHEEL = 0x020E;  // 横向滚轮消息
 
 enum GWLP_USERDATA = -21;
 
 enum COLOR_WINDOW = 5;
 enum IDC_ARROW = 32512;
 
-struct TRACKMOUSEEVENT
-{
-    uint cbSize;
-    uint dwFlags;
-    HWND hwndTrack;
-    uint dwHoverTime;
-}
-
-enum TME_HOVER   = 0x00000001;
-enum TME_LEAVE   = 0x00000002;
-enum TME_NONCLIENT = 0x00000010;
-enum TME_QUERY   = 0x40000000;
-enum TME_CANCEL  = 0x80000000;
-enum HOVER_DEFAULT = 0xFFFFFFFF;
+// 注意：TRACKMOUSEEVENT 结构体、TrackMouseEvent、GetKeyState 已从 windows.win32.ui.input.keyboardandmessaging 导入
+// GetWindowLongPtrW、SetWindowLongPtrW 在标准库中只在 X86 版本下定义，需要手动声明
 
 // 事件数据结构已移至 guia4.platform.types，此处通过 import guia4.platform.types 引用
 
+// GetModuleHandleW 在 winlib 中未声明，需要手动声明
 extern(Windows) HINSTANCE GetModuleHandleW(const(PWSTR) lpModuleName);
+
+// GetWindowLongPtrW、SetWindowLongPtrW 在标准库中只在 X86 版本下定义，需要手动声明
 extern(Windows) LONG_PTR GetWindowLongPtrW(HWND hWnd, int nIndex);
 extern(Windows) LONG_PTR SetWindowLongPtrW(HWND hWnd, int nIndex, LONG_PTR dwNewLong);
-extern(Windows) BOOL TrackMouseEvent(ref TRACKMOUSEEVENT lpEventTrack);
-extern(Windows) short GetKeyState(int nVirtKey);
+
+// HOVER_DEFAULT 在 winlib 中未定义，需要手动定义
+enum HOVER_DEFAULT = 0xFFFFFFFF;
 
 enum MK_LBUTTON   = 0x0001;
 enum MK_RBUTTON   = 0x0002;
@@ -135,6 +132,7 @@ class Win32Window : IPlatformWindow
     private int _windowTableIndex = -1;
     
     void delegate() _closeCallback;
+    void delegate() _resizeCallback;
     void delegate(ref MouseEventData) _mouseCallback;
     void delegate(ref KeyEventData) _keyCallback;
     void delegate(ref WheelEventData) _wheelCallback;
@@ -241,7 +239,25 @@ class Win32Window : IPlatformWindow
                 }
                 return LRESULT(0);
             }
-            
+
+            case WM_SIZE:
+            {
+                // 窗口大小改变时触发回调，更新布局
+                if (window !is null)
+                {
+                    // 更新 Win32Window 内部的大小记录
+                    window._width = cast(uint)lParamX(lparam);
+                    window._height = cast(uint)lParamY(lparam);
+                    
+                    // 调用 resize 回调（MainWindow.onResize）
+                    if (window._resizeCallback !is null)
+                    {
+                        window._resizeCallback();
+                    }
+                }
+                return LRESULT(0);
+            }
+
             case WM_CLOSE:
             {
                 // Do NOT call DestroyWindow here — the close callback (MainWindow.close())
@@ -377,7 +393,22 @@ class Win32Window : IPlatformWindow
                     pt.x = lParamX(lparam);
                     pt.y = lParamY(lparam);
                     ScreenToClient(hwnd, &pt);
-                    window.internalWheel(cast(int)pt.x, cast(int)pt.y, delta);
+                    window.internalWheel(cast(int)pt.x, cast(int)pt.y, delta, 0);
+                }
+                return LRESULT(0);
+            }
+            
+            case WM_MOUSEHWHEEL:
+            {
+                if (window !is null)
+                {
+                    int hDelta = cast(short)((wparam.Value >> 16) & 0xFFFF);
+                    // WM_MOUSEHWHEEL gives screen coordinates; convert to client
+                    POINT pt;
+                    pt.x = lParamX(lparam);
+                    pt.y = lParamY(lparam);
+                    ScreenToClient(hwnd, &pt);
+                    window.internalWheel(cast(int)pt.x, cast(int)pt.y, 0, hDelta);
                 }
                 return LRESULT(0);
             }
@@ -391,7 +422,7 @@ class Win32Window : IPlatformWindow
     
     private void internalPaint(HWND hwnd)
     {
-        logInfo("Win32Window.internalPaint called");
+        logTrace("Win32Window.internalPaint called");
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
         
@@ -433,6 +464,11 @@ class Win32Window : IPlatformWindow
         _closeCallback = callback;
     }
     
+    void setResizeCallback(void delegate() callback)
+    {
+        _resizeCallback = callback;
+    }
+    
     /// Request WM_MOUSELEAVE notifications — call on first mouse move over the window.
     /// Must be re-armed after each WM_MOUSELEAVE fires (standard Win32 behaviour).
     private void trackMouseLeave()
@@ -442,7 +478,7 @@ class Win32Window : IPlatformWindow
         tme.dwFlags = TME_LEAVE;
         tme.hwndTrack = _hwnd;
         tme.dwHoverTime = HOVER_DEFAULT;
-        TrackMouseEvent(tme);
+        TrackMouseEvent(&tme);
     }
     
     void setMouseCallback(void delegate(ref MouseEventData) callback)
@@ -547,7 +583,7 @@ class Win32Window : IPlatformWindow
     }
     
     // Wheel event forwarder — called from wndProcWrapper
-    private void internalWheel(int x, int y, int delta)
+    private void internalWheel(int x, int y, int delta, int hDelta)
     {
         if (_wheelCallback !is null)
         {
@@ -555,6 +591,7 @@ class Win32Window : IPlatformWindow
             ev.x = x;
             ev.y = y;
             ev.delta = delta;
+            ev.hDelta = hDelta;
             _wheelCallback(ev);
         }
     }
@@ -685,8 +722,24 @@ class Win32Window : IPlatformWindow
         return _height;
     }
     
+    /**
+     * 析构函数 — 仅标记对象为已销毁
+     * 
+     * 注意：不在析构函数中调用 Win32 API（如 DestroyWindow），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * Win32 API 可能导致访问冲突。
+     * 
+     * 正确的做法是在程序退出前显式调用 destroy() 方法。
+     */
     ~this()
     {
-        destroy(); // safe — checks _destroyed flag
+        // 仅标记为已销毁，不调用 Win32 API
+        _destroyed = true;
+        // 从查找表中移除，避免悬空引用
+        if (_windowTableIndex >= 0)
+        {
+            forgetWindow(_windowTableIndex);
+            _windowTableIndex = -1;
+        }
     }
 }

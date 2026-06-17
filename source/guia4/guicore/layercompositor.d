@@ -4,6 +4,7 @@ import guia4.guicore.control;
 import guia4.guicore.layer;
 import guia4.guicore.dirtyflag;
 import guia4.platform_win32.win32defs;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import windows.win32.graphics.gdi;
 import windows.win32.foundation;
@@ -50,6 +51,21 @@ class LayerCompositor
     }
     
     /**
+     * 析构函数 — 仅标记资源为已销毁
+     * 
+     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * GDI API 可能导致访问冲突。
+     * 
+     * 正确的做法是在程序退出前显式调用 destroy() 方法。
+     */
+    ~this()
+    {
+        // 仅标记为未初始化，不调用 GDI API
+        _initialized = false;
+    }
+    
+    /**
      * 初始化合并引擎
      * 
      * Params:
@@ -77,7 +93,7 @@ class LayerCompositor
         
         // 填充白色背景
         RECT rect = {0, 0, width, height};
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH brush = CreateSolidBrush(Theme.crBackground());
         FillRect(_outputDC, &rect, brush);
         FillRect(_historyDC, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
@@ -128,7 +144,7 @@ class LayerCompositor
         if (clearBuffer)
         {
             RECT rect = {0, 0, _width, _height};
-            HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+            HBRUSH brush = CreateSolidBrush(Theme.crBackground());
             FillRect(_outputDC, &rect, brush);
             DeleteObject(cast(HGDIOBJ)brush);
         }
@@ -158,7 +174,7 @@ class LayerCompositor
      */
     private void compositeLayer(Control ctrl, bool dirtyOnly)
     {
-        logInfo("compositeLayer: ctrl=", typeid(ctrl).name, " position=(", ctrl.position().x(), ",", ctrl.position().y(), ") size=(", ctrl.width(), ",", ctrl.height(), ")");
+        logTrace("compositeLayer: ctrl=", typeid(ctrl).name, " position=(", ctrl.position().x(), ",", ctrl.position().y(), ") size=(", ctrl.width(), ",", ctrl.height(), ")");
         
         // 确保控件布局已执行
         ctrl.ensureLayout();
@@ -509,7 +525,7 @@ class LayerCompositor
     private void renderRegion(Control[] controls, RECT region)
     {
         // 先填充新暴露区域的背景
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH brush = CreateSolidBrush(Theme.crBackground());
         FillRect(_outputDC, &region, brush);
         DeleteObject(cast(HGDIOBJ)brush);
         

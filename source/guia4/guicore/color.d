@@ -103,6 +103,35 @@ struct Color
         return parseHex(hexColor);
     }
 
+    // ==================== 预定义颜色常量 ====================
+
+    /// 红色
+    static Color red() @safe pure nothrow @nogc { return rgb(255, 0, 0); }
+    /// 绿色
+    static Color green() @safe pure nothrow @nogc { return rgb(0, 255, 0); }
+    /// 蓝色
+    static Color blue() @safe pure nothrow @nogc { return rgb(0, 0, 255); }
+    /// 黑色
+    static Color black() @safe pure nothrow @nogc { return rgb(0, 0, 0); }
+    /// 白色
+    static Color white() @safe pure nothrow @nogc { return rgb(255, 255, 255); }
+    /// 灰色
+    static Color gray() @safe pure nothrow @nogc { return rgb(128, 128, 128); }
+    /// 黄色
+    static Color yellow() @safe pure nothrow @nogc { return rgb(255, 255, 0); }
+    /// 青色
+    static Color cyan() @safe pure nothrow @nogc { return rgb(0, 255, 255); }
+    /// 品红色
+    static Color magenta() @safe pure nothrow @nogc { return rgb(255, 0, 255); }
+    /// 橙色
+    static Color orange() @safe pure nothrow @nogc { return rgb(255, 128, 0); }
+    /// 紫色
+    static Color purple() @safe pure nothrow @nogc { return rgb(128, 0, 128); }
+    /// 粉色
+    static Color pink() @safe pure nothrow @nogc { return rgb(255, 192, 203); }
+    /// 棕色
+    static Color brown() @safe pure nothrow @nogc { return rgb(139, 69, 19); }
+
     // ==================== 属性访问 ====================
 
     /// 红色分量（0-255）
@@ -187,10 +216,10 @@ struct Color
 
     // ==================== GDI兼容 ====================
 
-    /// 转换为COLORREF（直接返回union成员）
+    /// 转换为COLORREF（清除alpha通道，Windows GDI要求高位字节为0）
     COLORREF toCOLORREF() const @safe pure nothrow @nogc
     {
-        return _colorref;
+        return COLORREF((_r << 16) | (_g << 8) | _b);
     }
 
     /// 从COLORREF创建Color（直接赋值union成员）

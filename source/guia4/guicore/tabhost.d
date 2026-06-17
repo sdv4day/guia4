@@ -3,6 +3,7 @@ module guia4.guicore.tabhost;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
@@ -26,6 +27,7 @@ class TabHost : Control
         super(parent);
         width = 300;
         height = 200;
+        rendersChildren = true;  // 自己渲染子控件，防止递归重复渲染
     }
 
     /// 当前活跃页面索引
@@ -54,8 +56,7 @@ class TabHost : Control
     {
         auto hdc = cast(HDC)hdc_;
         logTrace("TabHost.renderWithGDI() size=(", width(), ",", height(), ") activeIndex=", _activeIndex);
-        
-        // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
+
         // 确保布局已执行
         ensureLayout();
 
@@ -66,46 +67,44 @@ class TabHost : Control
             auto page = kids[_activeIndex];
             if (page.visible())
             {
-                int pageX = 0;
-                int pageY = 0;
                 int pageW = width();
                 int pageH = height();
 
-                // 设置页面尺寸（不设位置，因为用 DC 偏移）
+                // 设置页面尺寸
                 page.width(pageW);
                 page.height(pageH);
 
-                // 使用 DC 坐标偏移渲染页面内容
-                // SaveDC 保存当前状态
-                // IntersectClipRect 裁剪到 TabHost 区域
-                // OffsetViewportOrgEx 将原点偏移到 TabHost 位置
-                // 这样子控件用相对坐标（如 x=10, y=10）渲染时，
-                // GDI 实际绘制在 (pageX+10, pageY+10)
                 int savedDC = SaveDC(hdc);
-                IntersectClipRect(hdc, pageX, pageY, pageX + pageW, pageY + pageH);
-                POINT oldOrigin;
-                OffsetViewportOrgEx(hdc, pageX, pageY, &oldOrigin);
+                // 裁剪到 TabHost 区域（相对于父控件的本地坐标）
+                IntersectClipRect(hdc, 0, 0, pageW, pageH);
 
-                // 临时将 page 位置设为 (0,0)，这样 page.renderWithGDI 
-                // 内部使用 x()/y() 渲染时坐标是相对的
-                int origPageX = page.position().x();
-                int origPageY = page.position().y();
-                page.setXY(0, 0);
+                // 偏移视口到 TabHost 在父控件中的位置
+                POINT hostOrigin;
+                OffsetViewportOrgEx(hdc, position().x(), position().y(), &hostOrigin);
+
+                // 填充 TabHost 背景
+                RECT bgRect = {0, 0, pageW, pageH};
+                HBRUSH bgBrush = CreateSolidBrush(Theme.crContainerBg());
+                FillRect(hdc, &bgRect, bgBrush);
+                DeleteObject(cast(HGDIOBJ)bgBrush);
 
                 // 渲染 page 本身（如果有自定义渲染）
                 page.renderWithGDI(hdc.Value);
 
-                // 渲染 page 的子控件（Control 基类不会自动渲染子控件）
+                // 渲染 page 的子控件，对每个子控件偏移视口到其位置
                 foreach (child; page.children())
                 {
                     if (child.visible())
+                    {
+                        POINT childOrigin;
+                        OffsetViewportOrgEx(hdc, child.position().x(), child.position().y(), &childOrigin);
                         child.renderWithGDI(hdc.Value);
+                        SetViewportOrgEx(hdc, childOrigin.x, childOrigin.y, null);
+                    }
                 }
 
-                // 恢复 page 原始位置
-                page.setXY(origPageX, origPageY);
-
                 // 恢复 DC 状态
+                SetViewportOrgEx(hdc, hostOrigin.x, hostOrigin.y, null);
                 RestoreDC(hdc, savedDC);
             }
         }

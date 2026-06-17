@@ -6,6 +6,7 @@ import guia4.guicore.layout;
 import guia4.guicore.events;
 import guia4.guicore.position;
 import guia4.platform_win32.win32defs;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import windows.win32.graphics.gdi;
 // 注意：guicore 基类不直接依赖平台 GDI，renderWithGDI 使用 void* 以解耦
@@ -65,6 +66,8 @@ class Control
 
     private Position _position;
     private int _width, _height;
+    private bool _autoWidth = false;   /// 宽度由布局管理器自动设置
+    private bool _autoHeight = false;  /// 高度由布局管理器自动设置
     private bool _visible = true;
     private Layer _layer = Layer.Content;
     private Control _parent;
@@ -179,12 +182,12 @@ class Control
 
     void width(int v) nothrow @nogc @property
     {
-        if (_width != v) { _width = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_width != v) { _width = v; _autoWidth = (v == 0); _dirty.mark(DirtyBits.Size); propagateDirty(); }
     }
 
     void height(int v) nothrow @nogc @property
     {
-        if (_height != v) { _height = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_height != v) { _height = v; _autoHeight = (v == 0); _dirty.mark(DirtyBits.Size); propagateDirty(); }
     }
 
     // ── 可见性 ────────────────────────────────────────────────────
@@ -212,10 +215,10 @@ class Control
 
     // ── 焦点 ──────────────────────────────────────────────────────
 
-    bool focusable() const @property { return _focusable; }
-    void focusable(bool v) @property { _focusable = v; }
-    bool hasFocus() const @property { return _hasFocus; }
-    void hasFocus(bool v) @property
+    bool focusable() const nothrow @nogc @property { return _focusable; }
+    void focusable(bool v) nothrow @nogc @property { _focusable = v; }
+    bool hasFocus() const nothrow @nogc @property { return _hasFocus; }
+    void hasFocus(bool v) nothrow @nogc @property
     {
         if (_hasFocus != v)
         {
@@ -290,25 +293,41 @@ class Control
     /// 确保布局已执行（在渲染前调用）
     void ensureLayout()
     {
-        // 先执行子控件的布局（自底向上）
-        foreach (child; _children)
-        {
-            child.ensureLayout();
-        }
-        
-        // 总是执行布局（不检查 _layoutRequested）
-        // 这样可以确保停靠布局总是被应用
         if (_layout !is null)
         {
+            // 自定义布局管理器（如 VerticalLayout）：先子后父
+            // 子控件需先确定自身尺寸，父布局才能正确计算排列
+            foreach (child; _children)
+            {
+                child.ensureLayout();
+            }
             _layout.layout(this);
         }
         else
         {
-            // 无布局管理器时，应用停靠布局
+            // 停靠布局（无布局管理器）：先父后子
+            // 父容器先分配空间（如 DockStyle.Fill 的宽高），子控件再基于分配到的空间布局
             layoutChildren();
+            foreach (child; _children)
+            {
+                child.ensureLayout();
+            }
         }
         
         _layoutRequested = false;
+    }
+    
+    // ── 布局管理器专用接口（package级别，同包可访问）────────────────
+    
+    package bool autoWidth() const nothrow @nogc { return _autoWidth; }
+    package bool autoHeight() const nothrow @nogc { return _autoHeight; }
+    package void setLayoutWidth(int v) nothrow @nogc
+    {
+        if (_width != v) { _width = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
+    }
+    package void setLayoutHeight(int v) nothrow @nogc
+    {
+        if (_height != v) { _height = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
     }
 
     // ── 脏标记 ────────────────────────────────────────────────────
@@ -357,7 +376,7 @@ class Control
         
         // 填充透明背景（白色，后续可改为真正的alpha通道）
         RECT rect = {0, 0, _width, _height};
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH brush = CreateSolidBrush(Theme.crBackground());
         FillRect(_layerDC, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
         
@@ -370,10 +389,17 @@ class Control
         if (_layerDC.Value !is null)
         {
             if (_layerOldBmp.Value !is null)
+            {
                 SelectObject(_layerDC, _layerOldBmp);
+                _layerOldBmp = HGDIOBJ.init;
+            }
             if (_layerBmp.Value !is null)
+            {
                 DeleteObject(cast(HGDIOBJ)_layerBmp);
+                _layerBmp = HBITMAP.init;
+            }
             DeleteDC(_layerDC);
+            _layerDC = HDC.init;
         }
         _layerBufferValid = false;
     }
@@ -393,7 +419,7 @@ class Control
         // 子类应该重写这个方法来渲染自己的内容
         // 默认实现：填充背景
         RECT rect = {0, 0, _width, _height};
-        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH brush = CreateSolidBrush(Theme.crBackground());
         FillRect(_layerDC, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
     }
@@ -533,7 +559,7 @@ class Control
         }
     }
 
-    void fireMouseWheel(int delta, int x = 0, int y = 0)
+    void fireMouseWheel(int delta, int hDelta = 0, int x = 0, int y = 0)
     {
         if (_mouseWheelHandler !is null)
         {
@@ -541,6 +567,7 @@ class Control
             event.id = EventId.MouseWheel;
             event.target = this;
             event.delta = delta;
+            event.hDelta = hDelta;
             event.x = x;
             event.y = y;
             _mouseWheelHandler(event);
@@ -548,7 +575,7 @@ class Control
         else if (_parent !is null)
         {
             // 冒泡到父控件 — 允许 ScrollableContainer 在光标位于子控件上时接收滚轮事件
-            _parent.fireMouseWheel(delta, x, y);
+            _parent.fireMouseWheel(delta, hDelta, x, y);
         }
     }
 
@@ -653,6 +680,24 @@ class Control
         {
             parent.addChild(this);
         }
+    }
+    
+    /**
+     * 析构函数 — 仅断开引用链
+     * 
+     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
+     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
+     * GDI API 可能导致访问冲突。
+     * 
+     * 同时，不遍历 _children 数组，因为子对象可能已经被析构。
+     * 正确的做法是在控件被移除时显式调用 destroyLayerBuffer() 方法。
+     */
+    ~this()
+    {
+        // 仅清空引用，不遍历子对象
+        // GC 会自动回收所有对象
+        _children = null;
+        _parent = null;
     }
 
     void render() {}
@@ -761,7 +806,7 @@ class Control
     /// 对所有子控件应用停靠布局（由容器控件在布局时调用）
     void layoutChildren()
     {
-        logInfo("layoutChildren: parent=", typeid(this).name, " size=(", _width, ",", _height, ") children=", _children.length);
+        logTrace("layoutChildren: parent=", typeid(this).name, " size=(", _width, ",", _height, ") children=", _children.length);
         
         // 停靠布局：按 DockStyle 顺序（Top→Bottom→Left→Right→Fill）依次分配空间
         // 剩余空间逐步被停靠控件占据
@@ -845,6 +890,59 @@ class Control
         }
 
         if (remainingH < 0) remainingH = 0;
+    }
+
+    // ── 滚动偏移虚属性 ──────────────────────────────────────────
+
+    /// 本控件的纵向滚动偏移（像素）。子类（ScrollableContainer/Panel/GridWidgetBase）override。
+    /// 默认返回 0（无滚动）。
+    int scrollOffsetY() const @property { return 0; }
+
+    /// 本控件的横向滚动偏移（像素）。子类 override。
+    int scrollOffsetX() const @property { return 0; }
+
+    // ── 坐标转换 ──────────────────────────────────────────────
+
+    /// 计算本控件在窗口客户区中的绝对坐标
+    /// 累加所有祖先的 position 偏移，并补偿滚动容器的 scrollOffset
+    void controlToClient(out int absX, out int absY)
+    {
+        absX = _position.x();
+        absY = _position.y();
+        int scrollY = 0;
+
+        Control cur = _parent;
+        while (cur !is null)
+        {
+            absX += cur._position.x();
+            absY += cur._position.y();
+            scrollY += cur.scrollOffsetY();
+            cur = cur._parent;
+        }
+
+        absY -= scrollY;
+    }
+
+    /// 将窗口客户区坐标转换为本控件的局部坐标
+    void clientToControl(int clientX, int clientY, out int localX, out int localY)
+    {
+        int absX, absY;
+        controlToClient(absX, absY);
+        localX = clientX - absX;
+        localY = clientY - absY;
+    }
+
+    /// 累加所有祖先的纵向滚动偏移
+    static int ancestorScrollY(Control ctrl)
+    {
+        int total = 0;
+        Control cur = ctrl._parent;
+        while (cur !is null)
+        {
+            total += cur.scrollOffsetY();
+            cur = cur._parent;
+        }
+        return total;
     }
 
     bool hitTest(int px, int py) const nothrow @nogc

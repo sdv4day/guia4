@@ -3,6 +3,7 @@ module guia4.guicore.scrollbar;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
@@ -39,11 +40,11 @@ class ScrollBar : Control
     private int _dragStart = 0;
     private int _dragStartValue = 0;
 
-    // 颜色
-    private COLORREF _trackColor   = cast(COLORREF)0x00E0E0E0; // 轨道灰色
-    private COLORREF _thumbColor   = cast(COLORREF)0x00C0C0C0; // 滑块灰色
-    private COLORREF _thumbHoverColor = cast(COLORREF)0x00A0A0A0; // 滑块悬停色
-    private COLORREF _thumbDragColor  = cast(COLORREF)0x00808080; // 滑块拖拽色
+    // 颜色（使用 Theme 常量作为默认值）
+    private COLORREF _trackColor   = Theme.crScrollTrack();
+    private COLORREF _thumbColor   = Theme.crScrollThumb();
+    private COLORREF _thumbHoverColor = Theme.crScrollHover();
+    private COLORREF _thumbDragColor  = Theme.crScrollDrag();
 
     this(Control parent, ScrollBarOrientation orient = ScrollBarOrientation.Vertical)
     {
@@ -81,6 +82,9 @@ class ScrollBar : Control
 
     int pageSize() const @property { return _pageSize; }
     void pageSize(int v) @property { _pageSize = v; _value = clampValue(_value); markDirty(DirtyBits.Visual); }
+
+    /// 滑块是否正在被拖拽（供容器查询以转发事件）
+    bool isDragging() const @property { return _thumbDragging; }
 
     // ── 辅助方法 ──────────────────────────────────────────
 
@@ -308,7 +312,7 @@ class ScrollBar : Control
         DeleteObject(cast(HGDIOBJ)thumbBrush);
 
         // 滑块边框
-        HPEN thumbPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00888888);
+        HPEN thumbPen = CreatePen(PS_SOLID, 1, Theme.crScrollBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)thumbPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
         Rectangle(hdc, thumbRect.left, thumbRect.top, thumbRect.right, thumbRect.bottom);

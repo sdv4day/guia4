@@ -3,6 +3,8 @@ module guia4.guicore.gridwidgetbase;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.scrollbar;
+import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
 import guia4.utils.math : clamp;
@@ -35,15 +37,9 @@ abstract class GridWidgetBase : Control
     private uint _fontSize = 14;
     private int _scrollBarWidth = 14;         /// 滚动条宽度（像素）
 
-    // ── 垂直滚动条拖拽状态 ──
-    private bool _vThumbDragging = false;
-    private int _vThumbDragStart = 0;         /// 拖拽起始鼠标Y
-    private int _vThumbDragStartScroll = 0;   /// 拖拽起始scrollY
-
-    // ── 水平滚动条拖拽状态 ──
-    private bool _hThumbDragging = false;
-    private int _hThumbDragStart = 0;         /// 拖拽起始鼠标X
-    private int _hThumbDragStartScroll = 0;   /// 拖拽起始scrollX
+    // ── 内部 ScrollBar 实例（非子控件）──
+    private ScrollBar _vScrollBar;
+    private ScrollBar _hScrollBar;
 
     // ── 列级可写控制 ──
     protected bool[] _colEditable;  /// 每列是否可编辑（空数组=全部可编辑）
@@ -87,6 +83,12 @@ abstract class GridWidgetBase : Control
         onMouseWheel(&handleWheel);
         onKeyDown(&handleKeyDown);
         onTextInput(&handleTextInput);
+
+        // 创建内部滚动条（null parent = 不加入控件树）
+        _vScrollBar = new ScrollBar(null, ScrollBarOrientation.Vertical);
+        _vScrollBar.width = _scrollBarWidth;
+        _hScrollBar = new ScrollBar(null, ScrollBarOrientation.Horizontal);
+        _hScrollBar.height = _scrollBarWidth;
     }
 
     /// 行数
@@ -169,6 +171,12 @@ abstract class GridWidgetBase : Control
         markDirty(DirtyBits.Visual);
     }
 
+    /// override Control.scrollOffsetY
+    override int scrollOffsetY() const @property { return _scrollY; }
+
+    /// override Control.scrollOffsetX
+    override int scrollOffsetX() const @property { return _scrollX; }
+
     /// 所有列的总宽度
     int totalColWidth() const
     {
@@ -192,6 +200,66 @@ abstract class GridWidgetBase : Control
         int totalW = totalColWidth();
         int viewW = width();
         return totalW > viewW;
+    }
+
+    // ── ScrollBar 同步辅助 ──
+
+    /// 同步内部 ScrollBar 状态（渲染和事件转发前调用）
+    private void syncScrollBars()
+    {
+        int headerH = _headerVisible ? _rowHeight : 0;
+        int viewH = height() - headerH - (needHScroll() ? _scrollBarWidth : 0);
+        int viewW = width() - (needVScroll() ? _scrollBarWidth : 0);
+        int totalH = _rowCount * _rowHeight;
+        int totalW = totalColWidth();
+
+        // 纵向
+        _vScrollBar.width = _scrollBarWidth;
+        _vScrollBar.height = viewH;
+        _vScrollBar.min(0);
+        _vScrollBar.max(totalH);
+        _vScrollBar.pageSize(viewH);
+        _vScrollBar.value(_scrollY);
+
+        // 横向
+        _hScrollBar.height = _scrollBarWidth;
+        _hScrollBar.width = viewW;
+        _hScrollBar.min(0);
+        _hScrollBar.max(totalW);
+        _hScrollBar.pageSize(viewW);
+        _hScrollBar.value(_scrollX);
+    }
+
+    /// 从内部 ScrollBar 同步滚动值回 GridWidgetBase
+    private void syncScrollFromBars()
+    {
+        int newSY = _vScrollBar.value();
+        int newSX = _hScrollBar.value();
+        if (newSY != _scrollY || newSX != _scrollX)
+        {
+            _scrollY = newSY;
+            _scrollX = newSX;
+            markDirty(DirtyBits.Visual);
+        }
+    }
+
+    /// 判断控件局部坐标是否在纵向滚动条区域内
+    private bool isInVScrollbar(int lx, int ly) const
+    {
+        if (!needVScroll()) return false;
+        int headerH = _headerVisible ? _rowHeight : 0;
+        int sbH = height() - headerH - (needHScroll() ? _scrollBarWidth : 0);
+        return lx >= width() - _scrollBarWidth && lx < width()
+            && ly >= headerH && ly < headerH + sbH;
+    }
+
+    /// 判断控件局部坐标是否在横向滚动条区域内
+    private bool isInHScrollbar(int lx, int ly) const
+    {
+        if (!needHScroll()) return false;
+        int sbW = width() - (needVScroll() ? _scrollBarWidth : 0);
+        return ly >= height() - _scrollBarWidth && ly < height()
+            && lx >= 0 && lx < sbW;
     }
 
     // ── 编辑相关方法 ──────────────────────────────────────
@@ -296,29 +364,26 @@ abstract class GridWidgetBase : Control
             return;
 
         // ── 检查垂直滚动条点击 ──
-        if (needVScroll())
+        if (isInVScrollbar(mx, my))
         {
-            int vsbX = width() - _scrollBarWidth;
-            int vsbY = (_headerVisible ? _rowHeight : 0);
-            int vsbH = height() - vsbY - (needHScroll() ? _scrollBarWidth : 0);
-            if (mx >= vsbX && mx < width() && my >= vsbY && my < vsbY + vsbH)
-            {
-                handleVScrollClick(my - vsbY, vsbH);
-                return;
-            }
+            syncScrollBars();
+            int headerH = _headerVisible ? _rowHeight : 0;
+            int sbLocalX = mx - (width() - _scrollBarWidth);
+            int sbLocalY = my - headerH;
+            _vScrollBar.fireMouseDown(sbLocalX, sbLocalY, button);
+            syncScrollFromBars();
+            return;
         }
 
         // ── 检查水平滚动条点击 ──
-        if (needHScroll())
+        if (isInHScrollbar(mx, my))
         {
-            int hsbY = height() - _scrollBarWidth;
-            int hsbX = 0;
-            int hsbW = width() - (needVScroll() ? _scrollBarWidth : 0);
-            if (mx >= hsbX && mx < hsbX + hsbW && my >= hsbY && my < hsbY + _scrollBarWidth)
-            {
-                handleHScrollClick(mx - hsbX, hsbW);
-                return;
-            }
+            syncScrollBars();
+            int sbLocalX = mx;
+            int sbLocalY = my - (height() - _scrollBarWidth);
+            _hScrollBar.fireMouseDown(sbLocalX, sbLocalY, button);
+            syncScrollFromBars();
+            return;
         }
 
         // mx, my 已经是控件本地坐标（由 MainWindow clientToControl 转换）
@@ -380,121 +445,27 @@ abstract class GridWidgetBase : Control
         super.fireMouseDown(mx, my, button);
     }
 
-    /// 垂直滚动条点击处理
-    private void handleVScrollClick(int clickY, int trackH)
-    {
-        int totalH = _rowCount * _rowHeight;
-        int thumbH = cast(int)((cast(long)trackH * trackH) / totalH);
-        if (thumbH < 16) thumbH = 16;
-        if (thumbH > trackH) thumbH = trackH;
-        int movable = trackH - thumbH;
-        int maxS = maxScroll();
-        int thumbY;
-        if (maxS <= 0) thumbY = 0;
-        else thumbY = cast(int)((cast(long)_scrollY * movable) / maxS);
-
-        // 点击在滑块上：开始拖拽
-        if (clickY >= thumbY && clickY < thumbY + thumbH)
-        {
-            _vThumbDragging = true;
-            _vThumbDragStart = clickY + (_headerVisible ? _rowHeight : 0);  /// 还原为控件本地Y坐标
-            _vThumbDragStartScroll = _scrollY;
-            markDirty(DirtyBits.Visual);
-            return;
-        }
-
-        // 点击在滑块上方：向上翻页
-        if (clickY < thumbY)
-        {
-            int viewH = height() - (_headerVisible ? _rowHeight : 0) - (needHScroll() ? _scrollBarWidth : 0);
-            _scrollY = (_scrollY - viewH).clamp(0, maxS);
-            markDirty(DirtyBits.Visual);
-            return;
-        }
-
-        // 点击在滑块下方：向下翻页
-        int viewH2 = height() - (_headerVisible ? _rowHeight : 0) - (needHScroll() ? _scrollBarWidth : 0);
-        _scrollY = (_scrollY + viewH2).clamp(0, maxS);
-        markDirty(DirtyBits.Visual);
-    }
-
-    /// 水平滚动条点击处理
-    private void handleHScrollClick(int clickX, int trackW)
-    {
-        int totalW = totalColWidth();
-        int thumbW = cast(int)((cast(long)trackW * trackW) / totalW);
-        if (thumbW < 16) thumbW = 16;
-        if (thumbW > trackW) thumbW = trackW;
-        int movable = trackW - thumbW;
-        int maxS = maxScrollX();
-        int thumbX;
-        if (maxS <= 0) thumbX = 0;
-        else thumbX = cast(int)((cast(long)_scrollX * movable) / maxS);
-
-        // 点击在滑块上：开始拖拽
-        if (clickX >= thumbX && clickX < thumbX + thumbW)
-        {
-            _hThumbDragging = true;
-            _hThumbDragStart = clickX;
-            _hThumbDragStartScroll = _scrollX;
-            markDirty(DirtyBits.Visual);
-            return;
-        }
-
-        // 点击在滑块左方：向左翻页
-        if (clickX < thumbX)
-        {
-            int viewW = width() - (needVScroll() ? _scrollBarWidth : 0);
-            _scrollX = (_scrollX - viewW).clamp(0, maxS);
-            markDirty(DirtyBits.Visual);
-            return;
-        }
-
-        // 点击在滑块右方：向右翻页
-        int viewW2 = width() - (needVScroll() ? _scrollBarWidth : 0);
-        _scrollX = (_scrollX + viewW2).clamp(0, maxS);
-        markDirty(DirtyBits.Visual);
-    }
-
     override void fireMouseMove(int mx, int my)
     {
-        if (_vThumbDragging)
+        bool vDrag = _vScrollBar.isDragging;
+        bool hDrag = _hScrollBar.isDragging;
+        if (vDrag || hDrag || isInVScrollbar(mx, my) || isInHScrollbar(mx, my))
         {
-            // 拖拽垂直滑块
+            syncScrollBars();
             int headerH = _headerVisible ? _rowHeight : 0;
-            int delta = my - _vThumbDragStart;
-            int trackH = height() - headerH - (needHScroll() ? _scrollBarWidth : 0);
-            int totalH = _rowCount * _rowHeight;
-            int thumbH = cast(int)((cast(long)trackH * trackH) / totalH);
-            if (thumbH < 16) thumbH = 16;
-            if (thumbH > trackH) thumbH = trackH;
-            int movable = trackH - thumbH;
-            if (movable > 0)
+            if (vDrag || isInVScrollbar(mx, my))
             {
-                int maxS = maxScroll();
-                int valueDelta = (delta * maxS) / movable;
-                _scrollY = (_vThumbDragStartScroll + valueDelta).clamp(0, maxS);
-                markDirty(DirtyBits.Visual);
+                int sbLocalX = mx - (width() - _scrollBarWidth);
+                int sbLocalY = my - headerH;
+                _vScrollBar.fireMouseMove(sbLocalX, sbLocalY);
             }
-            return;
-        }
-        if (_hThumbDragging)
-        {
-            // 拖拽水平滑块
-            int delta = mx - _hThumbDragStart;
-            int trackW = width() - (needVScroll() ? _scrollBarWidth : 0);
-            int totalW = totalColWidth();
-            int thumbW = cast(int)((cast(long)trackW * trackW) / totalW);
-            if (thumbW < 16) thumbW = 16;
-            if (thumbW > trackW) thumbW = trackW;
-            int movable = trackW - thumbW;
-            if (movable > 0)
+            if (hDrag || isInHScrollbar(mx, my))
             {
-                int maxS = maxScrollX();
-                int valueDelta = (delta * maxS) / movable;
-                _scrollX = (_hThumbDragStartScroll + valueDelta).clamp(0, maxS);
-                markDirty(DirtyBits.Visual);
+                int sbLocalX = mx;
+                int sbLocalY = my - (height() - _scrollBarWidth);
+                _hScrollBar.fireMouseMove(sbLocalX, sbLocalY);
             }
+            syncScrollFromBars();
             return;
         }
         super.fireMouseMove(mx, my);
@@ -502,16 +473,25 @@ abstract class GridWidgetBase : Control
 
     override void fireMouseUp(int mx, int my, int button)
     {
-        if (_vThumbDragging)
+        bool vDrag = _vScrollBar.isDragging;
+        bool hDrag = _hScrollBar.isDragging;
+        if (vDrag || hDrag)
         {
-            _vThumbDragging = false;
-            markDirty(DirtyBits.Visual);
-            return;
-        }
-        if (_hThumbDragging)
-        {
-            _hThumbDragging = false;
-            markDirty(DirtyBits.Visual);
+            syncScrollBars();
+            int headerH = _headerVisible ? _rowHeight : 0;
+            if (vDrag)
+            {
+                int sbLocalX = mx - (width() - _scrollBarWidth);
+                int sbLocalY = my - headerH;
+                _vScrollBar.fireMouseUp(sbLocalX, sbLocalY, button);
+            }
+            if (hDrag)
+            {
+                int sbLocalX = mx;
+                int sbLocalY = my - (height() - _scrollBarWidth);
+                _hScrollBar.fireMouseUp(sbLocalX, sbLocalY, button);
+            }
+            syncScrollFromBars();
             return;
         }
         super.fireMouseUp(mx, my, button);
@@ -826,7 +806,6 @@ abstract class GridWidgetBase : Control
     override void renderWithGDI(void* hdc_)
     {
         auto hdc = cast(HDC)hdc_;
-        logTrace("GridWidgetBase.renderWithGDI() size=(", width(), ",", height(), ")");
 
         // 关键修复：视口已经被偏移到控件位置，所以使用 (0, 0) 作为基准
         int rx = 0;
@@ -839,7 +818,7 @@ abstract class GridWidgetBase : Control
             cast(LONG)rx, cast(LONG)ry,
             cast(LONG)(rx + rw), cast(LONG)(ry + rh)
         };
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH bgBrush = CreateSolidBrush(Theme.crBackground());
         FillRect(hdc, &bgRect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
@@ -857,12 +836,12 @@ abstract class GridWidgetBase : Control
                 cast(LONG)rx, cast(LONG)ry,
                 cast(LONG)(rx + rw), cast(LONG)(ry + _rowHeight)
             };
-            HBRUSH hdrBrush = CreateSolidBrush(cast(COLORREF)0x00E8E8E8);
+            HBRUSH hdrBrush = CreateSolidBrush(Theme.crHeaderBg());
             FillRect(hdc, &hdrRect, hdrBrush);
             DeleteObject(cast(HGDIOBJ)hdrBrush);
 
             // 表头文字
-            SetTextColor(hdc, cast(COLORREF)0x00333333);
+            SetTextColor(hdc, Theme.crText());
             int colX = rx - _scrollX;
             for (int c = 0; c < _colCount; c++)
             {
@@ -877,6 +856,13 @@ abstract class GridWidgetBase : Control
         }
 
         // ── 逐行逐列渲染单元格 ──
+        // 设置裁剪区域为数据区域（表头下方），防止滚动时数据覆盖表头
+        int savedDC = SaveDC(hdc);
+        if (_headerVisible)
+        {
+            IntersectClipRect(hdc, rx, ry + headerH, rx + rw, ry + rh);
+        }
+        
         int bodyY = ry + headerH - _scrollY;
         for (int r = 0; r < _rowCount; r++)
         {
@@ -909,14 +895,14 @@ abstract class GridWidgetBase : Control
                         cast(LONG)(colX + cw), cast(LONG)(cellY + _rowHeight)
                     };
                     // 可编辑列选中：蓝色背景；不可编辑列选中：灰色背景
-                    COLORREF selColor = isColEditable(c) ? cast(COLORREF)0x00CCCCFF : cast(COLORREF)0x00E0E0E0;
+                    COLORREF selColor = isColEditable(c) ? Theme.crSelected() : Theme.crScrollTrack();
                     HBRUSH selBrush = CreateSolidBrush(selColor);
                     FillRect(hdc, &selRect, selBrush);
                     DeleteObject(cast(HGDIOBJ)selBrush);
                 }
 
                 // 单元格文字
-                SetTextColor(hdc, cast(COLORREF)0x00333333);
+                SetTextColor(hdc, Theme.crText());
                 string cell = (_cellTextDelegate !is null) ? _cellTextDelegate(r, c) : cellText(r, c);
                 wstring cellW = toUTF16(cell);
                 int textX = colX + 4;
@@ -926,14 +912,17 @@ abstract class GridWidgetBase : Control
                 colX += cw;
             }
         }
+        
+        // 恢复裁剪区域
+        RestoreDC(hdc, savedDC);
 
         FontCache.release(hdc, fontEntry);
 
         // ── 网格线 ──
-        HPEN gridPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00CCCCCC);
+        HPEN gridPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)gridPen);
 
-        // 水平线
+        // 水平线（数据区域，不穿过表头）
         {
             // 表头底线
             if (_headerVisible)
@@ -954,26 +943,44 @@ abstract class GridWidgetBase : Control
             }
         }
 
-        // 垂直线
+        SelectObject(hdc, oldPen);
+        DeleteObject(cast(HGDIOBJ)gridPen);
+
+        // ── 垂直线（穿过表头和数据区域）──
+        // 在表头上方单独绘制，避免被数据区域裁剪覆盖
+        if (_scrollY > 0)
         {
+            HPEN vPen = CreatePen(PS_SOLID, 1, Theme.crBorder());
+            HGDIOBJ oldVPen = SelectObject(hdc, cast(HGDIOBJ)vPen);
             int colX = rx - _scrollX;
             for (int c = 0; c <= _colCount; c++)
             {
                 MoveToEx(hdc, colX, ry, null);
-                LineTo(hdc, colX, ry + rh);
+                LineTo(hdc, colX, ry + headerH);
                 if (c < _colCount)
                     colX += getColWidth(c);
             }
+            SelectObject(hdc, oldVPen);
+            DeleteObject(cast(HGDIOBJ)vPen);
         }
 
-        SelectObject(hdc, oldPen);
-        DeleteObject(cast(HGDIOBJ)gridPen);
-
-        // ── 滚动条 ──
+        // ── 滚动条（通过内部 ScrollBar）──
+        syncScrollBars();
         if (needVScroll())
-            renderVScrollBar(hdc, rx, ry, rw, rh);
+        {
+            int vsbHeaderH = _headerVisible ? _rowHeight : 0;
+            POINT sbOrigin;
+            OffsetViewportOrgEx(hdc, rx + rw - _scrollBarWidth, ry + vsbHeaderH, &sbOrigin);
+            _vScrollBar.renderWithGDI(hdc.Value);
+            SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
+        }
         if (needHScroll())
-            renderHScrollBar(hdc, rx, ry, rw, rh);
+        {
+            POINT sbOrigin;
+            OffsetViewportOrgEx(hdc, rx, ry + rh - _scrollBarWidth, &sbOrigin);
+            _hScrollBar.renderWithGDI(hdc.Value);
+            SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
+        }
         // 右下角交汇区域
         if (needVScroll() && needHScroll())
         {
@@ -981,84 +988,19 @@ abstract class GridWidgetBase : Control
             int cornerY = ry + rh - _scrollBarWidth;
             RECT cornerRect = { cast(LONG)cornerX, cast(LONG)cornerY,
                                 cast(LONG)(cornerX + _scrollBarWidth), cast(LONG)(cornerY + _scrollBarWidth) };
-            HBRUSH cornerBrush = CreateSolidBrush(cast(COLORREF)0x00E0E0E0);
+            HBRUSH cornerBrush = CreateSolidBrush(Theme.crScrollTrack());
             FillRect(hdc, &cornerRect, cornerBrush);
             DeleteObject(cast(HGDIOBJ)cornerBrush);
         }
 
         // ── 边框 ──
-        HPEN borderPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00888888);
+        HPEN borderPen = CreatePen(PS_SOLID, 1, Theme.crBorderDark());
         HGDIOBJ oldPen2 = SelectObject(hdc, cast(HGDIOBJ)borderPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
         Rectangle(hdc, rx, ry, rx + rw, ry + rh);
         SelectObject(hdc, oldPen2);
         SelectObject(hdc, oldBrush);
         DeleteObject(cast(HGDIOBJ)borderPen);
-    }
-
-    /// 渲染垂直滚动条
-    private void renderVScrollBar(HDC hdc, int rx, int ry, int rw, int rh)
-    {
-        int headerH = _headerVisible ? _rowHeight : 0;
-        int sbX = rx + rw - _scrollBarWidth;
-        int sbY = ry + headerH;
-        int sbH = rh - headerH - (needHScroll() ? _scrollBarWidth : 0);
-        if (sbH <= 0) return;
-
-        // 轨道背景
-        RECT trackRect = { cast(LONG)sbX, cast(LONG)sbY, cast(LONG)(sbX + _scrollBarWidth), cast(LONG)(sbY + sbH) };
-        HBRUSH trackBrush = CreateSolidBrush(cast(COLORREF)0x00E0E0E0);
-        FillRect(hdc, &trackRect, trackBrush);
-        DeleteObject(cast(HGDIOBJ)trackBrush);
-
-        // 滑块
-        int totalH = _rowCount * _rowHeight;
-        int thumbH = cast(int)((cast(long)sbH * sbH) / totalH);
-        if (thumbH < 16) thumbH = 16;
-        if (thumbH > sbH) thumbH = sbH;
-        int movable = sbH - thumbH;
-        int maxS = maxScroll();
-        int thumbY;
-        if (maxS <= 0) thumbY = 0;
-        else thumbY = cast(int)((cast(long)_scrollY * movable) / maxS);
-
-        RECT thumbRect = { cast(LONG)(sbX + 1), cast(LONG)(sbY + thumbY),
-                           cast(LONG)(sbX + _scrollBarWidth - 1), cast(LONG)(sbY + thumbY + thumbH) };
-        HBRUSH thumbBrush = CreateSolidBrush(cast(COLORREF)0x00C0C0C0);
-        FillRect(hdc, &thumbRect, thumbBrush);
-        DeleteObject(cast(HGDIOBJ)thumbBrush);
-    }
-
-    /// 渲染水平滚动条
-    private void renderHScrollBar(HDC hdc, int rx, int ry, int rw, int rh)
-    {
-        int sbY = ry + rh - _scrollBarWidth;
-        int sbX = rx;
-        int sbW = rw - (needVScroll() ? _scrollBarWidth : 0);
-        if (sbW <= 0) return;
-
-        // 轨道背景
-        RECT trackRect = { cast(LONG)sbX, cast(LONG)sbY, cast(LONG)(sbX + sbW), cast(LONG)(sbY + _scrollBarWidth) };
-        HBRUSH trackBrush = CreateSolidBrush(cast(COLORREF)0x00E0E0E0);
-        FillRect(hdc, &trackRect, trackBrush);
-        DeleteObject(cast(HGDIOBJ)trackBrush);
-
-        // 滑块
-        int totalW = totalColWidth();
-        int thumbW = cast(int)((cast(long)sbW * sbW) / totalW);
-        if (thumbW < 16) thumbW = 16;
-        if (thumbW > sbW) thumbW = sbW;
-        int movable = sbW - thumbW;
-        int maxS = maxScrollX();
-        int thumbX;
-        if (maxS <= 0) thumbX = 0;
-        else thumbX = cast(int)((cast(long)_scrollX * movable) / maxS);
-
-        RECT thumbRect = { cast(LONG)(sbX + thumbX), cast(LONG)(sbY + 1),
-                           cast(LONG)(sbX + thumbX + thumbW), cast(LONG)(sbY + _scrollBarWidth - 1) };
-        HBRUSH thumbBrush = CreateSolidBrush(cast(COLORREF)0x00C0C0C0);
-        FillRect(hdc, &thumbRect, thumbBrush);
-        DeleteObject(cast(HGDIOBJ)thumbBrush);
     }
 
     /// 渲染编辑中的单元格（白色背景 + 蓝色边框 + 文本 + 选区高亮 + 光标）
@@ -1069,12 +1011,12 @@ abstract class GridWidgetBase : Control
             cast(LONG)cellX, cast(LONG)cellY,
             cast(LONG)(cellX + cellW), cast(LONG)(cellY + _rowHeight)
         };
-        HBRUSH editBrush = CreateSolidBrush(cast(COLORREF)0x00FFFFFF);
+        HBRUSH editBrush = CreateSolidBrush(Theme.crBackground());
         FillRect(hdc, &editRect, editBrush);
         DeleteObject(cast(HGDIOBJ)editBrush);
 
         // 蓝色边框
-        HPEN editPen = CreatePen(PS_SOLID, 2, cast(COLORREF)0x00FF6600);
+        HPEN editPen = CreatePen(PS_SOLID, 2, Theme.crFocusBorder());
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)editPen);
         HGDIOBJ oldBrush = SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
         Rectangle(hdc, cellX, cellY, cellX + cellW, cellY + _rowHeight);
@@ -1083,7 +1025,7 @@ abstract class GridWidgetBase : Control
         DeleteObject(cast(HGDIOBJ)editPen);
 
         // 编辑文本
-        SetTextColor(hdc, cast(COLORREF)0x00000000);
+        SetTextColor(hdc, Theme.crText());
         wstring editW = toUTF16(_editText);
         int textX = cellX + 4;
         int textY = cellY + (_rowHeight - cast(int)_fontSize) / 2;
@@ -1105,7 +1047,7 @@ abstract class GridWidgetBase : Control
                 cast(LONG)(textX + sizeBefore.cx), cast(LONG)(cellY + 2),
                 cast(LONG)(textX + sizeBefore.cx + sizeSel.cx), cast(LONG)(cellY + _rowHeight - 2)
             };
-            HBRUSH selBrush = CreateSolidBrush(cast(COLORREF)0x00CCCCFF);
+            HBRUSH selBrush = CreateSolidBrush(Theme.crSelected());
             FillRect(hdc, &selRect, selBrush);
             DeleteObject(cast(HGDIOBJ)selBrush);
         }
@@ -1129,7 +1071,7 @@ abstract class GridWidgetBase : Control
             int cursorY1 = cellY + 2;
             int cursorY2 = cellY + _rowHeight - 2;
 
-            HPEN cursorPen = CreatePen(PS_SOLID, 1, cast(COLORREF)0x00000000);
+            HPEN cursorPen = CreatePen(PS_SOLID, 1, Theme.crText());
             HGDIOBJ oldPen2 = SelectObject(hdc, cast(HGDIOBJ)cursorPen);
             MoveToEx(hdc, cursorX, cursorY1, null);
             LineTo(hdc, cursorX, cursorY2);

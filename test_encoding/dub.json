@@ -1,7 +1,0 @@
-{
-	"name": "test_encoding",
-	"targetType": "executable",
-	"dependencies": {
-		"winlib": {"path": "winlib"}
-	}
-}
