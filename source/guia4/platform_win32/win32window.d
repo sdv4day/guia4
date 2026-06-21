@@ -723,23 +723,14 @@ class Win32Window : IPlatformWindow
     }
     
     /**
-     * 析构函数 — 仅标记对象为已销毁
+     * 析构函数 — GC finalization 安全
      * 
-     * 注意：不在析构函数中调用 Win32 API（如 DestroyWindow），
-     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
-     * Win32 API 可能导致访问冲突。
-     * 
-     * 正确的做法是在程序退出前显式调用 destroy() 方法。
+     * 不做任何 GC 内存操作（包括修改 __gshared GC-tracked 数组），
+     * 因为 GC finalization 阶段会抛出 InvalidMemoryOperationError。
+     * 实际的资源清理应在 close() 中完成。
      */
     ~this()
     {
-        // 仅标记为已销毁，不调用 Win32 API
         _destroyed = true;
-        // 从查找表中移除，避免悬空引用
-        if (_windowTableIndex >= 0)
-        {
-            forgetWindow(_windowTableIndex);
-            _windowTableIndex = -1;
-        }
     }
 }
