@@ -59,6 +59,7 @@ class Panel : Control
     this(Control parent)
     {
         super(parent);
+        rendersChildren = true;
         width = 200;
         height = 150;
         padding(8);  // 默认内边距
@@ -76,6 +77,7 @@ class Panel : Control
     this(Control parent, string title)
     {
         super(parent);
+        rendersChildren = true;
         _title = title;
         _titleHeight = 24;
         width = 200;
@@ -299,15 +301,15 @@ class Panel : Control
         // 确保布局已执行
         ensureLayout();
 
-        int rx = position().x();
-        int ry = position().y();
+        // Panel 通过 LayerCompositor 渲染时，视口已被偏移到该 Panel 的位置，
+        // 所以这里所有绘制都使用本地坐标 (0,0) 而非 position()
         int rw = width();
         int rh = height();
 
         // ── 背景 ──
         RECT bgRect = {
-            cast(LONG)rx, cast(LONG)ry,
-            cast(LONG)(rx + rw), cast(LONG)(ry + rh)
+            cast(LONG)0, cast(LONG)0,
+            cast(LONG)rw, cast(LONG)rh
         };
         HBRUSH bgBrush = CreateSolidBrush(_bgColor);
         FillRect(hdc, &bgRect, bgBrush);
@@ -317,8 +319,8 @@ class Panel : Control
         if (_titleHeight > 0 && _title.length > 0)
         {
             RECT titleRect = {
-                cast(LONG)rx, cast(LONG)ry,
-                cast(LONG)(rx + rw), cast(LONG)(ry + _titleHeight)
+                cast(LONG)0, cast(LONG)0,
+                cast(LONG)rw, cast(LONG)_titleHeight
             };
             HBRUSH titleBrush = CreateSolidBrush(_titleBgColor);
             FillRect(hdc, &titleRect, titleBrush);
@@ -329,15 +331,15 @@ class Panel : Control
             SetTextColor(hdc, _titleTextColor);
             SetBkMode(hdc, TRANSPARENT);
             wstring textW = toUTF16(_title);
-            TextOutW(hdc, rx + 8, ry + (_titleHeight - cast(int)_fontSize) / 2,
+            TextOutW(hdc, 8, (_titleHeight - cast(int)_fontSize) / 2,
                      cast(const(PWSTR))textW.ptr, cast(int)textW.length);
             FontCache.release(hdc, fontEntry);
 
             // 标题栏底部分隔线
             HPEN sepPen = CreatePen(PS_SOLID, 1, _borderColor);
             HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)sepPen);
-            MoveToEx(hdc, rx, ry + _titleHeight, null);
-            LineTo(hdc, rx + rw, ry + _titleHeight);
+            MoveToEx(hdc, 0, _titleHeight, null);
+            LineTo(hdc, rw, _titleHeight);
             SelectObject(hdc, oldPen);
             DeleteObject(cast(HGDIOBJ)sepPen);
         }
@@ -351,12 +353,12 @@ class Panel : Control
 
             if (_borderRadius > 0)
             {
-                RoundRect(hdc, rx, ry, rx + rw, ry + rh,
+                RoundRect(hdc, 0, 0, rw, rh,
                           _borderRadius * 2, _borderRadius * 2);
             }
             else
             {
-                Rectangle(hdc, rx, ry, rx + rw, ry + rh);
+                Rectangle(hdc, 0, 0, rw, rh);
             }
 
             SelectObject(hdc, oldPen);
@@ -369,8 +371,8 @@ class Panel : Control
             calcContentSize();
 
         // ── 计算内容区域 ──
-        int contentX = rx + paddingLeft();
-        int contentY = ry + _titleHeight + paddingTop();
+        int contentX = paddingLeft();
+        int contentY = _titleHeight + paddingTop();
         int contentW = rw - paddingLeft() - paddingRight() - (_vScroll ? _scrollbarWidth : 0);
         int contentH = rh - _titleHeight - paddingTop() - paddingBottom() - (_hScroll ? _scrollbarWidth : 0);
 
@@ -380,8 +382,8 @@ class Panel : Control
             int savedDC = SaveDC(hdc);
             IntersectClipRect(hdc, contentX, contentY, contentX + contentW, contentY + contentH);
             POINT oldOrigin;
-            // 偏移原点：先到 Panel 位置，再减去滚动偏移
-            OffsetViewportOrgEx(hdc, rx - _scrollX, ry - _scrollY, &oldOrigin);
+            // 偏移原点：相对 Panel 本地原点，再减去滚动偏移
+            OffsetViewportOrgEx(hdc, -_scrollX, -_scrollY, &oldOrigin);
 
             foreach (child; children())
             {
@@ -396,32 +398,26 @@ class Panel : Control
             if (_vScroll && _contentHeight > contentH)
             {
                 POINT sbOrigin;
-                OffsetViewportOrgEx(hdc, rx + rw - _scrollbarWidth, ry + _titleHeight, &sbOrigin);
+                OffsetViewportOrgEx(hdc, rw - _scrollbarWidth, _titleHeight, &sbOrigin);
                 _vScrollBar.renderWithGDI(hdc.Value);
                 SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
             }
             if (_hScroll && _contentWidth > contentW)
             {
                 POINT sbOrigin;
-                OffsetViewportOrgEx(hdc, rx, ry + rh - _scrollbarWidth, &sbOrigin);
+                OffsetViewportOrgEx(hdc, 0, rh - _scrollbarWidth, &sbOrigin);
                 _hScrollBar.renderWithGDI(hdc.Value);
                 SetViewportOrgEx(hdc, sbOrigin.x, sbOrigin.y, null);
             }
         }
         else
         {
-            // ── 无滚动，使用 DC 偏移渲染子控件 ──
-            int savedDC = SaveDC(hdc);
-            POINT oldOrigin;
-            OffsetViewportOrgEx(hdc, rx, ry, &oldOrigin);
-            
+            // ── 无滚动，直接渲染子控件 ──
             foreach (child; children())
             {
                 if (child.visible())
                     child.renderWithGDI(hdc.Value);
             }
-            
-            RestoreDC(hdc, savedDC);
         }
     }
 
