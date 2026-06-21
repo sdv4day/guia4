@@ -191,7 +191,7 @@ struct Mat4
             {
                 float sum = 0;
                 for (int k = 0; k < 4; k++)
-                    sum += data[col * 4 + k] * rhs.data[k * 4 + row];
+                    sum += data[k * 4 + row] * rhs.data[col * 4 + k];
                 r.data[col * 4 + row] = sum;
             }
         }
