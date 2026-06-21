@@ -9,6 +9,7 @@
         {
             "name": "default",
             "mainSourceFile": "all_controls_demo.d",
+            "sourceFiles": ["demo3dcontrol.d", "demo3d_anim.d"],
             "excludedSourceFiles": ["virtualcanvas_demo.d", "async_demo.d"]
         },
         {

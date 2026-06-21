@@ -124,15 +124,15 @@ void main()
     // ══════════════════════════════════════════════════════════════
     Demo3DControl view3d;
     {
-        auto sec = new Container(scroll);
-        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
+        auto sec3d = new Container(scroll);
+        sec3d.layout(new VerticalLayout(ITEM_SPACING, 0));
 
-        auto hdr = new Label(sec, "—— 3D Model Viewer ——");
-        hdr.width(0); hdr.height(HEADER_HEIGHT);
-        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
+        auto hdr3d = new Label(sec3d, "—— 3D Model Viewer ——");
+        hdr3d.width(0); hdr3d.height(HEADER_HEIGHT);
+        hdr3d.fontSize(FONT_HEADER); hdr3d.textColor(COLOR_HEADER);
 
         // 创建3D控件
-        view3d = new Demo3DControl(sec, "demo/models/cube.obj");
+        view3d = new Demo3DControl(sec3d, "demo/models/cube.obj");
         view3d.width(400); view3d.height(300);
     }
 

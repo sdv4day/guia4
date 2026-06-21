@@ -124,19 +124,19 @@ class Demo3DControl : Control
 
     // ── 鼠标事件 ──
 
-    void mouseDown(MouseEvent e)
+    void mouseDown(ref MouseEvent e)
     {
         _dragging = true;
         _lastMouseX = e.x;
         _lastMouseY = e.y;
     }
 
-    void mouseUp(MouseEvent e)
+    void mouseUp(ref MouseEvent e)
     {
         _dragging = false;
     }
 
-    void mouseMove(MouseEvent e)
+    void mouseMove(ref MouseEvent e)
     {
         if (!_dragging) return;
 
@@ -180,7 +180,7 @@ class Demo3DControl : Control
 
         // 填充深色背景
         RECT rect = {0, 0, w, h};
-        HBRUSH bgBrush = CreateSolidBrush(0x002E1A1A); // dark navy
+        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)0x002E1A1A); // dark navy
         FillRect(memDC, &rect, bgBrush);
         DeleteObject(cast(HGDIOBJ)bgBrush);
 
@@ -228,11 +228,11 @@ class Demo3DControl : Control
     {
         auto hdc = cast(HDC)hdc_;
         RECT rect = {0, 0, width, height};
-        HBRUSH brush = CreateSolidBrush(0x00000000);
+        HBRUSH brush = CreateSolidBrush(cast(COLORREF)0x00000000);
         FillRect(hdc, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
 
-        SetTextColor(hdc, 0x00FFFFFF);
+        SetTextColor(hdc, cast(COLORREF)0x00FFFFFF);
         SetBkMode(hdc, TRANSPARENT);
 
         string msg = "Failed to load model: " ~ _modelPath;
