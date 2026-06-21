@@ -153,6 +153,14 @@ private static void mainWindowTimerCallback(uint id, void* data)
             }
         }
     }
+    else if (id == MainWindow.ANIM3D_TIMER_ID)
+    {
+        // Continuous 3D animation timer — do NOT stop the timer
+        if (mw._anim3DCallback !is null)
+        {
+            mw._anim3DCallback();
+        }
+    }
     else
     {
         // One-shot timers (screenshot)
@@ -279,9 +287,13 @@ class MainWindow : Control
     private void delegate() _asyncOnProgress;
     private void delegate() _asyncOnComplete;
 
+    // 3D 动画定时器支持
+    package void delegate() _anim3DCallback;
+
     package static immutable uint SCREENSHOT_TIMER_ID = 1001;
     package static immutable uint BLINK_TIMER_ID = 1002;
     package static immutable uint ASYNC_POLL_TIMER_ID = 1003;
+    package static immutable uint ANIM3D_TIMER_ID = 1004;
 
     this(Application app, int x = 100, int y = 100, uint width = 800, uint height = 600, string title = "DGUI Window")
     {
@@ -475,8 +487,28 @@ class MainWindow : Control
     void captureImmediate(string filename)
     {
         logInfo("MainWindow.captureImmediate('", filename, "')");
-        _screenshotManager.setScreenshotFile(filename);
         _screenshotManager.captureScreenshot(filename);
+    }
+
+    // ── 3D动画 ─────────────────────────────────────────────
+
+    /// 设置3D动画回调（由Demo3DControl使用，用于自动旋转）
+    void setAnim3DCallback(void delegate() cb)
+    {
+        _anim3DCallback = cb;
+    }
+
+    /// 启动3D动画定时器
+    void startAnim3DTimer(uint intervalMs = 16)
+    {
+        (cast(Win32Window)_platformWindow).setTimerFunction(&MainWindowCallbacks.timerCallback, cast(Object)this);
+        _platformWindow.startTimer(ANIM3D_TIMER_ID, intervalMs);
+    }
+
+    /// 停止3D动画定时器
+    void stopAnim3DTimer()
+    {
+        _platformWindow.stopTimer(ANIM3D_TIMER_ID);
     }
 
     // ── AsyncTask ─────────────────────────────────────────
