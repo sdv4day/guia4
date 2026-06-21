@@ -23,7 +23,8 @@ void main()
     auto window = app.createWindow(100, 50, 800, 600, "Scrollbar Test");
 
     // 创建滚动容器
-    auto scroll = new ScrollableContainer(window);
+    auto scroll = new Container(window);
+    scroll.dock = DockStyle.Fill;
     scroll.layout(new VerticalLayout(10, 20));
 
     // 添加多个控件，使内容高度超过容器高度

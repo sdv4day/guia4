@@ -4,10 +4,20 @@ import std.format : format;
 import std.conv : to;
 import std.string : strip, toUpper;
 import std.algorithm.comparison : min, max;
-import windows.win32.foundation : COLORREF;
+
+/// HSL to RGB helper — extracted from nested function for @nogc compatibility
+private static pure nothrow @safe @nogc float hue2rgb(float p, float q, float t)
+{
+    if (t < 0.0f) t += 1.0f;
+    if (t > 1.0f) t -= 1.0f;
+    if (t < 1.0f / 6.0f) return p + (q - p) * 6.0f * t;
+    if (t < 1.0f / 2.0f) return q;
+    if (t < 2.0f / 3.0f) return p + (q - p) * (2.0f / 3.0f - t) * 6.0f;
+    return p;
+}
 
 /**
- * 多功能颜色结构体
+ * 多功能颜色结构体（跨平台）
  * 
  * 支持多种颜色格式：
  * - RGB/RGBA：红绿蓝透明度（0-255）
@@ -15,22 +25,22 @@ import windows.win32.foundation : COLORREF;
  * - HSV/HSB：色相饱和度明度
  * - CMYK：青洋红黄黑（0-100）
  * - HEX：十六进制字符串
- * - COLORREF：Windows GDI颜色格式（0x00BBGGRR）
  * 
- * 使用union实现COLORREF和RGB共享内存，内部BGR顺序存储（COLORREF兼容）
+ * 内部存储为 RGBA（跨平台），提供 toBGR() 方法用于 Windows GDI。
  */
 struct Color
 {
-    // 使用union共享内存，COLORREF格式：0x00BBGGRR
+    // RGBA 顺序存储（跨平台）
     private union
     {
         struct
         {
-            ubyte _b, _g, _r, _a;  // BGR顺序（COLORREF兼容）
+            ubyte _r, _g, _b, _a;  // RGBA顺序
         }
         uint _value;  // 32位整数值（直接访问）
-        COLORREF _colorref;  // COLORREF类型（直接访问）
     }
+
+    // ==================== 构造函数 ====================
 
     /// 基础构造函数（RGBA）
     this(ubyte r, ubyte g, ubyte b, ubyte a = 255) @safe pure nothrow @nogc
@@ -40,6 +50,71 @@ struct Color
         _b = b;
         _a = a;
     }
+
+    // ==================== 转换方法 ====================
+
+    /// 转换为BGR格式（Windows GDI COLORREF 格式：0x00BBGGRR）
+    uint toBGR() const @safe pure nothrow @nogc
+    {
+        return (_b << 16) | (_g << 8) | _r;
+    }
+
+    /// 从BGR格式创建Color
+    static Color fromBGR(uint bgr) @safe pure nothrow @nogc
+    {
+        Color c;
+        c._r = cast(ubyte)(bgr & 0xFF);
+        c._g = cast(ubyte)((bgr >> 8) & 0xFF);
+        c._b = cast(ubyte)((bgr >> 16) & 0xFF);
+        c._a = 255;
+        return c;
+    }
+
+    /// 从32位整数值创建Color
+    static Color fromValue(uint v) @safe pure nothrow @nogc
+    {
+        Color c;
+        c._value = v;
+        return c;
+    }
+
+    /// 获取32位整数值
+    uint value() const @property @safe pure nothrow @nogc { return _value; }
+
+    // ==================== 预定义颜色 ====================
+
+    /// 透明
+    static Color transparent() @safe pure nothrow @nogc
+    {
+        return Color(0, 0, 0, 0);
+    }
+
+    /// 黑色
+    static Color black() @safe pure nothrow @nogc { return Color(0, 0, 0); }
+    /// 白色
+    static Color white() @safe pure nothrow @nogc { return Color(255, 255, 255); }
+    /// 红色
+    static Color red() @safe pure nothrow @nogc { return Color(255, 0, 0); }
+    /// 绿色
+    static Color green() @safe pure nothrow @nogc { return Color(0, 128, 0); }
+    /// 蓝色
+    static Color blue() @safe pure nothrow @nogc { return Color(0, 0, 255); }
+    /// 灰色
+    static Color gray() @safe pure nothrow @nogc { return Color(128, 128, 128); }
+    /// 黄色
+    static Color yellow() @safe pure nothrow @nogc { return Color(255, 255, 0); }
+    /// 青色
+    static Color cyan() @safe pure nothrow @nogc { return Color(0, 255, 255); }
+    /// 品红色
+    static Color magenta() @safe pure nothrow @nogc { return Color(255, 0, 255); }
+    /// 橙色
+    static Color orange() @safe pure nothrow @nogc { return Color(255, 128, 0); }
+    /// 紫色
+    static Color purple() @safe pure nothrow @nogc { return Color(128, 0, 128); }
+    /// 粉色
+    static Color pink() @safe pure nothrow @nogc { return Color(255, 192, 203); }
+    /// 棕色
+    static Color brown() @safe pure nothrow @nogc { return Color(139, 69, 19); }
 
     // ==================== 静态工厂方法 ====================
 
@@ -61,281 +136,16 @@ struct Color
         return hslToRgb(h, s, l);
     }
 
-    /// 从HSL创建（带透明度）
-    static Color hsla(float h, float s, float l, ubyte a) @safe pure nothrow
-    {
-        auto c = hslToRgb(h, s, l);
-        c._a = a;
-        return c;
-    }
-
     /// 从HSV/HSB创建（H:0-360, S:0-100, V:0-100）
     static Color hsv(float h, float s, float v) @safe pure nothrow
     {
         return hsvToRgb(h, s, v);
     }
 
-    /// 从HSV创建（带透明度）
-    static Color hsva(float h, float s, float v, ubyte a) @safe pure nothrow
-    {
-        auto c = hsvToRgb(h, s, v);
-        c._a = a;
-        return c;
-    }
-
-    /// 从CMYK创建（C,M,Y,K: 0-100）
-    static Color cmyk(float c, float m, float y, float k) @safe pure nothrow
-    {
-        return cmykToRgb(c, m, y, k);
-    }
-
-    /// 从CMYK创建（带透明度）
-    static Color cmyka(float c, float m, float y, float k, ubyte a) @safe pure nothrow
-    {
-        auto col = cmykToRgb(c, m, y, k);
-        col._a = a;
-        return col;
-    }
-
-    /// 从十六进制字符串创建（支持 "#RGB", "#RGBA", "#RRGGBB", "#RRGGBBAA"）
+    /// 从十六进制字符串创建
     static Color hex(string hexColor) @safe pure
     {
         return parseHex(hexColor);
-    }
-
-    // ==================== 预定义颜色常量 ====================
-
-    /// 红色
-    static Color red() @safe pure nothrow @nogc { return rgb(255, 0, 0); }
-    /// 绿色
-    static Color green() @safe pure nothrow @nogc { return rgb(0, 255, 0); }
-    /// 蓝色
-    static Color blue() @safe pure nothrow @nogc { return rgb(0, 0, 255); }
-    /// 黑色
-    static Color black() @safe pure nothrow @nogc { return rgb(0, 0, 0); }
-    /// 白色
-    static Color white() @safe pure nothrow @nogc { return rgb(255, 255, 255); }
-    /// 灰色
-    static Color gray() @safe pure nothrow @nogc { return rgb(128, 128, 128); }
-    /// 黄色
-    static Color yellow() @safe pure nothrow @nogc { return rgb(255, 255, 0); }
-    /// 青色
-    static Color cyan() @safe pure nothrow @nogc { return rgb(0, 255, 255); }
-    /// 品红色
-    static Color magenta() @safe pure nothrow @nogc { return rgb(255, 0, 255); }
-    /// 橙色
-    static Color orange() @safe pure nothrow @nogc { return rgb(255, 128, 0); }
-    /// 紫色
-    static Color purple() @safe pure nothrow @nogc { return rgb(128, 0, 128); }
-    /// 粉色
-    static Color pink() @safe pure nothrow @nogc { return rgb(255, 192, 203); }
-    /// 棕色
-    static Color brown() @safe pure nothrow @nogc { return rgb(139, 69, 19); }
-
-    // ==================== 属性访问 ====================
-
-    /// 红色分量（0-255）
-    ubyte r() const @property @safe pure nothrow @nogc
-    {
-        return _r;
-    }
-
-    /// 绿色分量（0-255）
-    ubyte g() const @property @safe pure nothrow @nogc
-    {
-        return _g;
-    }
-
-    /// 蓝色分量（0-255）
-    ubyte b() const @property @safe pure nothrow @nogc
-    {
-        return _b;
-    }
-
-    /// 透明度分量（0-255，255为不透明）
-    ubyte a() const @property @safe pure nothrow @nogc
-    {
-        return _a;
-    }
-
-    /// 红色分量（0.0-1.0）
-    float rf() const @property @safe pure nothrow @nogc
-    {
-        return cast(float)_r / 255.0f;
-    }
-
-    /// 绿色分量（0.0-1.0）
-    float gf() const @property @safe pure nothrow @nogc
-    {
-        return cast(float)_g / 255.0f;
-    }
-
-    /// 蓝色分量（0.0-1.0）
-    float bf() const @property @safe pure nothrow @nogc
-    {
-        return cast(float)_b / 255.0f;
-    }
-
-    /// 透明度分量（0.0-1.0）
-    float af() const @property @safe pure nothrow @nogc
-    {
-        return cast(float)_a / 255.0f;
-    }
-
-    // ==================== 格式转换 ====================
-
-    /// 转换为HSL（返回数组：[H, S, L]）
-    float[3] toHSL() const @safe pure nothrow @nogc
-    {
-        return rgbToHsl(_r, _g, _b);
-    }
-
-    /// 转换为HSV（返回数组：[H, S, V]）
-    float[3] toHSV() const @safe pure nothrow @nogc
-    {
-        return rgbToHsv(_r, _g, _b);
-    }
-
-    /// 转换为CMYK（返回数组：[C, M, Y, K]）
-    float[4] toCMYK() const @safe pure nothrow @nogc
-    {
-        return rgbToCmyk(_r, _g, _b);
-    }
-
-    /// 转换为十六进制字符串（格式：#RRGGBB）
-    string toHex() const @safe pure
-    {
-        return format("#%02X%02X%02X", _r, _g, _b);
-    }
-
-    /// 转换为十六进制字符串（带透明度，格式：#RRGGBBAA）
-    string toHexAlpha() const @safe pure
-    {
-        return format("#%02X%02X%02X%02X", _r, _g, _b, _a);
-    }
-
-    // ==================== GDI兼容 ====================
-
-    /// 转换为COLORREF（清除alpha通道，Windows GDI要求高位字节为0）
-    COLORREF toCOLORREF() const @safe pure nothrow @nogc
-    {
-        return COLORREF((_r << 16) | (_g << 8) | _b);
-    }
-
-    /// 从COLORREF创建Color（直接赋值union成员）
-    static Color fromCOLORREF(COLORREF cr) @safe pure nothrow @nogc
-    {
-        Color c;
-        c._colorref = cr;
-        c._a = 255;  // COLORREF没有透明度，默认不透明
-        return c;
-    }
-
-    /// 直接访问32位颜色值（COLORREF格式：0xAABBGGRR）
-    uint value() const @property @safe pure nothrow @nogc
-    {
-        return _value;
-    }
-
-    /// 从32位颜色值创建Color
-    static Color fromValue(uint v) @safe pure nothrow @nogc
-    {
-        Color c;
-        c._value = v;
-        return c;
-    }
-
-    // ==================== 颜色操作 ====================
-
-    /// 设置透明度
-    Color withAlpha(ubyte a) const @safe pure nothrow @nogc
-    {
-        return Color(_r, _g, _b, a);
-    }
-
-    /// 设置透明度（浮点版本，0.0-1.0）
-    Color withAlphaF(float a) const @safe pure nothrow @nogc
-    {
-        return Color(_r, _g, _b, cast(ubyte)(a * 255.0f));
-    }
-
-    /// 颜色混合（线性插值）
-    Color blend(Color other, float t) const @safe pure nothrow @nogc
-    {
-        t = clamp(t, 0.0f, 1.0f);
-        float invT = 1.0f - t;
-        
-        ubyte r = cast(ubyte)(_r * invT + other._r * t);
-        ubyte g = cast(ubyte)(_g * invT + other._g * t);
-        ubyte b = cast(ubyte)(_b * invT + other._b * t);
-        ubyte a = cast(ubyte)(_a * invT + other._a * t);
-        
-        return Color(r, g, b, a);
-    }
-
-    /// 变亮（增加亮度）
-    Color lighter(float amount = 0.2f) const @safe pure nothrow @nogc
-    {
-        auto hsl = rgbToHsl(_r, _g, _b);
-        hsl[2] = clamp(hsl[2] + amount * 100.0f, 0.0f, 100.0f);
-        auto result = hslToRgb(hsl[0], hsl[1], hsl[2]);
-        result._a = _a;
-        return result;
-    }
-
-    /// 变暗（减少亮度）
-    Color darker(float amount = 0.2f) const @safe pure nothrow @nogc
-    {
-        return lighter(-amount);
-    }
-
-    /// 增加饱和度
-    Color saturate(float amount = 0.2f) const @safe pure nothrow @nogc
-    {
-        auto hsl = rgbToHsl(_r, _g, _b);
-        hsl[1] = clamp(hsl[1] + amount * 100.0f, 0.0f, 100.0f);
-        auto result = hslToRgb(hsl[0], hsl[1], hsl[2]);
-        result._a = _a;
-        return result;
-    }
-
-    /// 减少饱和度（趋向灰色）
-    Color desaturate(float amount = 0.2f) const @safe pure nothrow @nogc
-    {
-        return saturate(-amount);
-    }
-
-    /// 旋转色相
-    Color rotateHue(float degrees) const @safe pure nothrow @nogc
-    {
-        auto hsl = rgbToHsl(_r, _g, _b);
-        hsl[0] = hueMod(hsl[0] + degrees, 360.0f);
-        if (hsl[0] < 0.0f) hsl[0] += 360.0f;
-        auto result = hslToRgb(hsl[0], hsl[1], hsl[2]);
-        result._a = _a;
-        return result;
-    }
-
-    /// 取反色
-    Color inverted() const @safe pure nothrow @nogc
-    {
-        return Color(cast(ubyte)(255 - _r), cast(ubyte)(255 - _g), cast(ubyte)(255 - _b), _a);
-    }
-
-    /// 灰度化
-    Color toGrayscale() const @safe pure nothrow @nogc
-    {
-        // 使用人眼感知权重
-        ubyte gray = cast(ubyte)(0.299f * _r + 0.587f * _g + 0.114f * _b);
-        return Color(gray, gray, gray, _a);
-    }
-
-    // ==================== 预定义颜色 ====================
-
-    /// 透明
-    static Color transparent() @safe pure nothrow @nogc
-    {
-        return Color(0, 0, 0, 0);
     }
 
     // ==================== 预定义颜色（枚举组） ====================
@@ -498,16 +308,6 @@ private:
         }
         else
         {
-            float hue2rgb(float p, float q, float t)
-            {
-                if (t < 0.0f) t += 1.0f;
-                if (t > 1.0f) t -= 1.0f;
-                if (t < 1.0f / 6.0f) return p + (q - p) * 6.0f * t;
-                if (t < 1.0f / 2.0f) return q;
-                if (t < 2.0f / 3.0f) return p + (q - p) * (2.0f / 3.0f - t) * 6.0f;
-                return p;
-            }
-
             float q = l < 0.5f ? l * (1.0f + s) : l + s - l * s;
             float p = 2.0f * l - q;
             r = hue2rgb(p, q, h / 360.0f + 1.0f / 3.0f);
@@ -732,10 +532,10 @@ unittest
     assert(c6.g == 0);
     assert(c6.b == 0);
 
-    // 测试COLORREF转换
+    // 测试BGR转换
     auto c7 = Color.rgb(255, 128, 64);
-    COLORREF cr = c7.toCOLORREF();
-    auto c8 = Color.fromCOLORREF(cr);
+    uint bgr = c7.toBGR();
+    auto c8 = Color.fromBGR(bgr);
     assert(c7.r == c8.r);
     assert(c7.g == c8.g);
     assert(c7.b == c8.b);
@@ -745,12 +545,12 @@ unittest
     assert(c9.r == 0x12);
     assert(c9.g == 0x34);
     assert(c9.b == 0x56);
-    // 验证COLORREF格式：0x00BBGGRR = 0x00563412
-    assert(c9.value() == 0xFF563412);  // 包含alpha=255
+    // 验证BGR格式：0x00BBGGRR = 0x00563412
+    assert(c9.toBGR() == 0x00563412);
 
     // 测试value属性
     auto c10 = Color.fromValue(0xFF804020);
-    assert(c10.r == 0x20);  // R在最高字节
+    assert(c10.r == 0x20);  // R在最低字节
     assert(c10.g == 0x40);
     assert(c10.b == 0x80);
     assert(c10.a == 0xFF);

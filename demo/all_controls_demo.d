@@ -51,8 +51,9 @@ void main()
     auto window = app.createWindow(WINDOW_X, WINDOW_Y, WINDOW_W, WINDOW_H, "guia4 - All Controls Demo");
 
     // ── 主滚动容器 ──
-    // ScrollableContainer 默认使用 DockStyle.Fill，自动填充剩余空间
-    auto scroll = new ScrollableContainer(window);
+    // Container 默认使用 DockStyle.Fill，自动填充剩余空间
+    auto scroll = new Container(window);
+    scroll.dock = DockStyle.Fill;
     scroll.layout(new VerticalLayout(SECTION_SPACING, CONTENT_PADDING));
 
     // ══════════════════════════════════════════════════════════════
@@ -60,7 +61,7 @@ void main()
     // ══════════════════════════════════════════════════════════════
     StringGrid grid;
     {
-        auto sec = new Control(scroll);
+        auto sec = new Container(scroll);
         sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
         auto hdr = new Label(sec, "—— StringGrid ——");
@@ -93,7 +94,7 @@ void main()
     // ══════════════════════════════════════════════════════════════
     // Section 7: TabWidget
     // ══════════════════════════════════════════════════════════════
-    auto sec = new Control(scroll);
+    auto sec = new Container(scroll);
     sec.layout(new VerticalLayout(ITEM_SPACING, 0));
 
     auto hdr = new Label(sec, "—— TabWidget ——");
@@ -103,25 +104,23 @@ void main()
     auto tabs = new TabWidget(sec);
     tabs.width(500); tabs.height(160);
 
-    auto page1 = new Control(tabs);
+    auto page1 = new Container(tabs);
     page1.layout(new VerticalLayout(4, 10));
     auto p1Label = new Label(page1, "Tab 1 content"); p1Label.width(200); p1Label.textColor(0x005A5A5A);
     auto p1Btn = new Button(page1, "Tab1 Button");
     tabs.addTab("Tab 1", page1);
 
-    auto page2 = new Control(tabs);
+    auto page2 = new Container(tabs);
     auto p2Label = new Label(page2, "Tab 2 content"); p2Label.setXY(10, 10); p2Label.width(200); p2Label.textColor(0x005A5A5A);
     tabs.addTab("Tab 2", page2);
 
-    auto page3 = new Control(tabs);
+    auto page3 = new Container(tabs);
     auto p3Label = new Label(page3, "Tab 3"); p3Label.setXY(10, 10); p3Label.width(200); p3Label.textColor(0x005A5A5A);
     tabs.addTab("Tab 3", page3);
 
     // ══════════════════════════════════════════════════════════════
     // Finalize
     // ══════════════════════════════════════════════════════════════
-    scroll.recalcContent();
-    logInfo("Content height: ", scroll.contentHeight());
     logInfo("StringGrid pos=(", grid.position().x(), ",", grid.position().y(), ") size=(", grid.width(), "x", grid.height(), ") visible=", grid.visible(), " rowCount=", grid.rowCount(), " colCount=", grid.colCount());
     window.show();
 

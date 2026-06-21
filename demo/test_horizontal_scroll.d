@@ -23,24 +23,23 @@ void main()
     auto window = app.createWindow(100, 50, 800, 600, "Horizontal Scroll Test");
 
     // 创建一个固定大小的容器作为父容器
-    auto container = new Control(window);
+    auto container = new Container(window);
     container.setXY(50, 50);
     container.width(600);  // 固定宽度 600
     container.height(400);  // 固定高度 400
 
     // 创建滚动容器
-    auto scroll = new ScrollableContainer(container);
+    auto scroll = new Container(container);
     scroll.dock(DockStyle.None);  // 不使用 DockStyle.Fill
     scroll.setXY(0, 0);
     scroll.width(600);  // 固定大小
     scroll.height(400);
 
     // 添加一个宽度超过容器的控件
-    auto wideControl = new Control(null);  // 先不设置父容器
+    auto wideControl = scroll.addChild!Container();
     wideControl.setXY(0, 0);  // 直接设置位置
     wideControl.width(1200);  // 宽度 1200，超过容器宽度 600
     wideControl.height(100);
-    scroll.addChild(wideControl);  // 然后再添加到父容器
     
     auto label1 = new Label(wideControl, "This is a very wide control that should trigger horizontal scrollbar");
     label1.setXY(10, 10);
@@ -63,19 +62,19 @@ void main()
     // scroll.ensureLayout();
     
     // 打印子控件的大小
-    logInfo("wideControl size: ", wideControl.width(), "x", wideControl.height(), " position: (", wideControl.position().x(), ",", wideControl.position().y(), ")");
+    info("wideControl size: ", wideControl.width(), "x", wideControl.height(), " position: (", wideControl.position().x(), ",", wideControl.position().y(), ")");
     foreach (i, child; scroll.children())
     {
-        logInfo("Child ", i, " size: ", child.width(), "x", child.height(), " position: (", child.position().x(), ",", child.position().y(), ")");
+        info("Child ", i, " size: ", child.width(), "x", child.height(), " position: (", child.position().x(), ",", child.position().y(), ")");
     }
-    
+
     scroll.recalcContent();
-    logInfo("Content width: ", scroll.contentWidth());
-    logInfo("Content height: ", scroll.contentHeight());
-    logInfo("Container width: ", scroll.width());
-    logInfo("Container height: ", scroll.height());
-    logInfo("Needs horizontal scrollbar: ", scroll.contentWidth() > scroll.width());
-    logInfo("Needs vertical scrollbar: ", scroll.contentHeight() > scroll.height());
+    info("Content width: ", scroll.contentWidth());
+    info("Content height: ", scroll.contentHeight());
+    info("Container width: ", scroll.width());
+    info("Container height: ", scroll.height());
+    info("Needs horizontal scrollbar: ", scroll.contentWidth() > scroll.width());
+    info("Needs vertical scrollbar: ", scroll.contentHeight() > scroll.height());
     
     window.show();
     app.run();

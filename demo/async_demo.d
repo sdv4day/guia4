@@ -53,8 +53,8 @@ void main()
     menuBar.add("File");
     menuBar.add("Help");
 
-    auto container = new ScrollableContainer(window);
-    container.contentHeight(2000);
+    auto container = new Panel(window);
+    container.dock = DockStyle.Fill;
 
     // 标题
     auto titleLabel = new Label(container, "AsyncTask 异步任务演示");

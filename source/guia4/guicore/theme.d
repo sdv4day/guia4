@@ -1,10 +1,9 @@
 module guia4.guicore.theme;
 
 import guia4.guicore.color;
-import windows.win32.foundation : COLORREF;
 
 /**
- * Theme — GUI 主题颜色常量
+ * Theme — GUI 主题颜色常量（跨平台）
  *
  * 消除各控件中硬编码的颜色魔数，统一在此定义。
  * 未来可扩展为可切换的主题系统。
@@ -30,55 +29,80 @@ struct Theme
 
     // ── 面板/容器 ──
     static Color panelBg()       { return Color.rgb(0xF5, 0xF5, 0xF5); }  /// Panel 背景（稍亮）
-    static Color containerBg()   { return Color.rgb(0xFA, 0xFA, 0xFA); }  /// ScrollableContainer 背景
+    static Color containerBg()   { return Color.rgb(0xFA, 0xFA, 0xFA); }  /// Container 背景
     static Color titleBarBg()    { return Color.rgb(0xF0, 0xF0, 0xF0); }  /// 标题栏背景（稍亮）
     static Color headerBg()      { return Color.rgb(0xF5, 0xF5, 0xF5); }  /// 表头背景（稍亮）
 
     // ── 滚动条 ──
-    static Color scrollTrack()   { return Color.rgb(0xE0, 0xE0, 0xE0); }  /// 滚动条轨道（暗灰，与背景有对比）
-    static Color scrollThumb()   { return Color.rgb(0xA0, 0xA0, 0xA0); }  /// 滚动条滑块（中灰，明显可见）
-    static Color scrollHover()   { return Color.rgb(0x80, 0x80, 0x80); }  /// 滑块悬停（深灰）
-    static Color scrollDrag()    { return Color.rgb(0x60, 0x60, 0x60); }  /// 滑块拖拽（更深灰）
+    static Color scrollTrack()   { return Color.rgb(0xE0, 0xE0, 0xE0); }  /// 滚动条轨道
+    static Color scrollThumb()   { return Color.rgb(0xA0, 0xA0, 0xA0); }  /// 滚动条滑块
+    static Color scrollHover()   { return Color.rgb(0x80, 0x80, 0x80); }  /// 滑块悬停
+    static Color scrollDrag()    { return Color.rgb(0x60, 0x60, 0x60); }  /// 滑块拖拽
     static Color scrollBorder()  { return Color.rgb(0x70, 0x70, 0x70); }  /// 滑块边框
 
     // ── 选中/焦点 ──
-    static Color selected()      { return Color.rgb(0xBB, 0xDE, 0xFB); }  /// 选中背景（更亮的蓝色）
+    static Color selected()      { return Color.rgb(0xBB, 0xDE, 0xFB); }  /// 选中背景
     static Color selectedText()  { return Color.rgb(0x00, 0x00, 0x00); }  /// 选中文字颜色
-    static Color focusBorder()   { return Color.rgb(0x00, 0x78, 0xD4); }  /// 焦点边框（蓝色）
+    static Color focusBorder()   { return Color.rgb(0x00, 0x78, 0xD4); }  /// 焦点边框
 
     // ── 菜单 ──
     static Color menuBg()        { return Color.rgb(0xFF, 0xFF, 0xFF); }  /// 菜单背景
-    static Color menuBarBg()     { return Color.rgb(0xF5, 0xF5, 0xF5); }  /// 菜单栏背景（稍亮）
-    static Color menuHoverBg()   { return Color.rgb(0xE5, 0xE5, 0xE5); }  /// 菜单项悬停（稍亮）
+    static Color menuBarBg()     { return Color.rgb(0xF5, 0xF5, 0xF5); }  /// 菜单栏背景
+    static Color menuHoverBg()   { return Color.rgb(0xE5, 0xE5, 0xE5); }  /// 菜单项悬停
 
-    // ── 便捷 COLORREF 转换 ──
-    // 用于直接传给 GDI 函数，避免每次调用 toCOLORREF()
+    // ── BGR 便捷方法（Windows GDI 兼容）──
+    // 控件通过 GdiRenderContext 渲染时使用 toBGR()
 
-    static COLORREF crBackground()   { return background().toCOLORREF(); }
-    static COLORREF crText()         { return text().toCOLORREF(); }
-    static COLORREF crBorder()       { return border().toCOLORREF(); }
-    static COLORREF crBorderDark()   { return borderDark().toCOLORREF(); }
-    static COLORREF crError()        { return error().toCOLORREF(); }
-    static COLORREF crErrorBg()      { return errorBg().toCOLORREF(); }
-    static COLORREF crWarning()      { return warning().toCOLORREF(); }
-    static COLORREF crWarningBg()    { return warningBg().toCOLORREF(); }
-    static COLORREF crSuccess()      { return success().toCOLORREF(); }
-    static COLORREF crSuccessBg()    { return successBg().toCOLORREF(); }
-    static COLORREF crInfo()         { return info().toCOLORREF(); }
-    static COLORREF crInfoBg()       { return infoBg().toCOLORREF(); }
-    static COLORREF crPanelBg()      { return panelBg().toCOLORREF(); }
-    static COLORREF crContainerBg()  { return containerBg().toCOLORREF(); }
-    static COLORREF crTitleBarBg()   { return titleBarBg().toCOLORREF(); }
-    static COLORREF crHeaderBg()     { return headerBg().toCOLORREF(); }
-    static COLORREF crScrollTrack()  { return scrollTrack().toCOLORREF(); }
-    static COLORREF crScrollThumb()  { return scrollThumb().toCOLORREF(); }
-    static COLORREF crScrollHover()  { return scrollHover().toCOLORREF(); }
-    static COLORREF crScrollDrag()   { return scrollDrag().toCOLORREF(); }
-    static COLORREF crScrollBorder() { return scrollBorder().toCOLORREF(); }
-    static COLORREF crSelected()     { return selected().toCOLORREF(); }
-    static COLORREF crSelectedText() { return selectedText().toCOLORREF(); }
-    static COLORREF crFocusBorder()  { return focusBorder().toCOLORREF(); }
-    static COLORREF crMenuBg()       { return menuBg().toCOLORREF(); }
-    static COLORREF crMenuBarBg()    { return menuBarBg().toCOLORREF(); }
-    static COLORREF crMenuHoverBg()  { return menuHoverBg().toCOLORREF(); }
+    static uint bgrBackground()   { return background().toBGR(); }
+    static uint bgrText()         { return text().toBGR(); }
+    static uint bgrBorder()       { return border().toBGR(); }
+    static uint bgrBorderDark()   { return borderDark().toBGR(); }
+    static uint bgrSelected()     { return selected().toBGR(); }
+    static uint bgrFocusBorder()  { return focusBorder().toBGR(); }
+    static uint bgrMenuBg()       { return menuBg().toBGR(); }
+    static uint bgrMenuBarBg()    { return menuBarBg().toBGR(); }
+    static uint bgrMenuHoverBg()  { return menuHoverBg().toBGR(); }
+    static uint bgrHeaderBg()     { return headerBg().toBGR(); }
+    static uint bgrScrollTrack()  { return scrollTrack().toBGR(); }
+    static uint bgrScrollThumb()  { return scrollThumb().toBGR(); }
+    static uint bgrScrollHover()  { return scrollHover().toBGR(); }
+    static uint bgrScrollDrag()   { return scrollDrag().toBGR(); }
+    static uint bgrPanelBg()      { return panelBg().toBGR(); }
+    static uint bgrContainerBg()  { return containerBg().toBGR(); }
+    static uint bgrTitleBarBg()   { return titleBarBg().toBGR(); }
+
+    // ── 兼容旧接口（crXxx 别名）──
+    // 保留 COLORREF 返回类型以便未重构的控件继续工作
+
+    version(Windows)
+    {
+        import windows.win32.foundation : COLORREF;
+        static COLORREF crBackground()   { return COLORREF(bgrBackground()); }
+        static COLORREF crText()         { return COLORREF(bgrText()); }
+        static COLORREF crBorder()       { return COLORREF(bgrBorder()); }
+        static COLORREF crBorderDark()   { return COLORREF(bgrBorderDark()); }
+        static COLORREF crSelected()     { return COLORREF(bgrSelected()); }
+        static COLORREF crFocusBorder()  { return COLORREF(bgrFocusBorder()); }
+        static COLORREF crMenuBg()       { return COLORREF(bgrMenuBg()); }
+        static COLORREF crMenuBarBg()    { return COLORREF(bgrMenuBarBg()); }
+        static COLORREF crMenuHoverBg()  { return COLORREF(bgrMenuHoverBg()); }
+        static COLORREF crHeaderBg()     { return COLORREF(bgrHeaderBg()); }
+        static COLORREF crScrollTrack()  { return COLORREF(bgrScrollTrack()); }
+        static COLORREF crScrollThumb()  { return COLORREF(bgrScrollThumb()); }
+        static COLORREF crScrollHover()  { return COLORREF(bgrScrollHover()); }
+        static COLORREF crScrollDrag()   { return COLORREF(bgrScrollDrag()); }
+        static COLORREF crPanelBg()      { return COLORREF(bgrPanelBg()); }
+        static COLORREF crContainerBg()  { return COLORREF(bgrContainerBg()); }
+        static COLORREF crTitleBarBg()   { return COLORREF(bgrTitleBarBg()); }
+        static COLORREF crSelectedText() { return COLORREF(selectedText().toBGR()); }
+        static COLORREF crError()        { return COLORREF(error().toBGR()); }
+        static COLORREF crErrorBg()      { return COLORREF(errorBg().toBGR()); }
+        static COLORREF crWarning()      { return COLORREF(warning().toBGR()); }
+        static COLORREF crWarningBg()    { return COLORREF(warningBg().toBGR()); }
+        static COLORREF crSuccess()      { return COLORREF(success().toBGR()); }
+        static COLORREF crSuccessBg()    { return COLORREF(successBg().toBGR()); }
+        static COLORREF crInfo()         { return COLORREF(info().toBGR()); }
+        static COLORREF crInfoBg()       { return COLORREF(infoBg().toBGR()); }
+        static COLORREF crScrollBorder() { return COLORREF(scrollBorder().toBGR()); }
+    }
 }
