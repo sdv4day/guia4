@@ -92,7 +92,15 @@ struct MainWindowCallbacks
                 }
             }
         }
-        else
+        else if (id == MainWindow.ANIM3D_TIMER_ID)
+        {
+            // Continuous 3D animation timer — do NOT stop the timer
+            if (mw._anim3DCallback !is null)
+            {
+                mw._anim3DCallback();
+            }
+        }
+        else if (id == MainWindow.SCREENSHOT_TIMER_ID)
         {
             mw._platformWindow.stopTimer(id);
             mw._screenshotManager.captureScreenshot(mw._screenshotManager.screenshotFile);
