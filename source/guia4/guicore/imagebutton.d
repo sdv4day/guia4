@@ -37,13 +37,13 @@ class ImageButton : Control
     // ── 属性 ────────────────────────────────────────────────
 
     HBITMAP normalBitmap() @property { return _normalBitmap; }
-    void normalBitmap(HBITMAP v) @property { _normalBitmap = v; markDirty(DirtyBits.Visual); }
+    void normalBitmap(HBITMAP v) @property { _normalBitmap = v; markDirty(); }
 
     HBITMAP hoverBitmap() @property { return _hoverBitmap; }
-    void hoverBitmap(HBITMAP v) @property { _hoverBitmap = v; markDirty(DirtyBits.Visual); }
+    void hoverBitmap(HBITMAP v) @property { _hoverBitmap = v; markDirty(); }
 
     HBITMAP pressedBitmap() @property { return _pressedBitmap; }
-    void pressedBitmap(HBITMAP v) @property { _pressedBitmap = v; markDirty(DirtyBits.Visual); }
+    void pressedBitmap(HBITMAP v) @property { _pressedBitmap = v; markDirty(); }
 
     // ── 从文件加载位图 ──────────────────────────────────────
 
@@ -80,7 +80,7 @@ class ImageButton : Control
     {
         logTrace("ImageButton.fireMouseDown(x=", x, ", y=", y, ")");
         _pressed = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
@@ -88,7 +88,7 @@ class ImageButton : Control
     {
         logTrace("ImageButton.fireMouseUp(x=", x, ", y=", y, ")");
         _pressed = false;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseUp(x, y, button);
     }
 
@@ -104,10 +104,10 @@ class ImageButton : Control
         if (keyCode == VK_RETURN || keyCode == VK_SPACE)
         {
             _pressed = true;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             fireClick(width / 2, height / 2);
             _pressed = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireKeyDown(keyCode, shift, control, alt);
     }
@@ -120,7 +120,7 @@ class ImageButton : Control
             if (_hovered)
             {
                 _hovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -128,7 +128,7 @@ class ImageButton : Control
             if (!_hovered)
             {
                 _hovered = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         super.fireMouseMove(x, y);

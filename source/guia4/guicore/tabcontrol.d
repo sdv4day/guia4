@@ -37,7 +37,7 @@ class TabControl : Control
     int addTab(string label)
     {
         _tabLabels ~= label;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         return cast(int)_tabLabels.length - 1;
     }
 
@@ -46,7 +46,7 @@ class TabControl : Control
     void selectedIndex(int v) @property
     {
         _selectedIndex = v.clamp(0, cast(int)_tabLabels.length - 1);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 标签数量
@@ -68,10 +68,10 @@ class TabControl : Control
                 if (_selectedIndex != idx)
                 {
                     _selectedIndex = idx;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                     // 通知父控件（TabWidget）子控件状态变化，需要重新渲染
                     if (parent() !is null)
-                        parent().markDirty(DirtyBits.Children);
+                        parent().markDirty();
                 }
             }
     }
@@ -90,7 +90,7 @@ class TabControl : Control
         if (idx != _hoveredTab)
         {
             _hoveredTab = idx;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 

@@ -39,16 +39,16 @@ class TextImageButton : Control
     // ── 属性 ────────────────────────────────────────────────
 
     string text() const @property { return _text; }
-    void text(string v) @property { _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) @property { _text = v; markDirty(); }
 
     HBITMAP icon() @property { return _icon; }
-    void icon(HBITMAP v) @property { _icon = v; markDirty(DirtyBits.Visual); }
+    void icon(HBITMAP v) @property { _icon = v; markDirty(); }
 
     int iconWidth() const @property { return _iconWidth; }
-    void iconWidth(int v) @property { _iconWidth = v; markDirty(DirtyBits.Visual); }
+    void iconWidth(int v) @property { _iconWidth = v; markDirty(); }
 
     int iconHeight() const @property { return _iconHeight; }
-    void iconHeight(int v) @property { _iconHeight = v; markDirty(DirtyBits.Visual); }
+    void iconHeight(int v) @property { _iconHeight = v; markDirty(); }
 
     // ── 鼠标事件 ──────────────────────────────────────────
 
@@ -56,7 +56,7 @@ class TextImageButton : Control
     {
         logTrace("TextImageButton.fireMouseDown - '", _text, "'");
         _pressed = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
@@ -64,7 +64,7 @@ class TextImageButton : Control
     {
         logTrace("TextImageButton.fireMouseUp - '", _text, "'");
         _pressed = false;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseUp(x, y, button);
     }
 
@@ -79,10 +79,10 @@ class TextImageButton : Control
         if (keyCode == VK_RETURN || keyCode == VK_SPACE)
         {
             _pressed = true;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             fireClick(width / 2, height / 2);
             _pressed = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireKeyDown(keyCode, shift, control, alt);
     }
@@ -94,7 +94,7 @@ class TextImageButton : Control
             if (_hovered)
             {
                 _hovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -102,7 +102,7 @@ class TextImageButton : Control
             if (!_hovered)
             {
                 _hovered = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         super.fireMouseMove(x, y);

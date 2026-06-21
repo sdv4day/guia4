@@ -73,7 +73,7 @@ class TreeWidget : Control
 
     /// 根节点
     TreeItem root() @property { return _root; }
-    void root(TreeItem r) @property { _root = r; markDirty(DirtyBits.Visual); }
+    void root(TreeItem r) @property { _root = r; markDirty(); }
 
     /// 当前选中项
     TreeItem selectedItem() @property { return _selectedItem; }
@@ -83,14 +83,14 @@ class TreeWidget : Control
     void scrollY(int v) @property
     {
         _scrollY = v.clamp(0, maxScroll());
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     private void handleWheel(ref MouseWheelEvent ev)
     {
         int delta = ev.delta;
         _scrollY = (_scrollY + (delta > 0 ? -_itemHeight : _itemHeight)).clamp(0, maxScroll());
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     private int maxScroll() const
@@ -171,7 +171,7 @@ class TreeWidget : Control
                 _scrollY = cast(int)(maxScroll() * ratio);
                 _scrollY = (_scrollY > maxScroll()) ? maxScroll() : (_scrollY < 0) ? 0 : _scrollY;
             }
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -192,13 +192,13 @@ class TreeWidget : Control
             localX >= indentX && localX < indentX + _expandBoxWidth)
         {
             clickedItem.expanded = !clickedItem.expanded;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
         // 选中该项
         _selectedItem = clickedItem;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     override void fireMouseUp(int x, int y, int button)
@@ -207,7 +207,7 @@ class TreeWidget : Control
         {
             _thumbDragging = false;
             _thumbHovered = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseUp(x, y, button);
     }
@@ -226,7 +226,7 @@ class TreeWidget : Control
                 _scrollY = cast(int)(_dragStartScrollY + deltaY * scrollPerPixel);
                 _scrollY = (_scrollY > maxScroll()) ? maxScroll() : (_scrollY < 0) ? 0 : _scrollY;
             }
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         else if (needsScrollbar() && isInScrollbar(mx))
         {
@@ -235,14 +235,14 @@ class TreeWidget : Control
             bool wasHovered = _thumbHovered;
             _thumbHovered = (my >= tTop && my < tTop + tHeight);
             if (_thumbHovered != wasHovered)
-                markDirty(DirtyBits.Visual);
+                markDirty();
         }
         else
         {
             if (_thumbHovered)
             {
                 _thumbHovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
     }
@@ -381,7 +381,7 @@ class TreeWidget : Control
         if (currentY > clipBottom)
             return;
 
-        int rx = position().x();
+        int rx = 0;
         int itemY = currentY;
 
         // 只渲染可见范围内的项

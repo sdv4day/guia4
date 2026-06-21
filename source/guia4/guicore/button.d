@@ -3,24 +3,22 @@ module guia4.guicore.button;
 import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
+import guia4.guicore.irendercontext;
+import guia4.guicore.rendercontextfactory;
+import guia4.guicore.color;
 import guia4.utils.logger;
-import guia4.utils.fontcache;
 import guia4.platform_win32.win32defs;
-import std.utf;
-import windows.win32.graphics.gdi;
-import windows.win32.foundation;
-import windows.win32.ui.windowsandmessaging;
 
 /**
- * Button control with dlangui-style state machine.
+ * Button — 带状态机的按钮控件
  *
- * Mouse state transitions (orchestrated by MainWindow mouse dispatch):
- *   fireMouseDown(x,y)  → Pressed=true,  visual = pressed
- *   fireMouseUp(x,y)    → Pressed=false, visual = normal/hovered
- *   fireMouseMove(x,y)  → Hovered=true  (if inside bounds)
- *   fireMouseMove(-1,-1) → Hovered=false (cursor left)
+ * 鼠标状态转换（由 MainWindow 鼠标分发协调）：
+ *   fireMouseDown(x,y)  → Pressed=true,  视觉=按下
+ *   fireMouseUp(x,y)    → Pressed=false, 视觉=正常/悬停
+ *   fireMouseMove(x,y)  → Hovered=true   (如果在边界内)
+ *   fireMouseMove(-1,-1) → Hovered=false  (光标离开)
  *
- * Click detection is handled at the MainWindow dispatch layer.
+ * 点击检测在 MainWindow 分发层处理。
  */
 class Button : Control
 {
@@ -39,15 +37,15 @@ class Button : Control
     }
 
     string text() const @property { return _text; }
-    void text(string v) @property { logTrace("Button.text = '", v, "'"); _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) @property { logTrace("Button.text = '", v, "'"); _text = v; markDirty(); }
 
-    // ── Mouse event overrides ──────────────────────────────────────────
+    // ── 鼠标事件 ──────────────────────────────────────────
 
     override void fireMouseDown(int x, int y, int button)
     {
         logTrace("Button.fireMouseDown(x=", x, ", y=", y, ") - '", _text, "'");
         _pressed = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
@@ -55,7 +53,7 @@ class Button : Control
     {
         logTrace("Button.fireMouseUp(x=", x, ", y=", y, ") - '", _text, "'");
         _pressed = false;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseUp(x, y, button);
     }
 
@@ -68,130 +66,85 @@ class Button : Control
     override void fireKeyDown(uint keyCode, bool shift = false, bool control = false, bool alt = false)
     {
         logTrace("Button.fireKeyDown(keyCode=", keyCode, ") - '", _text, "'");
-        // Enter or Space triggers click (same as dlangui behaviour)
         if (keyCode == VK_RETURN || keyCode == VK_SPACE)
         {
             _pressed = true;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             fireClick(width / 2, height / 2);
             _pressed = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireKeyDown(keyCode, shift, control, alt);
     }
 
     override void fireMouseMove(int x, int y)
     {
-        // Sentinels: (-1, -1) signals mouse leave, (>=0, >=0) normal move
         if (x < 0 || y < 0)
         {
-            // Mouse left this button
             if (_hovered)
             {
                 logTrace("Button.fireMouseMove(LEAVE) - '", _text, "'");
                 _hovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
         {
-            // Normal mouse move (within window) — cursor could be entering or already inside
             if (!_hovered)
             {
                 logTrace("Button.fireMouseMove(ENTER) - '", _text, "' at (", x, ",", y, ")");
                 _hovered = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         super.fireMouseMove(x, y);
     }
 
-    // ── Rendering ──────────────────────────────────────────────────────
+    // ── 渲染（通过 IRenderContext 接口）───────────────────
 
     override void renderWithGDI(void* hdc_)
     {
-        auto hdc = cast(HDC)hdc_;
-        // 关键修复：视口已经被 renderChildRecursive 偏移到控件位置，所以使用 (0, 0) 渲染
+        auto ctx = RenderContextFactory.create(hdc_, width(), height());
         logTrace("Button.renderWithGDI() - '", _text, "' size=(", width(), ",", height(), ")");
 
-        // Select colors based on state
-        COLORREF bgColor;
-        COLORREF borderColor;
-        COLORREF textColor = cast(COLORREF)0x00FFFFFF; // white
+        // 根据状态选择颜色
+        Color bgColor, borderColor;
+        Color textColor = Color.white;
 
         if (_pressed)
         {
-            bgColor     = cast(COLORREF)0x00444444; // dark grey
-            borderColor = cast(COLORREF)0x00222222; // darker grey
+            bgColor = Color.rgb(0x44, 0x44, 0x44);
+            borderColor = Color.rgb(0x22, 0x22, 0x22);
         }
         else if (_hovered)
         {
-            bgColor     = cast(COLORREF)0x008888FF; // lighter blue
-            borderColor = cast(COLORREF)0x005555CC; // medium blue
+            bgColor = Color.rgb(0x88, 0x88, 0xFF);
+            borderColor = Color.rgb(0x55, 0x55, 0xCC);
         }
         else
         {
-            bgColor     = cast(COLORREF)0x006666FF; // default blue
-            borderColor = cast(COLORREF)0x003333AA; // dark blue
+            bgColor = Color.rgb(0x66, 0x66, 0xFF);
+            borderColor = Color.rgb(0x33, 0x33, 0xAA);
         }
 
-        // 使用 (0, 0) 而不是 position()，因为视口已经偏移
-        RECT rect = {
-            0, 0,
-            cast(LONG)width(), cast(LONG)height()
-        };
+        // 绘制圆角矩形背景
+        ctx.fillRoundRect(0, 0, width(), height(), 8, bgColor);
+        ctx.drawRoundRect(0, 0, width(), height(), 8, borderColor, 2);
 
-        HBRUSH bgBrush = CreateSolidBrush(cast(COLORREF)bgColor);
-        HPEN borderPen = CreatePen(PS_SOLID, 2, cast(COLORREF)borderColor);
+        // 绘制文本
+        ctx.setFont("Segoe UI", 14);
+        int tw, th;
+        ctx.measureText(_text, tw, th);
+        int textX = (width() - tw) / 2;
+        int textY = (height() - th) / 2;
+        ctx.drawText(textX, textY, _text, textColor);
 
-        HBRUSH oldBrush = cast(HBRUSH)SelectObject(hdc, cast(HGDIOBJ)bgBrush);
-        HPEN oldPen = cast(HPEN)SelectObject(hdc, cast(HGDIOBJ)borderPen);
-
-        RoundRect(hdc, rect.left, rect.top, rect.right, rect.bottom, 8, 8);
-
-        SelectObject(hdc, cast(HGDIOBJ)oldBrush);
-        SelectObject(hdc, cast(HGDIOBJ)oldPen);
-        DeleteObject(cast(HGDIOBJ)bgBrush);
-        DeleteObject(cast(HGDIOBJ)borderPen);
-
-        // Draw text
-        auto fontEntry = FontCache.get(hdc, "Segoe UI", 14);
-
-        SetTextColor(hdc, cast(COLORREF)textColor);
-        SetBkMode(hdc, TRANSPARENT);
-
-        wstring textW = toUTF16(_text);
-
-        SIZE textSize;
-        GetTextExtentPointW(hdc, cast(const(PWSTR))textW.ptr, cast(int)textW.length, &textSize);
-
-        int textX = (width() - textSize.cx) / 2;
-        int textY = (height() - textSize.cy) / 2;
-
-        TextOutW(hdc, textX, textY, cast(const(PWSTR))textW.ptr, cast(int)textW.length);
-
-        FontCache.release(hdc, fontEntry);
-
-        // Focus indicator: dotted rectangle around the button when focused
+        // 焦点指示器
         if (hasFocus())
         {
-            HPEN focusPen = CreatePen(PS_DOT, 1, cast(COLORREF)0x00000000); // black dotted
-            HGDIOBJ oldPen2 = SelectObject(hdc, cast(HGDIOBJ)focusPen);
-            HBRUSH oldBrush2 = cast(HBRUSH)SelectObject(hdc, cast(HGDIOBJ)GetStockObject(HOLLOW_BRUSH));
-
-            RECT focusRect = {
-                2, 2,
-                cast(LONG)(width() - 2), cast(LONG)(height() - 2)
-            };
-            Rectangle(hdc, focusRect.left, focusRect.top, focusRect.right, focusRect.bottom);
-
-            SelectObject(hdc, cast(HGDIOBJ)oldBrush2);
-            SelectObject(hdc, cast(HGDIOBJ)oldPen2);
-            DeleteObject(cast(HGDIOBJ)focusPen);
+            ctx.drawRect(2, 2, width() - 4, height() - 4, Color.black);
         }
     }
 
-    override void render()
-    {
-    }
+    override void render() {}
 }

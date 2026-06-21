@@ -87,7 +87,7 @@ class EditBox : Control
         _text = v;
         splitLines();
         clampCursor();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     int cursorLine() const @property { return _cursorLine; }
@@ -100,7 +100,7 @@ class EditBox : Control
         if (v < 0) v = 0;
         if (v > maxScroll) v = maxScroll;
         _scrollY = v;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 计算最大滚动偏移（确保最后一行可见）
@@ -168,7 +168,7 @@ class EditBox : Control
         }
         // 合并行：sLine的sCol前 + eLine的eCol后
         _lines[sLine] = _lines[sLine][0 .. sCol] ~ _lines[eLine][eCol .. $];
-        // 删除中间行
+        // 删除中间行（sLine+1 到 eLine 的行被移除）
         if (eLine > sLine)
         {
             string[] newLines;
@@ -176,7 +176,7 @@ class EditBox : Control
             {
                 if (i == sLine)
                     newLines ~= _lines[sLine];
-                else if (i <= sLine || i > eLine)
+                else if (i > eLine)
                     newLines ~= _lines[i];
             }
             _lines = newLines;
@@ -187,7 +187,7 @@ class EditBox : Control
         joinLines();
         clampCursor();
         _cursorVisible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 全选
@@ -199,7 +199,7 @@ class EditBox : Control
         _selectionEndCol = cast(int)_lines[_selectionEndLine].length;
         _cursorLine = _selectionEndLine;
         _cursorCol = _selectionEndCol;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 检查右键菜单是否打开
@@ -219,7 +219,7 @@ class EditBox : Control
             case 3: selectAll(); break;
             default: break;
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 剪贴板操作 ──────────────────────────────────────
@@ -283,7 +283,7 @@ class EditBox : Control
             _cursorVisible = true;
             joinLines();
             clampCursor();
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -393,7 +393,7 @@ class EditBox : Control
         _cursorCol += encodedLen;
         _cursorVisible = true;
         joinLines();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 键盘处理 ─────────────────────────────────────────
@@ -435,7 +435,7 @@ class EditBox : Control
                     _cursorLine--;
                     clampCursor();
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -445,7 +445,7 @@ class EditBox : Control
                     _cursorLine++;
                     clampCursor();
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -458,7 +458,7 @@ class EditBox : Control
                         prev--;
                     _cursorCol = prev;
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_cursorLine > 0)
                 {
@@ -466,7 +466,7 @@ class EditBox : Control
                     _cursorLine--;
                     _cursorCol = cast(int)_lines[_cursorLine].length;
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -479,7 +479,7 @@ class EditBox : Control
                         next++;
                     _cursorCol = next;
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_cursorLine < cast(int)_lines.length - 1)
                 {
@@ -487,20 +487,20 @@ class EditBox : Control
                     _cursorLine++;
                     _cursorCol = 0;
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
             case VK_HOME:
                 _cursorCol = 0;
                 _cursorVisible = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             case VK_END:
                 _cursorCol = cast(int)_lines[_cursorLine].length;
                 _cursorVisible = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             case VK_BACK:
@@ -520,7 +520,7 @@ class EditBox : Control
                     _cursorCol = prevStart;
                     _cursorVisible = true;
                     joinLines();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_cursorLine > 0)
                 {
@@ -539,7 +539,7 @@ class EditBox : Control
                     _cursorCol = prevLen;
                     _cursorVisible = true;
                     joinLines();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -559,7 +559,7 @@ class EditBox : Control
                     _lines[_cursorLine] = line[0 .. _cursorCol] ~ line[cpEnd .. $];
                     _cursorVisible = true;
                     joinLines();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_cursorLine < cast(int)_lines.length - 1)
                 {
@@ -575,7 +575,7 @@ class EditBox : Control
                     _lines = newLines;
                     _cursorVisible = true;
                     joinLines();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -598,7 +598,7 @@ class EditBox : Control
                 _cursorCol = 0;
                 _cursorVisible = true;
                 joinLines();
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             default:
@@ -617,7 +617,7 @@ class EditBox : Control
     {
         super.hasFocus(v);
         _cursorVisible = v;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 由闪烁定时器调用
@@ -626,7 +626,7 @@ class EditBox : Control
         if (hasFocus())
         {
             _cursorVisible = !_cursorVisible;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -647,7 +647,8 @@ class EditBox : Control
 
         if (line.length > 0)
         {
-            HDC tempDC = CreateCompatibleDC(cast(HDC)null);
+            import guia4.utils.dccache : DCCache;
+            HDC tempDC = DCCache.get();
             if (tempDC.Value !is null)
             {
                 auto fontEntry = FontCache.get(tempDC, "Segoe UI", cast(int)_fontSize);
@@ -660,7 +661,6 @@ class EditBox : Control
                 _cursorCol = cast(int)(line.length * ratio);
 
                 FontCache.release(tempDC, fontEntry);
-                DeleteDC(tempDC);
             }
             else
             {
@@ -684,7 +684,7 @@ class EditBox : Control
             positionCursorFromClick(x, y);
             // 弹出右键菜单
             _contextMenu.popup(x, y);
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -702,7 +702,7 @@ class EditBox : Control
         _selectionEndCol = _cursorCol;
 
         _cursorVisible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
@@ -713,7 +713,7 @@ class EditBox : Control
             _isSelecting = false;
             if (_selectionStartLine == _selectionEndLine && _selectionStartCol == _selectionEndCol)
                 clearSelection();
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseUp(x, y, button);
     }
@@ -725,7 +725,7 @@ class EditBox : Control
             positionCursorFromClick(x, y);
             _selectionEndLine = _cursorLine;
             _selectionEndCol = _cursorCol;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseMove(x, y);
     }
@@ -736,7 +736,7 @@ class EditBox : Control
         int scrollDelta = (ev.delta > 0) ? -3 : 3;
         scrollY = _scrollY + scrollDelta;
 
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 渲染 ──────────────────────────────────────────────

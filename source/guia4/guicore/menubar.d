@@ -91,7 +91,7 @@ class MenuBar : Control
         {
             slot.item.closeMenu();
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 检查是否有任何菜单展开
@@ -221,7 +221,7 @@ class MenuBar : Control
                                 other.item.closeMenu();
                         }
                     }
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 return;
             }
@@ -248,20 +248,20 @@ class MenuBar : Control
             {
                 slot.item._hovered = true;
                 // 标记该MenuItem为脏（只更新该item的buffer）
-                slot.item.markDirty(DirtyBits.Visual);
+                slot.item.markDirty();
                 // 如果有其他菜单展开，切换到这个
                 if (hasOpenMenu() && slot.item.hasSubMenu())
                 {
                     closeAll();
                     slot.item._menuOpen = true;
-                    markDirty(DirtyBits.Visual); // 子菜单展开需要重新布局
+                    markDirty(); // 子菜单展开需要重新布局
                 }
             }
             else if (!inSlot && slot.item._hovered)
             {
                 slot.item._hovered = false;
                 // 标记该MenuItem为脏（只更新该item的buffer）
-                slot.item.markDirty(DirtyBits.Visual);
+                slot.item.markDirty();
             }
         }
     }
@@ -283,11 +283,12 @@ class MenuItem : Control
 
     /// 获取/设置悬停状态（用于外部更新）
     bool hovered() const @property { return _hovered; }
-    void hovered(bool v) @property { if (_hovered != v) { _hovered = v; markDirty(DirtyBits.Visual); } }
+    void hovered(bool v) @property { if (_hovered != v) { _hovered = v; markDirty(); } }
 
     // 子菜单支持
     package MenuItem[] _subItems;       /// 子菜单项列表
     package bool _menuOpen = false;     /// 子菜单是否展开
+    private int _subMenuItemHeight = 24; /// 子菜单项高度
 
     // Layer buffer尺寸缓存（用于检测尺寸变化）
     private int _bufferWidth = 0;
@@ -366,7 +367,7 @@ class MenuItem : Control
     }
 
     string text() const @property { return _text; }
-    void text(string v) { _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) { _text = v; markDirty(); }
 
     /// 添加子菜单项
     MenuItem addSubItem(string text)
@@ -394,7 +395,7 @@ class MenuItem : Control
         {
             sub.closeMenu();
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 关闭所有展开的子菜单（向上查找到 MenuBar）
@@ -440,7 +441,7 @@ class MenuItem : Control
         if (hasSubMenu())
         {
             _menuOpen = !_menuOpen;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         else
         {
@@ -458,7 +459,7 @@ class MenuItem : Control
             if (_hovered)
             {
                 _hovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -466,7 +467,7 @@ class MenuItem : Control
             if (!_hovered)
             {
                 _hovered = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
     }
@@ -570,7 +571,7 @@ class MenuItem : Control
         int subX = position().x();                    // 子菜单左对齐父项
         int subY = position().y() + height();         // 子菜单在父项下方
         int subW = 160;                    // 子菜单宽度
-        int subH = cast(int)_subItems.length * 24;  // 每项24px高
+        int subH = cast(int)_subItems.length * _subMenuItemHeight;
 
         // 绘制子菜单背景
         RECT subRect = { cast(LONG)subX, cast(LONG)subY, cast(LONG)(subX + subW), cast(LONG)(subY + subH) };
@@ -594,17 +595,17 @@ class MenuItem : Control
 
         foreach (i, subItem; _subItems)
         {
-            int itemY = subY + cast(int)i * 24;
+            int itemY = subY + cast(int)i * _subMenuItemHeight;
 
             // 设置子项位置（用于命中测试）
             subItem.setXY(subX, itemY);
             subItem.width(subW);
-            subItem.height(24);
+            subItem.height(_subMenuItemHeight);
 
             // 悬停背景
             if (subItem._hovered)
             {
-                RECT hoverRect = { cast(LONG)subX, cast(LONG)itemY, cast(LONG)(subX + subW), cast(LONG)(itemY + 24) };
+                RECT hoverRect = { cast(LONG)subX, cast(LONG)itemY, cast(LONG)(subX + subW), cast(LONG)(itemY + _subMenuItemHeight) };
                 HBRUSH hoverBrush = CreateSolidBrush(Theme.crMenuHoverBg());
                 FillRect(hdc, &hoverRect, hoverBrush);
                 DeleteObject(cast(HGDIOBJ)hoverBrush);
@@ -612,7 +613,7 @@ class MenuItem : Control
 
             // 文字
             wstring textW = toUTF16(subItem._text);
-            TextOutW(hdc, subX + 8, itemY + (24 - cast(int)_fontSize) / 2,
+            TextOutW(hdc, subX + 8, itemY + (_subMenuItemHeight - cast(int)_fontSize) / 2,
                      cast(const(PWSTR))textW.ptr, cast(int)textW.length);
 
             // 子项的子菜单箭头

@@ -4,6 +4,7 @@ import guia4.guicore.control;
 import guia4.guicore.dirtyflag;
 import guia4.guicore.events;
 import guia4.guicore.scrollbar;
+import guia4.guicore.popupmenu;
 import guia4.guicore.theme;
 import guia4.utils.logger;
 import guia4.utils.fontcache;
@@ -15,6 +16,8 @@ import windows.win32.graphics.gdi;
 import windows.win32.foundation;
 import windows.win32.ui.windowsandmessaging;
 import windows.win32.system.systeminformation;
+import windows.win32.system.dataexchange;
+import windows.win32.system.memory;
 
 /**
  * GridWidgetBase — 抽象网格控件基类
@@ -74,6 +77,9 @@ abstract class GridWidgetBase : Control
     private int _lastClickRow = -1;
     private int _lastClickCol = -1;
 
+    // ── 右键菜单 ──
+    private PopupMenu _contextMenu;
+
     this(Control parent)
     {
         super(parent);
@@ -89,6 +95,15 @@ abstract class GridWidgetBase : Control
         _vScrollBar.width = _scrollBarWidth;
         _hScrollBar = new ScrollBar(null, ScrollBarOrientation.Horizontal);
         _hScrollBar.height = _scrollBarWidth;
+
+        // 创建右键菜单
+        _contextMenu = new PopupMenu(null);
+        _contextMenu.width = 140;
+        _contextMenu.addItem("剪切");
+        _contextMenu.addItem("复制");
+        _contextMenu.addItem("粘贴");
+        _contextMenu.addItem("全选");
+        _contextMenu.onItemClick = &handleContextMenuItem;
     }
 
     /// 行数
@@ -99,11 +114,11 @@ abstract class GridWidgetBase : Control
 
     /// 行高
     int rowHeight() const @property { return _rowHeight; }
-    void rowHeight(int v) @property { _rowHeight = v; markDirty(DirtyBits.Visual); }
+    void rowHeight(int v) @property { _rowHeight = v; markDirty(); }
 
     /// 表头是否可见
     bool headerVisible() const @property { return _headerVisible; }
-    void headerVisible(bool v) @property { _headerVisible = v; markDirty(DirtyBits.Visual); }
+    void headerVisible(bool v) @property { _headerVisible = v; markDirty(); }
 
     /// 选中行
     int selectedRow() const @property { return _selectedRow; }
@@ -120,7 +135,7 @@ abstract class GridWidgetBase : Control
     void setColWidths(int[] widths)
     {
         _colWidths = widths;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 设置列可编辑状态
@@ -160,7 +175,7 @@ abstract class GridWidgetBase : Control
     void scrollY(int v) @property
     {
         _scrollY = v.clamp(0, maxScroll());
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 水平滚动位置
@@ -168,7 +183,7 @@ abstract class GridWidgetBase : Control
     void scrollX(int v) @property
     {
         _scrollX = v.clamp(0, maxScrollX());
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// override Control.scrollOffsetY
@@ -239,7 +254,7 @@ abstract class GridWidgetBase : Control
         {
             _scrollY = newSY;
             _scrollX = newSX;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -280,6 +295,128 @@ abstract class GridWidgetBase : Control
         _editSelEnd = -1;
     }
 
+    /// 获取选区文本（规范化后）
+    string getSelectedEditText() const
+    {
+        if (!hasEditSelection()) return "";
+        int selMin = (_editSelStart < _editSelEnd) ? _editSelStart : _editSelEnd;
+        int selMax = (_editSelStart < _editSelEnd) ? _editSelEnd : _editSelStart;
+        if (selMin >= 0 && selMax <= cast(int)_editText.length && selMin <= selMax)
+            return _editText[selMin .. selMax];
+        return "";
+    }
+
+    /// 选区是否已全选
+    bool isAllSelected() const
+    {
+        return hasEditSelection() && _editSelStart == 0 && _editSelEnd == cast(int)_editText.length;
+    }
+
+    /// 全选编辑文本
+    void selectAllEditText()
+    {
+        if (_editText.length == 0) return;
+        _editSelStart = 0;
+        _editSelEnd = cast(int)_editText.length;
+        _editCursorPos = _editSelEnd;
+        markDirty();
+    }
+
+    /// 剪切选中文本
+    void cutEditText()
+    {
+        if (!hasEditSelection()) return;
+        copyEditTextToClipboard();
+        deleteEditSelection();
+    }
+
+    /// 复制选中文本到剪贴板
+    void copyEditTextToClipboard()
+    {
+        string sel = getSelectedEditText();
+        if (sel.length > 0)
+            copyToClipboardWin(sel);
+    }
+
+    /// 粘贴剪贴板文本到编辑位置
+    void pasteEditText()
+    {
+        string clipText = pasteFromClipboardWin();
+        if (clipText.length == 0) return;
+
+        // 如果有选区，先删除
+        if (hasEditSelection())
+            deleteEditSelection();
+
+        // 在光标位置插入
+        _editText = _editText[0 .. _editCursorPos] ~ clipText ~ _editText[_editCursorPos .. $];
+        _editCursorPos += cast(int)clipText.length;
+        markDirty();
+    }
+
+    /// 删除选区文本
+    private void deleteEditSelection()
+    {
+        if (!hasEditSelection()) return;
+        int selMin = (_editSelStart < _editSelEnd) ? _editSelStart : _editSelEnd;
+        int selMax = (_editSelStart < _editSelEnd) ? _editSelEnd : _editSelStart;
+        _editText = _editText[0 .. selMin] ~ _editText[selMax .. $];
+        _editCursorPos = selMin;
+        clearEditSelection();
+        markDirty();
+    }
+
+    /// Win32 剪贴板：复制文本
+    private void copyToClipboardWin(string txt)
+    {
+        if (OpenClipboard(HWND.init).Value != 0)
+        {
+            EmptyClipboard();
+            wstring textW = toUTF16(txt);
+            HGLOBAL hMem = GlobalAlloc(cast(GLOBAL_ALLOC_FLAGS)0x0002, (textW.length + 1) * wchar.sizeof);
+            if (hMem.Value !is null)
+            {
+                void* pMem = GlobalLock(hMem);
+                if (pMem !is null)
+                {
+                    import core.stdc.string : memcpy;
+                    memcpy(pMem, textW.ptr, textW.length * wchar.sizeof);
+                    (cast(wchar*)pMem)[textW.length] = 0;
+                    GlobalUnlock(hMem);
+                    SetClipboardData(cast(uint)13, HANDLE(hMem.Value));
+                }
+                else
+                    GlobalFree(hMem);
+            }
+            CloseClipboard();
+        }
+    }
+
+    /// Win32 剪贴板：粘贴文本
+    private string pasteFromClipboardWin()
+    {
+        string result;
+        if (OpenClipboard(HWND.init).Value != 0)
+        {
+            HANDLE hData = GetClipboardData(cast(uint)13);
+            if (hData.Value !is null)
+            {
+                HGLOBAL hMem = HGLOBAL(hData.Value);
+                const(wchar)* pMem = cast(const(wchar)*)GlobalLock(hMem);
+                if (pMem !is null)
+                {
+                    int len = 0;
+                    while (pMem[len] != 0) len++;
+                    wstring ws = pMem[0 .. len].idup;
+                    result = toUTF8(ws);
+                    GlobalUnlock(hMem);
+                }
+            }
+            CloseClipboard();
+        }
+        return result;
+    }
+
     /// 开始编辑指定单元格
     void beginEdit(int row, int col)
     {
@@ -304,7 +441,7 @@ abstract class GridWidgetBase : Control
         _editing = true;
         _selectedRow = row;
         _selectedCol = col;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 确认编辑（基类清理编辑状态，子类 override 以写入数据）
@@ -320,7 +457,7 @@ abstract class GridWidgetBase : Control
         _editing = false;
         _editRow = -1;
         _editCol = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 取消编辑，恢复原始文本
@@ -331,14 +468,14 @@ abstract class GridWidgetBase : Control
         _editing = false;
         _editRow = -1;
         _editCol = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     private void handleWheel(ref MouseWheelEvent ev)
     {
         int delta = ev.delta;
         _scrollY = (_scrollY + (delta > 0 ? -_rowHeight : _rowHeight)).clamp(0, maxScroll());
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     private int maxScroll() const
@@ -358,10 +495,46 @@ abstract class GridWidgetBase : Control
 
     // ── 鼠标事件 ──────────────────────────────────────────
 
+    /// 检查右键菜单是否打开
+    bool contextMenuOpen() const @property { return _contextMenu !is null && _contextMenu.isOpen; }
+
+    /// 获取内部 PopupMenu 实例（供 MainWindow 事件转发）
+    PopupMenu contextMenu() @property { return _contextMenu; }
+
+    /// 右键菜单项点击处理
+    private void handleContextMenuItem(int index, string text)
+    {
+        switch (index)
+        {
+            case 0: cutEditText(); break;
+            case 1: copyEditTextToClipboard(); break;
+            case 2: pasteEditText(); break;
+            case 3: selectAllEditText(); break;
+            default: break;
+        }
+        markDirty();
+    }
+
     override void fireMouseDown(int mx, int my, int button)
     {
+        // 右键：弹出上下文菜单
+        if (button == 1)
+        {
+            if (_editing)
+            {
+                // 编辑中右键，先定位光标到点击位置
+                // 简单处理：不做精确定位，直接弹出菜单
+            }
+            _contextMenu.popup(mx, my);
+            markDirty();
+            return;
+        }
+
         if (button != 0)
             return;
+
+        // 关闭右键菜单
+        _contextMenu.close();
 
         // ── 检查垂直滚动条点击 ──
         if (isInVScrollbar(mx, my))
@@ -433,11 +606,14 @@ abstract class GridWidgetBase : Control
             else
             {
                 // 单击
-                if (_editing)
-                    commitEdit(); // 提交当前编辑
+                if (_editing && (_editRow != row || _editCol != col))
+                    commitEdit(); // 点击其他单元格，提交当前编辑
                 _selectedRow = row;
                 _selectedCol = col;
-                markDirty(DirtyBits.Visual);
+                // 单击进入编辑模式（如果列可编辑）
+                if (!_editing && isColEditable(col))
+                    beginEdit(row, col);
+                markDirty();
             }
         }
 
@@ -514,6 +690,28 @@ abstract class GridWidgetBase : Control
     /// 编辑模式下的键盘处理
     private void handleEditKeyDown(ref KeyEvent event)
     {
+        // Ctrl 快捷键
+        if (event.control)
+        {
+            switch (event.keyCode)
+            {
+                case 'A':
+                    selectAllEditText();
+                    return;
+                case 'C':
+                    copyEditTextToClipboard();
+                    return;
+                case 'X':
+                    cutEditText();
+                    return;
+                case 'V':
+                    pasteEditText();
+                    return;
+                default:
+                    break;
+            }
+        }
+
         switch (event.keyCode)
         {
             case VK_RETURN:
@@ -536,7 +734,7 @@ abstract class GridWidgetBase : Control
                     _selectedRow++;
                     _selectedCol = 0;
                 }
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             case VK_LEFT:
@@ -555,7 +753,7 @@ abstract class GridWidgetBase : Control
                             prev--;
                         _editCursorPos = prev;
                         _editSelEnd = prev;
-                        markDirty(DirtyBits.Visual);
+                        markDirty();
                     }
                 }
                 else
@@ -574,7 +772,7 @@ abstract class GridWidgetBase : Control
                             prev--;
                         _editCursorPos = prev;
                     }
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -594,7 +792,7 @@ abstract class GridWidgetBase : Control
                             next++;
                         _editCursorPos = next;
                         _editSelEnd = next;
-                        markDirty(DirtyBits.Visual);
+                        markDirty();
                     }
                 }
                 else
@@ -613,7 +811,7 @@ abstract class GridWidgetBase : Control
                             next++;
                         _editCursorPos = next;
                     }
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -628,13 +826,13 @@ abstract class GridWidgetBase : Control
                     }
                     _editCursorPos = 0;
                     _editSelEnd = 0;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else
                 {
                     _editCursorPos = 0;
                     clearEditSelection();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -649,13 +847,13 @@ abstract class GridWidgetBase : Control
                     }
                     _editCursorPos = cast(int)_editText.length;
                     _editSelEnd = _editCursorPos;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else
                 {
                     _editCursorPos = cast(int)_editText.length;
                     clearEditSelection();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -668,7 +866,7 @@ abstract class GridWidgetBase : Control
                     _editText = _editText[0 .. selMin] ~ _editText[selMax .. $];
                     _editCursorPos = selMin;
                     clearEditSelection();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_editCursorPos > 0 && _editText.length > 0)
                 {
@@ -678,7 +876,7 @@ abstract class GridWidgetBase : Control
                         prevStart--;
                     _editText = _editText[0 .. prevStart] ~ _editText[_editCursorPos .. $];
                     _editCursorPos = prevStart;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -691,7 +889,7 @@ abstract class GridWidgetBase : Control
                     _editText = _editText[0 .. selMin] ~ _editText[selMax .. $];
                     _editCursorPos = selMin;
                     clearEditSelection();
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 else if (_editCursorPos < cast(int)_editText.length)
                 {
@@ -700,7 +898,7 @@ abstract class GridWidgetBase : Control
                     while (cpEnd < cast(int)_editText.length && (_editText[cpEnd] & 0xC0) == 0x80)
                         cpEnd++;
                     _editText = _editText[0 .. _editCursorPos] ~ _editText[cpEnd .. $];
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -725,7 +923,7 @@ abstract class GridWidgetBase : Control
                 if (_selectedRow > 0)
                 {
                     _selectedRow--;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -733,7 +931,7 @@ abstract class GridWidgetBase : Control
                 if (_selectedRow < _rowCount - 1)
                 {
                     _selectedRow++;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -741,7 +939,7 @@ abstract class GridWidgetBase : Control
                 if (_selectedCol > 0)
                 {
                     _selectedCol--;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -749,7 +947,7 @@ abstract class GridWidgetBase : Control
                 if (_selectedCol < _colCount - 1)
                 {
                     _selectedCol++;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -787,7 +985,7 @@ abstract class GridWidgetBase : Control
         // 在光标位置插入
         _editText = _editText[0 .. _editCursorPos] ~ charStr ~ _editText[_editCursorPos .. $];
         _editCursorPos += cast(int)encodedLen;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 获取指定列的宽度

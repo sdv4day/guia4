@@ -64,24 +64,24 @@ class ScrollBar : Control
     // ── 属性 ────────────────────────────────────────────────
 
     ScrollBarOrientation orientation() const @property { return _orientation; }
-    void orientation(ScrollBarOrientation v) @property { _orientation = v; markDirty(DirtyBits.Visual); }
+    void orientation(ScrollBarOrientation v) @property { _orientation = v; markDirty(); }
 
     int value() const @property { return _value; }
 
     void value(int v) @property
     {
         _value = clampValue(v);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     int min() const @property { return _min; }
-    void min(int v) @property { _min = v; _value = clampValue(_value); markDirty(DirtyBits.Visual); }
+    void min(int v) @property { _min = v; _value = clampValue(_value); markDirty(); }
 
     int max() const @property { return _max; }
-    void max(int v) @property { _max = v; _value = clampValue(_value); markDirty(DirtyBits.Visual); }
+    void max(int v) @property { _max = v; _value = clampValue(_value); markDirty(); }
 
     int pageSize() const @property { return _pageSize; }
-    void pageSize(int v) @property { _pageSize = v; _value = clampValue(_value); markDirty(DirtyBits.Visual); }
+    void pageSize(int v) @property { _pageSize = v; _value = clampValue(_value); markDirty(); }
 
     /// 滑块是否正在被拖拽（供容器查询以转发事件）
     bool isDragging() const @property { return _thumbDragging; }
@@ -176,7 +176,7 @@ class ScrollBar : Control
         int delta = ev.delta;
         int step = (delta > 0) ? -3 : 3;
         _value = clampValue(_value + step);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 鼠标事件 ──────────────────────────────────────────
@@ -196,7 +196,7 @@ class ScrollBar : Control
             _thumbDragging = true;
             _dragStart = clickPos;
             _dragStartValue = _value;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         else
         {
@@ -204,7 +204,7 @@ class ScrollBar : Control
             int newThumbPos = clickPos - thumbLength / 2;
             if (newThumbPos < 0) newThumbPos = 0;
             _value = valueFromPixel(newThumbPos);
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
 
         super.fireMouseDown(x, y, button);
@@ -217,7 +217,7 @@ class ScrollBar : Control
         if (_thumbDragging)
         {
             _thumbDragging = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
 
         super.fireMouseUp(x, y, button);
@@ -243,7 +243,7 @@ class ScrollBar : Control
                 int valueDelta = (delta * totalRange) / movableRange;
                 _value = clampValue(_dragStartValue + valueDelta);
             }
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         else
         {
@@ -251,7 +251,7 @@ class ScrollBar : Control
             bool wasHovered = _thumbHovered;
             _thumbHovered = (pos >= thumbStart && pos < thumbStart + thumbLength);
             if (_thumbHovered != wasHovered)
-                markDirty(DirtyBits.Visual);
+                markDirty();
         }
 
         super.fireMouseMove(x, y);

@@ -50,21 +50,31 @@ class ImageWidget : Control
 
     void bitmap(HBITMAP v) @property
     {
+        if (_bitmap.Value !is null && _bitmap.Value != v.Value)
+            DeleteObject(cast(HGDIOBJ)_bitmap);
         _bitmap = v;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     bool autoSize() const @property { return _autoSize; }
-    void autoSize(bool v) @property { _autoSize = v; markDirty(DirtyBits.Visual); }
+    void autoSize(bool v) @property { _autoSize = v; markDirty(); }
 
     // ── 加载 BMP ──────────────────────────────────────────
+
+    ~this()
+    {
+        if (_bitmap.Value !is null)
+            DeleteObject(cast(HGDIOBJ)_bitmap);
+    }
 
     private void loadBitmap(string path)
     {
         if (path.length == 0)
         {
+            if (_bitmap.Value !is null)
+                DeleteObject(cast(HGDIOBJ)_bitmap);
             _bitmap = HBITMAP.init;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -81,6 +91,8 @@ class ImageWidget : Control
 
         if (hImg.Value !is null)
         {
+            if (_bitmap.Value !is null)
+                DeleteObject(cast(HGDIOBJ)_bitmap);
             _bitmap = HBITMAP(hImg.Value);
             logTrace("ImageWidget.loadBitmap: loaded '", path, "'");
 
@@ -100,7 +112,7 @@ class ImageWidget : Control
             logWarning("ImageWidget.loadBitmap: failed to load '", path, "'");
         }
 
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 渲染 ──────────────────────────────────────────────

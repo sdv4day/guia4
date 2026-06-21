@@ -1,6 +1,8 @@
 module guia4.guicore.filedialog;
 
 import guia4.utils.logger;
+import std.utf : toUTF16;
+import std.conv : to;
 
 /**
  * FileDialog — 文件选择对话框
@@ -26,9 +28,6 @@ class FileDialog
             {
                 // 尝试使用 Win32 API
                 import core.sys.windows.windows : OPENFILENAMEW, GetOpenFileNameW;
-                import std.utf : toUTF16;
-                import std.conv : to;
-
                 OPENFILENAMEW ofn = OPENFILENAMEW.init;
 
                 wchar[260] fileBuf = 0;
@@ -63,7 +62,6 @@ class FileDialog
                     if (len > 0)
                     {
                         wstring pathW = fileBuf[0 .. len].idup;
-                        import std.conv : to;
                         return to!string(pathW);
                     }
                 }
@@ -90,9 +88,6 @@ class FileDialog
             try
             {
                 import core.sys.windows.windows : OPENFILENAMEW, GetSaveFileNameW;
-                import std.utf : toUTF16;
-                import std.conv : to;
-
                 OPENFILENAMEW ofn = OPENFILENAMEW.init;
 
                 wchar[260] fileBuf = 0;
@@ -127,7 +122,6 @@ class FileDialog
                     if (len > 0)
                     {
                         wstring pathW = fileBuf[0 .. len].idup;
-                        import std.conv : to;
                         return to!string(pathW);
                     }
                 }

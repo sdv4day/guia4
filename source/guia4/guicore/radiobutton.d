@@ -37,7 +37,7 @@ class RadioButton : Control
     // ── 属性 ────────────────────────────────────────────────
 
     string text() const @property { return _text; }
-    void text(string v) @property { _text = v; markDirty(DirtyBits.Visual); }
+    void text(string v) @property { _text = v; markDirty(); }
 
     bool checked() const @property { return _checked; }
 
@@ -46,11 +46,11 @@ class RadioButton : Control
         _checked = v;
         if (v)
             uncheckSiblings();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     int groupId() const @property { return _groupId; }
-    void groupId(int v) @property { _groupId = v; markDirty(DirtyBits.Visual); }
+    void groupId(int v) @property { _groupId = v; markDirty(); }
 
     // ── 取消同组其他选中 ──────────────────────────────────
 
@@ -65,7 +65,7 @@ class RadioButton : Control
             if (rb !is null && rb !is this && rb.groupId() == _groupId && rb.checked())
             {
                 rb._checked = false;
-                rb.markDirty(DirtyBits.Visual);
+                rb.markDirty();
             }
         }
     }
@@ -84,13 +84,13 @@ class RadioButton : Control
 
     override void fireMouseDown(int x, int y, int button)
     {
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
     override void fireMouseUp(int x, int y, int button)
     {
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseUp(x, y, button);
     }
 
@@ -115,7 +115,7 @@ class RadioButton : Control
             if (_hovered)
             {
                 _hovered = false;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -123,7 +123,7 @@ class RadioButton : Control
             if (!_hovered)
             {
                 _hovered = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         super.fireMouseMove(x, y);

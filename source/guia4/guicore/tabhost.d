@@ -37,7 +37,7 @@ class TabHost : Control
         if (_activeIndex != v)
         {
             _activeIndex = v;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 

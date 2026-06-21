@@ -91,11 +91,11 @@ class TextInput : Control
         if (_cursorPos > cast(int)_text.length)
             _cursorPos = cast(int)_text.length;
         clearSelection();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     string placeholder() const @property { return _placeholder; }
-    void placeholder(string v) @property { _placeholder = v; markDirty(DirtyBits.Visual); }
+    void placeholder(string v) @property { _placeholder = v; markDirty(); }
 
     int cursorPos() const @property { return _cursorPos; }
 
@@ -143,7 +143,7 @@ class TextInput : Control
     {
         _selectionStart = start.clamp(0, cast(int)_text.length);
         _selectionEnd = end.clamp(0, cast(int)_text.length);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 全选
@@ -152,7 +152,7 @@ class TextInput : Control
         _selectionStart = 0;
         _selectionEnd = cast(int)_text.length;
         _cursorPos = _selectionEnd;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 检查右键菜单是否打开
@@ -172,7 +172,7 @@ class TextInput : Control
             case 3: selectAll(); break;
             default: break;
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 文本输入处理 ──────────────────────────────────────
@@ -194,7 +194,7 @@ class TextInput : Control
         _text = _text[0 .. _cursorPos] ~ charStr ~ _text[_cursorPos .. $];
         _cursorPos += encodedLen;
         _cursorVisible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 键盘处理 ─────────────────────────────────────────
@@ -272,7 +272,7 @@ class TextInput : Control
                         }
                     }
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -311,7 +311,7 @@ class TextInput : Control
                         }
                     }
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -328,7 +328,7 @@ class TextInput : Control
                     clearSelection();
                 }
                 _cursorVisible = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             case VK_END:
@@ -344,7 +344,7 @@ class TextInput : Control
                     clearSelection();
                 }
                 _cursorVisible = true;
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 break;
 
             case VK_BACK:
@@ -362,7 +362,7 @@ class TextInput : Control
                     _text = _text[0 .. prevStart] ~ _text[_cursorPos .. $];
                     _cursorPos = prevStart;
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -379,7 +379,7 @@ class TextInput : Control
                         cpEnd++;
                     _text = _text[0 .. _cursorPos] ~ _text[cpEnd .. $];
                     _cursorVisible = true;
-                    markDirty(DirtyBits.Visual);
+                    markDirty();
                 }
                 break;
 
@@ -401,7 +401,7 @@ class TextInput : Control
         _cursorPos = start;
         clearSelection();
         _cursorVisible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 剪切选区文本到剪贴板
@@ -434,7 +434,7 @@ class TextInput : Control
             _text = _text[0 .. _cursorPos] ~ clipText ~ _text[_cursorPos .. $];
             _cursorPos += cast(int)clipText.length;
             _cursorVisible = true;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -508,7 +508,7 @@ class TextInput : Control
     {
         super.hasFocus(v);
         _cursorVisible = v;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 由闪烁定时器调用，切换光标可见性。
@@ -517,7 +517,7 @@ class TextInput : Control
         if (hasFocus())
         {
             _cursorVisible = !_cursorVisible;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -533,7 +533,7 @@ class TextInput : Control
             positionCursorFromX(x);
             // 弹出右键菜单
             _contextMenu.popup(x, y);
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -549,7 +549,7 @@ class TextInput : Control
         _selectionEnd = _cursorPos;
 
         _cursorVisible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         super.fireMouseDown(x, y, button);
     }
 
@@ -561,7 +561,7 @@ class TextInput : Control
             // 如果选区为空，清除选区
             if (_selectionStart == _selectionEnd)
                 clearSelection();
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseUp(x, y, button);
     }
@@ -573,7 +573,7 @@ class TextInput : Control
             // 更新选区结束位置
             positionCursorFromX(x);
             _selectionEnd = _cursorPos;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseMove(x, y);
     }
@@ -583,7 +583,8 @@ class TextInput : Control
     {
         if (_text.length > 0 && width() > _padding * 2)
         {
-            HDC tempDC = CreateCompatibleDC(cast(HDC)null);
+            import guia4.utils.dccache : DCCache;
+            HDC tempDC = DCCache.get();
             if (tempDC.Value !is null)
             {
                 auto fontEntry = FontCache.get(tempDC, "Segoe UI", cast(int)_fontSize);
@@ -622,7 +623,6 @@ class TextInput : Control
                     _cursorPos = cast(int)_text.length;
 
                 FontCache.release(tempDC, fontEntry);
-                DeleteDC(tempDC);
             }
             else
             {

@@ -101,13 +101,13 @@ class LongList : Control
     // ── 数据源设置 ──────────────────────────────────────────────
 
     /// 设置项总数回调
-    void itemCountFunc(int delegate() func) { _itemCountFunc = func; recalcTotalHeight(); markDirty(DirtyBits.Visual); }
+    void itemCountFunc(int delegate() func) { _itemCountFunc = func; recalcTotalHeight(); markDirty(); }
 
     /// 设置项文本回调
-    void itemTextFunc(string delegate(int index) func) { _itemTextFunc = func; markDirty(DirtyBits.Visual); }
+    void itemTextFunc(string delegate(int index) func) { _itemTextFunc = func; markDirty(); }
 
     /// 设置项高度回调（可变行高）
-    void itemHeightFunc(int delegate(int index) func) { _itemHeightFunc = func; recalcTotalHeight(); markDirty(DirtyBits.Visual); }
+    void itemHeightFunc(int delegate(int index) func) { _itemHeightFunc = func; recalcTotalHeight(); markDirty(); }
 
     /// 便捷方法：设置固定项数（不需要回调）
     void setItemCount(int count)
@@ -115,7 +115,7 @@ class LongList : Control
         int c = count;  // 捕获到闭包
         _itemCountFunc = () => c;
         recalcTotalHeight();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 便捷方法：设置字符串数组为数据源
@@ -125,18 +125,18 @@ class LongList : Control
         _itemCountFunc = () => cast(int)data.length;
         _itemTextFunc = (int index) => (index >= 0 && index < cast(int)data.length) ? data[index] : "";
         recalcTotalHeight();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     // ── 属性 ────────────────────────────────────────────────────
 
     /// 默认项高度
     int defaultItemHeight() const @property { return _defaultItemHeight; }
-    void defaultItemHeight(int v) @property { _defaultItemHeight = v; recalcTotalHeight(); markDirty(DirtyBits.Visual); }
+    void defaultItemHeight(int v) @property { _defaultItemHeight = v; recalcTotalHeight(); markDirty(); }
 
     /// 选择模式
     ListSelectionMode selectionMode() const @property { return _selectionMode; }
-    void selectionMode(ListSelectionMode v) @property { _selectionMode = v; markDirty(DirtyBits.Visual); }
+    void selectionMode(ListSelectionMode v) @property { _selectionMode = v; markDirty(); }
 
     /// Follow 模式 — 自动跟随最新记录
     FollowMode followMode() const @property { return _followMode; }
@@ -148,7 +148,7 @@ class LongList : Control
             // 启用跟随时，立即滚到底部
             scrollToBottom();
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 距底部多少像素内视为"在底部"（Follow 模式阈值）
@@ -215,7 +215,7 @@ class LongList : Control
             _selectedIndices ~= index;
         }
         _anchorIndex = index;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 取消选中指定项
@@ -226,7 +226,7 @@ class LongList : Control
             if (_selectedIndices[i] == index)
             {
                 _selectedIndices = _selectedIndices[0 .. i] ~ _selectedIndices[i + 1 .. $];
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 return;
             }
         }
@@ -249,7 +249,7 @@ class LongList : Control
         _selectedIndices.reserve(count);
         for (int i = 0; i < count; i++)
             _selectedIndices ~= i;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 清除选中
@@ -257,7 +257,7 @@ class LongList : Control
     {
         _selectedIndices.length = 0;
         _anchorIndex = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 判断项是否选中
@@ -291,7 +291,7 @@ class LongList : Control
 
         _scrollY = _scrollY.clamp(0, maxScroll());
         updateAtBottomState();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 滚动到底部（显示最新记录）
@@ -300,7 +300,7 @@ class LongList : Control
         recalcTotalHeight();
         _scrollY = maxScroll();
         _isAtBottom = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 通知数据已追加 — 在 Follow 模式下自动滚到底部
@@ -314,13 +314,13 @@ class LongList : Control
             // 始终跟随：强制滚到底部
             _scrollY = maxScroll();
             _isAtBottom = true;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         else if (_followMode == FollowMode.Follow && _isAtBottom)
         {
             // 跟随模式且当前在底部：自动跟随
             _scrollY = maxScroll();
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         // FollowMode.None 或用户已上滚：不做任何操作
     }
@@ -341,7 +341,7 @@ class LongList : Control
             _scrollY = 0;
             _isAtBottom = false;
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 更新 _isAtBottom 状态
@@ -450,7 +450,7 @@ class LongList : Control
         _scrollY = (_scrollY / _defaultItemHeight) * _defaultItemHeight;
 
         updateAtBottomState();
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     override void fireMouseDown(int mx, int my, int button)
@@ -488,7 +488,7 @@ class LongList : Control
                     updateAtBottomState();
                 }
             }
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -514,7 +514,7 @@ class LongList : Control
                 _anchorIndex = clickedIndex;
             }
             _hoveredIndex = clickedIndex;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
 
         super.fireMouseDown(mx, my, button);
@@ -525,7 +525,7 @@ class LongList : Control
         if (_scrollbarThumbDragging)
         {
             _scrollbarThumbDragging = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
         super.fireMouseUp(mx, my, button);
     }
@@ -552,7 +552,7 @@ class LongList : Control
 
                 updateAtBottomState();
             }
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -565,7 +565,7 @@ class LongList : Control
             bool wasHovered = _scrollbarThumbHovered;
             _scrollbarThumbHovered = (my >= thumbStart && my < thumbStart + thumbLength);
             if (_scrollbarThumbHovered != wasHovered)
-                markDirty(DirtyBits.Visual);
+                markDirty();
             return;
         }
 
@@ -575,7 +575,7 @@ class LongList : Control
         if (hoveredIdx != _hoveredIndex)
         {
             _hoveredIndex = hoveredIdx;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -723,8 +723,8 @@ class LongList : Control
     /// 渲染滚动条
     private void renderScrollbar(HDC hdc)
     {
-        int rx = position().x() + width() - _scrollbarWidth;
-        int ry = position().y();
+        int rx = width() - _scrollbarWidth;
+        int ry = 0;
         int rh = height();
 
         // 轨道

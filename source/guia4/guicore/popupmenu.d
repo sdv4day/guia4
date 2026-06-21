@@ -92,7 +92,7 @@ class PopupMenu : Control
         _isOpen = true;
         visible = true;
         _hoveredIndex = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 关闭菜单
@@ -101,14 +101,14 @@ class PopupMenu : Control
         _isOpen = false;
         visible = false;
         _hoveredIndex = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 重新计算高度
     private void recalcHeight()
     {
         height = cast(int)_items.length * _itemHeight;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     override void fireMouseDown(int mx, int my, int button)
@@ -143,7 +143,7 @@ class PopupMenu : Control
             if (_hoveredIndex != -1)
             {
                 _hoveredIndex = -1;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
             return;
         }
@@ -152,7 +152,7 @@ class PopupMenu : Control
         if (idx != _hoveredIndex)
         {
             _hoveredIndex = idx;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 

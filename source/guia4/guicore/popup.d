@@ -47,7 +47,7 @@ class Popup : Control
 
     /// 标题文本
     string title() const @property { return _title; }
-    void title(string v) @property { _title = v; markDirty(DirtyBits.Visual); }
+    void title(string v) @property { _title = v; markDirty(); }
 
     /// 弹出窗口是否打开
     bool isOpen() const @property { return _isOpen; }
@@ -58,7 +58,7 @@ class Popup : Control
         setXY(px, py);
         _isOpen = true;
         visible = true;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 关闭弹出窗口
@@ -66,7 +66,7 @@ class Popup : Control
     {
         _isOpen = false;
         visible = false;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 是否正在拖拽
@@ -176,19 +176,22 @@ class Popup : Control
             if (newY > parentH - minVisible) newY = parentH - minVisible;  // 不能太下
 
             setXY(newX, newY);
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
-        // 关闭按钮悬停检测
-        int closeBtnSize = _titleBarHeight - 6;
-        int closeBtnX = width() - closeBtnSize - 3;
-        int closeBtnY = 3;
-        bool wasHovered = _closeBtnHovered;
-        _closeBtnHovered = (mx >= closeBtnX && mx < closeBtnX + closeBtnSize &&
-                            my >= closeBtnY && my < closeBtnY + closeBtnSize);
-        if (_closeBtnHovered != wasHovered)
-            markDirty(DirtyBits.Visual);
+        // 关闭按钮悬停检测（拖拽时跳过，坐标系不同）
+        if (!_isDragging)
+        {
+            int closeBtnSize = _titleBarHeight - 6;
+            int closeBtnX = width() - closeBtnSize - 3;
+            int closeBtnY = 3;
+            bool wasHovered = _closeBtnHovered;
+            _closeBtnHovered = (mx >= closeBtnX && mx < closeBtnX + closeBtnSize &&
+                                my >= closeBtnY && my < closeBtnY + closeBtnSize);
+            if (_closeBtnHovered != wasHovered)
+                markDirty();
+        }
 
         super.fireMouseMove(mx, my);
     }
@@ -199,7 +202,7 @@ class Popup : Control
         {
             _isDragging = false;
             _dragOriginSet = false;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
         super.fireMouseUp(mx, my, button);
@@ -213,8 +216,8 @@ class Popup : Control
 
         logTrace("Popup.renderWithGDI() at (", position().x(), ",", position().y(), ")");
 
-        int rx = position().x();
-        int ry = position().y();
+        int rx = 0;
+        int ry = 0;
         int rw = width();
         int rh = height();
 

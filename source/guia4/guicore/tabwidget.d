@@ -97,7 +97,11 @@ class TabWidget : Control
         if (my >= 0 && my < _tabBarHeight)
         {
             // 点击在标签栏区域 — 转发到 tabControl
+            int oldSelected = _tabControl.selectedIndex();
             _tabControl.fireMouseDown(mx, my, button);
+            // 选中标签变化时，标记自身脏（触发重绘）
+            if (_tabControl.selectedIndex() != oldSelected)
+                markDirty();
         }
         else if (my >= _tabBarHeight)
         {

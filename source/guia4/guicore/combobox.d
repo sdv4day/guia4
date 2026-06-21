@@ -41,7 +41,7 @@ class ComboBox : Control
     void addItem(string item)
     {
         _items ~= item;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 当前选中项索引
@@ -56,7 +56,7 @@ class ComboBox : Control
             _selectedIndex = cast(int)_items.length - 1;
         else
             _selectedIndex = v;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 下拉列表是否展开
@@ -83,7 +83,7 @@ class ComboBox : Control
         if (mx >= width() - 24)
         {
             _isDropDown = !_isDropDown;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -91,7 +91,7 @@ class ComboBox : Control
         if (mx >= 0 && mx < width() - 24 && my >= 0 && my < height())
         {
             _isDropDown = !_isDropDown;
-            markDirty(DirtyBits.Visual);
+            markDirty();
             return;
         }
 
@@ -104,7 +104,7 @@ class ComboBox : Control
         bool wasHovered = _hovered;
         _hovered = (mx >= 0 && mx < width() && my >= 0 && my < height());
         if (_hovered != wasHovered)
-            markDirty(DirtyBits.Visual);
+            markDirty();
 
         // 下拉列表悬停
         if (_isDropDown && my > height())
@@ -113,7 +113,7 @@ class ComboBox : Control
             if (itemIdx != _hoveredItem)
             {
                 _hoveredItem = itemIdx;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -121,7 +121,7 @@ class ComboBox : Control
             if (_hoveredItem != -1)
             {
                 _hoveredItem = -1;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
     }
@@ -147,7 +147,7 @@ class ComboBox : Control
                 _selectedIndex = itemIdx;
                 _isDropDown = false;
                 _hoveredItem = -1;
-                markDirty(DirtyBits.Visual);
+                markDirty();
                 return true;
             }
         }
@@ -155,7 +155,7 @@ class ComboBox : Control
         // 点击下拉列表外，关闭下拉
         _isDropDown = false;
         _hoveredItem = -1;
-        markDirty(DirtyBits.Visual);
+        markDirty();
         return true;  // 已处理（关闭下拉）
     }
 
@@ -173,7 +173,7 @@ class ComboBox : Control
             if (itemIdx != _hoveredItem)
             {
                 _hoveredItem = itemIdx;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
         else
@@ -181,7 +181,7 @@ class ComboBox : Control
             if (_hoveredItem != -1)
             {
                 _hoveredItem = -1;
-                markDirty(DirtyBits.Visual);
+                markDirty();
             }
         }
     }

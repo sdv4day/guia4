@@ -78,7 +78,7 @@ class VirtualCanvas : Control
     void viewX(int v) @property
     {
         _viewX = v.clamp(0, _canvasWidth - width);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
     
     /// 可视窗口Y偏移
@@ -86,7 +86,7 @@ class VirtualCanvas : Control
     void viewY(int v) @property
     {
         _viewY = v.clamp(0, _canvasHeight - height);
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
     
     /// Tile大小
@@ -393,7 +393,7 @@ class VirtualCanvas : Control
             _viewX = newX;
             _viewY = newY;
             // 滚动不需要标记脏，只需移动可视窗口
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
     

@@ -39,7 +39,7 @@ class StringGrid : GridWidgetBase
         _data = data;
         _colCount = cast(int)headers.length;
         _rowCount = cast(int)data.length;
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 设置指定单元格的值
@@ -50,7 +50,7 @@ class StringGrid : GridWidgetBase
         {
             _data[row][col] = value;
         }
-        markDirty(DirtyBits.Visual);
+        markDirty();
     }
 
     /// 获取指定单元格的值
