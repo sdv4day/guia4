@@ -132,7 +132,7 @@ void main()
         hdr3d.fontSize(FONT_HEADER); hdr3d.textColor(COLOR_HEADER);
 
         // 创建3D控件
-        view3d = new Demo3DControl(sec3d, "demo/models/cube.obj");
+        view3d = new Demo3DControl(sec3d, "models/cube.obj");
         view3d.width(400); view3d.height(300);
     }
 
