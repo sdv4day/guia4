@@ -5,6 +5,7 @@ import guia4.guicore;
 import guia4.utils.logger;
 import windows.win32.system.console;
 import std.string;
+import demo3dcontrol;
 
 // ══════════════════════════════════════════════════════════════
 // 布局常量
@@ -119,10 +120,34 @@ void main()
     tabs.addTab("Tab 3", page3);
 
     // ══════════════════════════════════════════════════════════════
+    // Section: 3D Model Viewer
+    // ══════════════════════════════════════════════════════════════
+    Demo3DControl view3d;
+    {
+        auto sec = new Container(scroll);
+        sec.layout(new VerticalLayout(ITEM_SPACING, 0));
+
+        auto hdr = new Label(sec, "—— 3D Model Viewer ——");
+        hdr.width(0); hdr.height(HEADER_HEIGHT);
+        hdr.fontSize(FONT_HEADER); hdr.textColor(COLOR_HEADER);
+
+        // 创建3D控件
+        view3d = new Demo3DControl(sec, "demo/models/cube.obj");
+        view3d.width(400); view3d.height(300);
+    }
+
+    // ══════════════════════════════════════════════════════════════
     // Finalize
     // ══════════════════════════════════════════════════════════════
     logInfo("StringGrid pos=(", grid.position().x(), ",", grid.position().y(), ") size=(", grid.width(), "x", grid.height(), ") visible=", grid.visible(), " rowCount=", grid.rowCount(), " colCount=", grid.colCount());
     window.show();
+
+    // 设置3D自动旋转动画（需要在show之后，因为需要HWND）
+    if (view3d.modelLoaded())
+    {
+        window.setAnim3DCallback(&view3d.advanceFrame);
+        window.startAnim3DTimer(16); // ~60fps
+    }
 
     // 自动截图用于验证修复效果（10秒后截图并关闭）
     window.scheduleScreenshotAndClose(10000, "all_controls_test.bmp");
