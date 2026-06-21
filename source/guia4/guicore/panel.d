@@ -381,14 +381,15 @@ class Panel : Control
         {
             int savedDC = SaveDC(hdc);
             IntersectClipRect(hdc, contentX, contentY, contentX + contentW, contentY + contentH);
-            POINT oldOrigin;
-            // 偏移原点：相对 Panel 本地原点，再减去滚动偏移
-            OffsetViewportOrgEx(hdc, -_scrollX, -_scrollY, &oldOrigin);
 
             foreach (child; children())
             {
-                if (child.visible())
-                    child.renderWithGDI(hdc.Value);
+                if (!child.visible()) continue;
+                POINT oldOrigin;
+                // 每个子控件偏移到其相对位置，再减去滚动偏移
+                OffsetViewportOrgEx(hdc, child.position().x() - _scrollX, child.position().y() - _scrollY, &oldOrigin);
+                child.renderWithGDI(hdc.Value);
+                SetViewportOrgEx(hdc, oldOrigin.x, oldOrigin.y, null);
             }
 
             RestoreDC(hdc, savedDC);
@@ -412,11 +413,14 @@ class Panel : Control
         }
         else
         {
-            // ── 无滚动，直接渲染子控件 ──
+            // ── 无滚动，依次偏移并渲染每个子控件 ──
             foreach (child; children())
             {
-                if (child.visible())
-                    child.renderWithGDI(hdc.Value);
+                if (!child.visible()) continue;
+                POINT oldOrigin;
+                OffsetViewportOrgEx(hdc, child.position().x(), child.position().y(), &oldOrigin);
+                child.renderWithGDI(hdc.Value);
+                SetViewportOrgEx(hdc, oldOrigin.x, oldOrigin.y, null);
             }
         }
     }
