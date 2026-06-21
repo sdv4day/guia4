@@ -2,6 +2,7 @@ module all_controls_demo;
 
 import guia4.app;
 import guia4.guicore;
+import guia4.guicore.panel;
 import guia4.utils.logger;
 import windows.win32.system.console;
 import std.string;
@@ -52,8 +53,8 @@ void main()
     auto window = app.createWindow(WINDOW_X, WINDOW_Y, WINDOW_W, WINDOW_H, "guia4 - All Controls Demo");
 
     // ── 主滚动容器 ──
-    // Container 默认使用 DockStyle.Fill，自动填充剩余空间
-    auto scroll = new Container(window);
+    auto scroll = new Panel(window);
+    scroll.vScroll = true;
     scroll.dock = DockStyle.Fill;
     scroll.layout(new VerticalLayout(SECTION_SPACING, CONTENT_PADDING));
 
