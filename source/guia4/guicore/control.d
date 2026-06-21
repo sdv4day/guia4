@@ -72,7 +72,7 @@ class Control
     private Layer _layer = Layer.Content;
     private Control _parent;
     private Control[] _children;
-    private DirtyFlag _dirty;
+    private DirtyFlag _dirty = DirtyFlag(false);
     private ILayout _layout;
     private bool _layoutRequested = false;  /// 布局请求标志
 
@@ -122,42 +122,39 @@ class Control
 
     // ── 位置 ──────────────────────────────────────────────────────
 
-
     /// Z轴层级
     int z() const nothrow @nogc @property { return _position.z(); }
     void z(int v) nothrow @nogc @property
     {
-        if (_position.z() != v) { _position.z(v); _dirty.mark(DirtyBits.Position); propagateDirty(); }
+        if (_position.z() != v) { _position.z(v); markDirty(); }
     }
     
     /// Position对象访问
     Position position() const nothrow @nogc @property { return _position; }
     void position(Position pos) nothrow @nogc @property
     {
-        if (_position != pos) { _position = pos; _dirty.mark(DirtyBits.Position); propagateDirty(); }
+        if (_position != pos) { _position = pos; markDirty(); }
     }
 
     /// 便捷方法：设置XY坐标
     void setXY(int x, int y) nothrow @nogc
     {
         _position.setXY(x, y);
-        _dirty.mark(DirtyBits.Position);
-        propagateDirty();
+        markDirty();
     }
 
     /// 便捷方法：设置XYZ坐标
     void setXYZ(int x, int y, int z) nothrow @nogc
     {
         _position.set(x, y, z, _position.mode());
-        _dirty.mark(DirtyBits.Position);
-        propagateDirty();
+        markDirty();
     }
 
     /// 定位模式
     PositionMode positionMode() const nothrow @nogc @property { return _position.mode(); }
     void positionMode(PositionMode mode) nothrow @nogc @property
     {
-        if (_position.mode() != mode) { _position.mode(mode); _dirty.mark(DirtyBits.Visual); propagateDirty(); }
+        if (_position.mode() != mode) { _position.mode(mode); markDirty(); }
     }
     
     /// 是否静态定位
@@ -182,12 +179,12 @@ class Control
 
     void width(int v) nothrow @nogc @property
     {
-        if (_width != v) { _width = v; _autoWidth = (v == 0); _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_width != v) { _width = v; _autoWidth = (v == 0); markDirty(); }
     }
 
     void height(int v) nothrow @nogc @property
     {
-        if (_height != v) { _height = v; _autoHeight = (v == 0); _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_height != v) { _height = v; _autoHeight = (v == 0); markDirty(); }
     }
 
     // ── 可见性 ────────────────────────────────────────────────────
@@ -195,7 +192,7 @@ class Control
     bool visible() const nothrow @nogc @property { return _visible; }
     void visible(bool v) nothrow @nogc @property
     {
-        if (_visible != v) { _visible = v; _dirty.mark(DirtyBits.Visibility); propagateDirty(); }
+        if (_visible != v) { _visible = v; markDirty(); }
     }
 
     // ── 子控件渲染控制 ─────────────────────────────────────────────
@@ -210,7 +207,7 @@ class Control
     Layer layer() const nothrow @nogc @property { return _layer; }
     void layer(Layer v) nothrow @nogc @property
     {
-        if (_layer != v) { _layer = v; _dirty.mark(DirtyBits.Visual); propagateDirty(); }
+        if (_layer != v) { _layer = v; markDirty(); }
     }
 
     // ── 焦点 ──────────────────────────────────────────────────────
@@ -223,8 +220,7 @@ class Control
         if (_hasFocus != v)
         {
             _hasFocus = v;
-            _dirty.mark(DirtyBits.Visual);
-            propagateDirty();
+            markDirty();
         }
     }
 
@@ -248,8 +244,7 @@ class Control
             child._dock = DockStyle.Fill;
         }
 
-        _dirty.mark(DirtyBits.Children);
-        propagateDirty();
+        markDirty();
         
         // 请求重新布局
         requestLayout();
@@ -263,8 +258,7 @@ class Control
             {
                 child.parent(null);
                 _children = _children[0 .. i] ~ _children[i + 1 .. $];
-                _dirty.mark(DirtyBits.Children);
-                propagateDirty();
+                markDirty();
                 return;
             }
         }
@@ -323,36 +317,41 @@ class Control
     package bool autoHeight() const nothrow @nogc { return _autoHeight; }
     package void setLayoutWidth(int v) nothrow @nogc
     {
-        if (_width != v) { _width = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_width != v) { _width = v; markDirty(); }
     }
     package void setLayoutHeight(int v) nothrow @nogc
     {
-        if (_height != v) { _height = v; _dirty.mark(DirtyBits.Size); propagateDirty(); }
+        if (_height != v) { _height = v; markDirty(); }
     }
 
     // ── 脏标记 ────────────────────────────────────────────────────
 
+    /// 全局脏控件计数器 — 避免每帧 O(N) 递归检查
+    package static int _globalDirtyCount = 0;
+
     DirtyFlag dirtyFlag() const nothrow @nogc @property { return _dirty; }
     bool isDirty() const nothrow @nogc { return _dirty.isDirty(); }
 
-    void markDirty(DirtyBits bits) nothrow @nogc
+    /// 全局是否有脏控件
+    static bool hasAnyDirty() nothrow @nogc { return _globalDirtyCount > 0; }
+
+    void markDirty() nothrow @nogc
     {
-        _dirty.mark(bits);
-        propagateDirty();
+        if (!_dirty.isDirty())
+            _globalDirtyCount++;
+        _dirty.mark();
+        // 向父控件传播脏标记
+        // 使得 rendersChildren=true 的容器在 dirtyOnly 模式下
+        // 能被正确判断为需要渲染（否则容器自身没脏标记时会被跳过）
+        if (_parent !is null)
+            _parent.markDirty();
     }
 
     void clearDirty() nothrow @nogc
     {
+        if (_dirty.isDirty())
+            _globalDirtyCount--;
         _dirty.clear();
-    }
-
-    /// 向父控件传播脏标记
-    private void propagateDirty() nothrow @nogc
-    {
-        if (_parent !is null && _dirty.isDirty())
-        {
-            _parent.markDirty(DirtyBits.Children);
-        }
     }
     
     // ── Layer Buffer管理 ───────────────────────────────────────────
@@ -591,75 +590,75 @@ class Control
 
     /// 停靠模式
     DockStyle dock() const @property { return _dock; }
-    void dock(DockStyle v) @property { _dock = v; markDirty(DirtyBits.Visual); }
+    void dock(DockStyle v) @property { _dock = v; markDirty(); }
 
     /// 水平对齐
     HAlign hAlign() const @property { return _hAlign; }
-    void hAlign(HAlign v) @property { _hAlign = v; markDirty(DirtyBits.Visual); }
+    void hAlign(HAlign v) @property { _hAlign = v; markDirty(); }
 
     /// 垂直对齐
     VAlign vAlign() const @property { return _vAlign; }
-    void vAlign(VAlign v) @property { _vAlign = v; markDirty(DirtyBits.Visual); }
+    void vAlign(VAlign v) @property { _vAlign = v; markDirty(); }
 
     /// 悬浮模式
     FloatMode floatMode() const @property { return _floatMode; }
-    void floatMode(FloatMode v) @property { _floatMode = v; markDirty(DirtyBits.Visual); }
+    void floatMode(FloatMode v) @property { _floatMode = v; markDirty(); }
 
     /// 外边距（控件与父容器的间距）
     int marginTop() const @property { return _marginTop; }
-    void marginTop(int v) @property { _marginTop = v; markDirty(DirtyBits.Visual); }
+    void marginTop(int v) @property { _marginTop = v; markDirty(); }
     int marginBottom() const @property { return _marginBottom; }
-    void marginBottom(int v) @property { _marginBottom = v; markDirty(DirtyBits.Visual); }
+    void marginBottom(int v) @property { _marginBottom = v; markDirty(); }
     int marginLeft() const @property { return _marginLeft; }
-    void marginLeft(int v) @property { _marginLeft = v; markDirty(DirtyBits.Visual); }
+    void marginLeft(int v) @property { _marginLeft = v; markDirty(); }
     int marginRight() const @property { return _marginRight; }
-    void marginRight(int v) @property { _marginRight = v; markDirty(DirtyBits.Visual); }
+    void marginRight(int v) @property { _marginRight = v; markDirty(); }
 
     /// 设置四边外边距（便捷方法）
-    void margin(int all) @property { _marginTop = _marginBottom = _marginLeft = _marginRight = all; markDirty(DirtyBits.Visual); }
-    void setMargin(int top, int right, int bottom, int left) { _marginTop = top; _marginRight = right; _marginBottom = bottom; _marginLeft = left; markDirty(DirtyBits.Visual); }
+    void margin(int all) @property { _marginTop = _marginBottom = _marginLeft = _marginRight = all; markDirty(); }
+    void setMargin(int top, int right, int bottom, int left) { _marginTop = top; _marginRight = right; _marginBottom = bottom; _marginLeft = left; markDirty(); }
 
     /// 内边距（控件内容区与边界的间距）
     int paddingTop() const @property { return _paddingTop; }
-    void paddingTop(int v) @property { _paddingTop = v; markDirty(DirtyBits.Visual); }
+    void paddingTop(int v) @property { _paddingTop = v; markDirty(); }
     int paddingBottom() const @property { return _paddingBottom; }
-    void paddingBottom(int v) @property { _paddingBottom = v; markDirty(DirtyBits.Visual); }
+    void paddingBottom(int v) @property { _paddingBottom = v; markDirty(); }
     int paddingLeft() const @property { return _paddingLeft; }
-    void paddingLeft(int v) @property { _paddingLeft = v; markDirty(DirtyBits.Visual); }
+    void paddingLeft(int v) @property { _paddingLeft = v; markDirty(); }
     int paddingRight() const @property { return _paddingRight; }
-    void paddingRight(int v) @property { _paddingRight = v; markDirty(DirtyBits.Visual); }
+    void paddingRight(int v) @property { _paddingRight = v; markDirty(); }
 
     /// 设置四边内边距（便捷方法）
-    void padding(int all) @property { _paddingTop = _paddingBottom = _paddingLeft = _paddingRight = all; markDirty(DirtyBits.Visual); }
-    void setPadding(int top, int right, int bottom, int left) { _paddingTop = top; _paddingRight = right; _paddingBottom = bottom; _paddingLeft = left; markDirty(DirtyBits.Visual); }
+    void padding(int all) @property { _paddingTop = _paddingBottom = _paddingLeft = _paddingRight = all; markDirty(); }
+    void setPadding(int top, int right, int bottom, int left) { _paddingTop = top; _paddingRight = right; _paddingBottom = bottom; _paddingLeft = left; markDirty(); }
 
     /// 最小尺寸
     int minWidth() const @property { return _minWidth; }
-    void minWidth(int v) @property { _minWidth = v; markDirty(DirtyBits.Visual); }
+    void minWidth(int v) @property { _minWidth = v; markDirty(); }
     int minHeight() const @property { return _minHeight; }
-    void minHeight(int v) @property { _minHeight = v; markDirty(DirtyBits.Visual); }
+    void minHeight(int v) @property { _minHeight = v; markDirty(); }
 
     /// 最大尺寸（0 = 无限制）
     int maxWidth() const @property { return _maxWidth; }
-    void maxWidth(int v) @property { _maxWidth = v; markDirty(DirtyBits.Visual); }
+    void maxWidth(int v) @property { _maxWidth = v; markDirty(); }
     int maxHeight() const @property { return _maxHeight; }
-    void maxHeight(int v) @property { _maxHeight = v; markDirty(DirtyBits.Visual); }
+    void maxHeight(int v) @property { _maxHeight = v; markDirty(); }
 
     /// 水平权重（用于弹性布局，按比例分配剩余空间）
     float weightX() const @property { return _weightX; }
-    void weightX(float v) @property { _weightX = v; markDirty(DirtyBits.Visual); }
+    void weightX(float v) @property { _weightX = v; markDirty(); }
 
     /// 垂直权重
     float weightY() const @property { return _weightY; }
-    void weightY(float v) @property { _weightY = v; markDirty(DirtyBits.Visual); }
+    void weightY(float v) @property { _weightY = v; markDirty(); }
 
     /// 网格跨列数
     int spanX() const @property { return _spanX; }
-    void spanX(int v) @property { _spanX = v < 1 ? 1 : v; markDirty(DirtyBits.Visual); }
+    void spanX(int v) @property { _spanX = v < 1 ? 1 : v; markDirty(); }
 
     /// 网格跨行数
     int spanY() const @property { return _spanY; }
-    void spanY(int v) @property { _spanY = v < 1 ? 1 : v; markDirty(DirtyBits.Visual); }
+    void spanY(int v) @property { _spanY = v < 1 ? 1 : v; markDirty(); }
 
     // ── 构造/渲染/命中测试 ────────────────────────────────────────
 
@@ -667,7 +666,7 @@ class Control
     protected this()
     {
         _children = [];
-        _dirty.mark(DirtyBits.All);
+        markDirty();
     }
 
     /// 带父级参数的构造函数（推荐使用）
@@ -675,7 +674,7 @@ class Control
     this(Control parent)
     {
         _children = [];
-        _dirty.mark(DirtyBits.All);
+        markDirty();
         if (parent !is null)
         {
             parent.addChild(this);
@@ -683,20 +682,15 @@ class Control
     }
     
     /**
-     * 析构函数 — 仅断开引用链
+     * 析构函数 — 信赖 GC，将引用置 null 交给 GC 处理
      * 
-     * 注意：不在析构函数中调用 GDI API（如 DeleteDC, DeleteObject），
-     * 因为 GC 可能在 D 运行时的模块析构阶段析构对象，此时调用
-     * GDI API 可能导致访问冲突。
-     * 
-     * 同时，不遍历 _children 数组，因为子对象可能已经被析构。
-     * 正确的做法是在控件被移除时显式调用 destroyLayerBuffer() 方法。
+     * 充分信赖 GC，不需要自行释放内存，将 GC 托管的引用置 null 即可。
+     * 但注意：动态数组（如 _children）置 null 会触发 GC 内存操作，
+     * 在 GC finalization 阶段是非法的，所以不能在此处置 null。
+     * GC 会在 finalization 阶段自动处理这些资源。
      */
     ~this()
     {
-        // 仅清空引用，不遍历子对象
-        // GC 会自动回收所有对象
-        _children = null;
         _parent = null;
     }
 

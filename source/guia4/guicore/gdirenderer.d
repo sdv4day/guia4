@@ -76,7 +76,7 @@ class GdiPlatformRenderer : IPlatformRenderer
     {
         HDC hdc = HDC(dc);
         RECT rect = {x, y, x + w, y + h};
-        HBRUSH brush = CreateSolidBrush(color.toCOLORREF());
+        HBRUSH brush = CreateSolidBrush(COLORREF(color.toBGR()));
         FillRect(hdc, &rect, brush);
         DeleteObject(cast(HGDIOBJ)brush);
     }
@@ -84,7 +84,7 @@ class GdiPlatformRenderer : IPlatformRenderer
     void drawRect(void* dc, int x, int y, int w, int h, Color color)
     {
         HDC hdc = HDC(dc);
-        HPEN pen = CreatePen(PS_SOLID, 1, color.toCOLORREF());
+        HPEN pen = CreatePen(PS_SOLID, 1, COLORREF(color.toBGR()));
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)pen);
 
         // 绘制矩形边框
@@ -101,7 +101,7 @@ class GdiPlatformRenderer : IPlatformRenderer
     void drawLine(void* dc, int x1, int y1, int x2, int y2, Color color)
     {
         HDC hdc = HDC(dc);
-        HPEN pen = CreatePen(PS_SOLID, 1, color.toCOLORREF());
+        HPEN pen = CreatePen(PS_SOLID, 1, COLORREF(color.toBGR()));
         HGDIOBJ oldPen = SelectObject(hdc, cast(HGDIOBJ)pen);
 
         MoveToEx(hdc, x1, y1, null);
@@ -114,7 +114,7 @@ class GdiPlatformRenderer : IPlatformRenderer
     void drawText(void* dc, int x, int y, string text, Color color)
     {
         HDC hdc = HDC(dc);
-        SetTextColor(hdc, color.toCOLORREF());
+        SetTextColor(hdc, COLORREF(color.toBGR()));
         SetBkMode(hdc, TRANSPARENT);
 
         auto wtext = toUTF16(text);
@@ -179,9 +179,9 @@ class GdiPlatformRenderer : IPlatformRenderer
 
         HFONT font = CreateFontIndirectW(&lf);
         HGDIOBJ oldFont = SelectObject(hdc, cast(HGDIOBJ)font);
-
-        // 注意:这里没有删除旧字体,调用者负责管理字体生命周期
-        // 在实际使用中,应该使用字体缓存来管理字体对象
+        if (oldFont.Value !is null)
+            DeleteObject(oldFont);
+        DeleteObject(cast(HGDIOBJ)font);
     }
 }
 

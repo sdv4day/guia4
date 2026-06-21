@@ -95,28 +95,28 @@ class Panel : Control
     // ── 属性 ─────────────────────────────────────────────────────
 
     string title() const @property { return _title; }
-    void title(string v) @property { _title = v; _titleHeight = v.length > 0 ? 24 : 0; markDirty(DirtyBits.Visual); }
+    void title(string v) @property { _title = v; _titleHeight = v.length > 0 ? 24 : 0; markDirty(); }
 
     COLORREF bgColor() const @property { return _bgColor; }
-    void bgColor(COLORREF v) @property { _bgColor = v; markDirty(DirtyBits.Visual); }
+    void bgColor(COLORREF v) @property { _bgColor = v; markDirty(); }
 
     COLORREF borderColor() const @property { return _borderColor; }
-    void borderColor(COLORREF v) @property { _borderColor = v; markDirty(DirtyBits.Visual); }
+    void borderColor(COLORREF v) @property { _borderColor = v; markDirty(); }
 
     int borderWidth() const @property { return _borderWidth; }
-    void borderWidth(int v) @property { _borderWidth = v; markDirty(DirtyBits.Visual); }
+    void borderWidth(int v) @property { _borderWidth = v; markDirty(); }
 
     int borderRadius() const @property { return _borderRadius; }
-    void borderRadius(int v) @property { _borderRadius = v; markDirty(DirtyBits.Visual); }
+    void borderRadius(int v) @property { _borderRadius = v; markDirty(); }
 
 
     // ── 滚动条使能属性 ──
 
     bool vScroll() const @property { return _vScroll; }
-    void vScroll(bool v) @property { _vScroll = v; markDirty(DirtyBits.Visual); }
+    void vScroll(bool v) @property { _vScroll = v; markDirty(); }
 
     bool hScroll() const @property { return _hScroll; }
-    void hScroll(bool v) @property { _hScroll = v; markDirty(DirtyBits.Visual); }
+    void hScroll(bool v) @property { _hScroll = v; markDirty(); }
 
     // ── 滚动偏移属性 ──
 
@@ -133,7 +133,7 @@ class Panel : Control
     // ── 自动内容尺寸属性 ──
 
     bool autoSizeContent() const @property { return _autoSizeContent; }
-    void autoSizeContent(bool v) @property { _autoSizeContent = v; markDirty(DirtyBits.Visual); }
+    void autoSizeContent(bool v) @property { _autoSizeContent = v; markDirty(); }
 
     // ── ScrollBar 同步辅助 ──
 
@@ -169,7 +169,7 @@ class Panel : Control
         {
             _scrollY = newSY;
             _scrollX = newSX;
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 
@@ -264,7 +264,7 @@ class Panel : Control
                 _scrollY = (_scrollY - 20).clamp(0, maxY);
             else
                 _scrollY = (_scrollY + 20).clamp(0, maxY);
-            markDirty(DirtyBits.Visual);
+            markDirty();
         }
     }
 

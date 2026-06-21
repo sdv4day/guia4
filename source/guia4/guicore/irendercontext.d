@@ -3,107 +3,136 @@ module guia4.guicore.irendercontext;
 import guia4.guicore.color;
 
 /**
- * IRenderContext — 抽象渲染上下文接口
+ * IRenderContext — 跨平台抽象渲染上下文接口
  *
- * 目的：解耦控件对 GDI（HDC/HBITMAP 等）的直接依赖，
- * 为未来支持其他渲染后端（如 Cairo、Skia）预留扩展点。
+ * 设计目标：
+ * - 控件只通过此接口渲染，不直接调用任何平台 API
+ * - 支持 GDI（Windows）、Cairo（Linux）、Vulkan 等后端
+ * - 无 void* 或平台特定类型泄露到接口中
  *
- * 设计原则：
- * - 只暴露控件渲染所需的最小接口集
- * - 不暴露平台特定类型（如 HDC、HBITMAP）
- * - 使用 void* 作为不透明句柄，由具体实现解释
+ * 使用原则：
+ * - 控件在 renderWithGDI(void* hdc) 中创建 IRenderContext 实例
+ * - 所有绘制操作通过 IRenderContext 方法完成
+ * - 状态管理（save/restore/clip）通过接口方法完成
  */
 interface IRenderContext
 {
-    /// 获取原生渲染设备句柄（不透明，由具体实现解释）
-    /// 对于 GDI 后端，返回 HDC；对于其他后端，返回相应的上下文
-    void* nativeHandle();
+    // ── 尺寸 ──────────────────────────────────────────────
 
-    /// 获取渲染目标的宽度（像素）
+    /// 渲染目标宽度（像素）
     int width() const;
 
-    /// 获取渲染目标的高度（像素）
+    /// 渲染目标高度（像素）
     int height() const;
 
-    // ── 基础绘图操作 ─────────────────────────────────────
+    // ── 绘图基元 ─────────────────────────────────────────
 
     /// 填充矩形
     void fillRect(int x, int y, int w, int h, Color color);
 
-    /// 绘制矩形边框
-    void drawRect(int x, int y, int w, int h, Color color);
+    /// 绘制矩形边框（1px 线宽）
+    void drawRect(int x, int y, int w, int h, Color color, int lineWidth = 1);
+
+    /// 绘制圆角矩形边框
+    void drawRoundRect(int x, int y, int w, int h, int radius, Color color, int lineWidth = 1);
+
+    /// 填充圆角矩形
+    void fillRoundRect(int x, int y, int w, int h, int radius, Color color);
+
+    /// 绘制椭圆边框
+    void drawEllipse(int x, int y, int w, int h, Color color, int lineWidth = 1);
+
+    /// 填充椭圆
+    void fillEllipse(int x, int y, int w, int h, Color color);
 
     /// 绘制直线
-    void drawLine(int x1, int y1, int x2, int y2, Color color);
+    void drawLine(int x1, int y1, int x2, int y2, Color color, int lineWidth = 1);
 
-    /// 绘制文本
+    /// 绘制多段线
+    void drawPolyline(int[] points, Color color, int lineWidth = 1);
+
+    // ── 文本操作 ─────────────────────────────────────────
+
+    /// 设置当前字体（返回之前设置的字体 ID）
+    int setFont(string family, int size, int weight = 400);
+
+    /// 恢复之前的字体
+    void restoreFont(int fontId);
+
+    /// 绘制文本（使用当前字体）
     void drawText(int x, int y, string text, Color color);
 
-    /// 测量文本尺寸
+    /// 测量文本尺寸（使用当前字体）
     void measureText(string text, out int w, out int h);
 
-    // ── Layer Buffer 管理 ───────────────────────────────
+    /// 测量单个字符宽度
+    void measureChar(dchar ch, out int w, out int h);
 
-    /// 创建 layer buffer（用于双缓冲渲染）
-    /// refHandle: 参考设备上下文（用于创建兼容 DC）
-    void createLayerBuffer(void* refHandle, int w, int h);
+    // ── 状态管理 ─────────────────────────────────────────
 
-    /// 销毁 layer buffer
-    void destroyLayerBuffer();
+    /// 保存当前渲染状态（字体、裁剪、视口等）
+    int saveState();
 
-    /// 获取 layer buffer 的原生句柄
-    void* layerBufferHandle();
+    /// 恢复之前保存的状态
+    void restoreState(int stateId);
 
-    /// 将 layer buffer 内容复制到目标
-    void blitToTarget(int srcX, int srcY, int srcW, int srcH,
-                      int dstX, int dstY);
-
-    // ── 裁剪区域 ─────────────────────────────────────────
-
-    /// 设置裁剪矩形
+    /// 设置裁剪矩形（交集）
     void setClipRect(int x, int y, int w, int h);
 
     /// 清除裁剪区域
     void clearClipRect();
+
+    /// 偏移视口原点
+    void setViewportOrigin(int x, int y);
+
+    /// 恢复视口原点
+    void resetViewportOrigin();
+
+    // ── 位图操作 ─────────────────────────────────────────
+
+    /// 创建兼容的内存 DC（用于双缓冲）
+    void* createCompatibleDC();
+
+    /// 释放内存 DC
+    void releaseCompatibleDC(void* dc);
+
+    /// 创建兼容位图
+    void* createCompatibleBitmap(void* dc, int w, int h);
+
+    /// 释放位图
+    void releaseBitmap(void* bmp);
+
+    /// 选择位图到 DC
+    void* selectBitmap(void* dc, void* bmp);
+
+    /// BitBlt 位块传输
+    void bitBlt(void* dstDC, int dstX, int dstY, int dstW, int dstH,
+                void* srcDC, int srcX, int srcY);
+
+    // ── 裁剪区域（高级）──────────────────────────────────
+
+    /// 创建矩形裁剪区域
+    void* createClipRegion(int x, int y, int w, int h);
+
+    /// 应用裁剪区域
+    void applyClipRegion(void* region);
+
+    /// 释放裁剪区域
+    void releaseClipRegion(void* region);
 }
 
 /**
- * LayerBuffer — Layer 缓冲区管理器
+ * IPlatformRenderer — 平台渲染器接口
  *
- * 封装 GDI layer buffer 的创建、销毁和复用逻辑。
- * 用于需要双缓冲渲染的控件。
+ * 用于创建和管理 IRenderContext 实例。
+ * 每个平台后端（GDI、Cairo、Vulkan）实现此接口。
  */
-struct LayerBuffer
+interface IPlatformRenderer
 {
-    private void* _dc;          // HDC (GDI) 或其他后端的等价物
-    private void* _bitmap;      // HBITMAP (GDI) 或其他后端的等价物
-    private void* _oldBitmap;   // 原始位图（用于恢复）
-    private int _width = 0;
-    private int _height = 0;
+    /// 从原生句柄创建渲染上下文
+    /// nativeHandle: HDC (GDI), cairo_t* (Cairo), VkCommandBuffer (Vulkan)
+    IRenderContext createContext(void* nativeHandle, int width, int height);
 
-    /// 是否已初始化
-    bool isInitialized() const { return _dc !is null; }
-
-    /// 获取宽度
-    int width() const { return _width; }
-
-    /// 获取高度
-    int height() const { return _height; }
-
-    /// 获取原生 DC 句柄
-    void* nativeDC() { return _dc; }
-
-    /// 创建 layer buffer（GDI 实现）
-    /// 注意：此方法包含 GDI 特定代码，应移到平台层
-    /// 这里保留为占位符，实际实现在 GdiLayerBuffer 中
-    void create(void* refDC, int w, int h)
-    {
-        // 占位符 - 实际实现在 GdiLayerBuffer
-    }
-
-    /// 销毁 layer buffer
-    void destroy()
-    {
-        // 占位符 - 实际实现在 GdiLayerBuffer
-    }
+    /// 销毁渲染上下文
+    void destroyContext(IRenderContext ctx);
 }

@@ -39,6 +39,7 @@ class LayerCompositor
     private HGDIOBJ _historyOldBmp;     // 原始位图
     
     private bool _initialized = false;
+    private Control[] _sortedCache;  // 排序缓存，避免每次composite都dup+sort
     
     // ── Camera（可视窗口）────────────────────────────────────────
     private int _cameraX = 0;           // Camera在世界中的X位置
@@ -111,8 +112,11 @@ class LayerCompositor
             if (_outputBmp.Value !is null)
                 DeleteObject(cast(HGDIOBJ)_outputBmp);
             DeleteDC(_outputDC);
+            _outputDC = HDC.init;
+            _outputBmp = HBITMAP.init;
+            _outputOldBmp = HGDIOBJ.init;
         }
-        
+
         if (_historyDC.Value !is null)
         {
             if (_historyOldBmp.Value !is null)
@@ -120,8 +124,11 @@ class LayerCompositor
             if (_historyBmp.Value !is null)
                 DeleteObject(cast(HGDIOBJ)_historyBmp);
             DeleteDC(_historyDC);
+            _historyDC = HDC.init;
+            _historyBmp = HBITMAP.init;
+            _historyOldBmp = HGDIOBJ.init;
         }
-        
+
         _initialized = false;
     }
     
@@ -150,11 +157,14 @@ class LayerCompositor
         }
         
         // 2. 按layer排序（z轴顺序，低layer先渲染）
-        auto sorted = controls.dup;
-        sorted.sort!((a, b) => cast(int)a.layer() < cast(int)b.layer());
+        // 复用缓存，避免每次dup+sort产生GC压力
+        if (_sortedCache.length != controls.length)
+            _sortedCache = new Control[](controls.length);
+        _sortedCache[] = controls[];
+        _sortedCache[].sort!((a, b) => cast(int)a.layer() < cast(int)b.layer());
         
         // 3. 依次合成各layer
-        foreach (ctrl; sorted)
+        foreach (ctrl; _sortedCache[0 .. controls.length])
         {
             if (!ctrl.visible())
                 continue;
@@ -198,10 +208,7 @@ class LayerCompositor
         }
         
         // 检查控件是否需要更新layer buffer
-        // Visual 脏标记：控件自身视觉状态变化（如 hover、pressed）
-        // Children 脏标记：子控件状态变化，需要重新渲染 layer buffer
-        bool needUpdateBuffer = ctrl.dirtyFlag().isDirty(DirtyBits.Visual) ||
-                                ctrl.dirtyFlag().isDirty(DirtyBits.Children);
+        bool needUpdateBuffer = ctrl.isDirty();
         
         if (ctrl.hasLayerBuffer())
         {
@@ -236,23 +243,30 @@ class LayerCompositor
         }
         else
         {
-            // ✅ 检查脏标记（如果dirtyOnly=true）
-            if (dirtyOnly && !ctrl.isDirty())
-                return;  // 不是脏控件且要求只渲染脏控件，跳过
-            
             // 控件没有独立buffer，直接渲染到输出buffer
-            SaveDC(_outputDC);
+            // dirtyOnly 模式：只渲染自身如果它是脏的，但始终递归子控件
+            bool renderSelf = !dirtyOnly || ctrl.isDirty();
             
-            // 设置裁剪区域（相对于Camera）
-            IntersectClipRect(_outputDC, screenX, screenY, 
-                             screenX + ctrl.width(), screenY + ctrl.height());
+            if (renderSelf)
+            {
+                SaveDC(_outputDC);
+
+                // 设置裁剪区域（相对于Camera）
+                IntersectClipRect(_outputDC, screenX, screenY,
+                                 screenX + ctrl.width(), screenY + ctrl.height());
+
+                // 偏移视口到控件屏幕位置，使控件使用相对坐标 (0,0) 绘制
+                POINT oldOrigin;
+                OffsetViewportOrgEx(_outputDC, screenX, screenY, &oldOrigin);
+
+                // 渲染控件
+                ctrl.renderWithGDI(_outputDC.Value);
+
+                SetViewportOrgEx(_outputDC, oldOrigin.x, oldOrigin.y, null);
+                RestoreDC(_outputDC, -1);
+            }
             
-            // 渲染控件
-            ctrl.renderWithGDI(_outputDC.Value);
-            
-            RestoreDC(_outputDC, -1);
-            
-            // 只有没有layer buffer且控件不自己渲染子控件时，才递归渲染子控件
+            // 始终递归子控件 — 每个子控件独立检查自己的脏标记
             if (!ctrl.rendersChildren())
             {
                 foreach (child; ctrl.children())
